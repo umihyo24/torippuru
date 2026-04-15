@@ -86,50 +86,50 @@
 
   const MOVES = {
     clawStrike: {
-      id: "clawStrike", name: "Claw Strike", category: "attack", type: "fire", power: 32,
+      id: "clawStrike", name: "クロー・ストライク", category: "attack", type: "fire", power: 32,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     drainBite: {
-      id: "drainBite", name: "Drain Bite", category: "attack", type: "nature", power: 28,
+      id: "drainBite", name: "ドレインバイト", category: "attack", type: "nature", power: 28,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }]
     },
     quakeWave: {
-      id: "quakeWave", name: "Quake Wave", category: "attack", type: "earth", power: 24,
+      id: "quakeWave", name: "クエイクウェーブ", category: "attack", type: "earth", power: 24,
       patternId: "front3", targetRule: "enemy", targetMode: "allPattern",
       beforeDamage: [], afterDamage: []
     },
     frostLance: {
-      id: "frostLance", name: "Frost Lance", category: "attack", type: "water", power: 34,
+      id: "frostLance", name: "フロストランス", category: "attack", type: "water", power: 34,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     toxicSpit: {
-      id: "toxicSpit", name: "Toxic Spit", category: "attack", type: "shadow", power: 18,
+      id: "toxicSpit", name: "トキシックスピット", category: "attack", type: "shadow", power: 18,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     ironGuard: {
-      id: "ironGuard", name: "Iron Guard", category: "status", type: "earth", power: 0,
+      id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0,
       patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }],
       afterDamage: []
     },
     rallyHowl: {
-      id: "rallyHowl", name: "Rally Howl", category: "status", type: "light", power: 0,
+      id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0,
       patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
       afterDamage: []
     },
     shellStance: {
-      id: "shellStance", name: "Shell Stance", category: "status", type: "water", power: 0,
+      id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0,
       patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }],
       afterDamage: []
     },
     venomBless: {
-      id: "venomBless", name: "Venom Bless", category: "status", type: "shadow", power: 0,
+      id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0,
       patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
       afterDamage: []
@@ -155,16 +155,16 @@
   };
 
   const UNIT_LIBRARY = {
-    emberlynx: { id: "emberlynx", name: "Ember Lynx", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    mossblob: { id: "mossblob", name: "Moss Blob", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
-    frostfang: { id: "frostfang", name: "Frost Fang", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
-    stormimp: { id: "stormimp", name: "Storm Imp", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "venomBless", "ironGuard"] },
-    ironboar: { id: "ironboar", name: "Iron Boar", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
-    wyvern: { id: "wyvern", name: "Blue Wyvern", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    golem: { id: "golem", name: "Rock Golem", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
-    thunderroc: { id: "thunderroc", name: "Thunder Roc", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
-    venomtoad: { id: "venomtoad", name: "Venom Toad", portrait: "venomtoad", hp: 92, atk: 29, def: 27, spd: 20, abilityId: "venomTouch", moves: ["toxicSpit", "drainBite", "ironGuard", "rallyHowl"] },
-    duskmoth: { id: "duskmoth", name: "Dusk Moth", portrait: "duskmoth", hp: 74, atk: 32, def: 19, spd: 41, abilityId: null, moves: ["toxicSpit", "frostLance", "venomBless", "shellStance"] }
+    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
+    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
+    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "venomBless", "ironGuard"] },
+    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
+    thunderroc: { id: "thunderroc", name: "サンダーロック", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
+    venomtoad: { id: "venomtoad", name: "ベノムトード", portrait: "venomtoad", hp: 92, atk: 29, def: 27, spd: 20, abilityId: "venomTouch", moves: ["toxicSpit", "drainBite", "ironGuard", "rallyHowl"] },
+    duskmoth: { id: "duskmoth", name: "ダスクモス", portrait: "duskmoth", hp: 74, atk: 32, def: 19, spd: 41, abilityId: null, moves: ["toxicSpit", "frostLance", "venomBless", "shellStance"] }
   };
 
   // ------------------------------------------------------------
@@ -307,24 +307,24 @@
   };
 
   const STATUS_LABELS = {
-    poison: "poison",
-    barrier: "barrier",
-    atkUp: "attack boost",
-    defUp: "defense boost"
+    poison: "どく",
+    barrier: "バリア",
+    atkUp: "こうげきアップ",
+    defUp: "ぼうぎょアップ"
   };
 
   const STATUS_APPLY_TEXT = {
-    poison: (name) => `${name} was poisoned!`,
-    barrier: (name) => `${name} was protected by a barrier!`,
-    atkUp: (name) => `${name}'s Attack rose!`,
-    defUp: (name) => `${name}'s Defense rose!`
+    poison: (name) => `${name}は どく状態になった！`,
+    barrier: (name) => `${name}は バリアに守られた！`,
+    atkUp: (name) => `${name}の こうげきが上がった！`,
+    defUp: (name) => `${name}の ぼうぎょが上がった！`
   };
 
   const STATUS_FADE_TEXT = {
-    poison: (name) => `${name} recovered from poison.`,
-    barrier: (name) => `${name}'s barrier faded.`,
-    atkUp: (name) => `${name}'s attack boost faded.`,
-    defUp: (name) => `${name}'s defense boost faded.`
+    poison: (name) => `${name}の どく状態が治った。`,
+    barrier: (name) => `${name}の バリアが消えた。`,
+    atkUp: (name) => `${name}の こうげきアップが切れた。`,
+    defUp: (name) => `${name}の ぼうぎょアップが切れた。`
   };
 
   const asLogTeam = (team) => (team === TEAM.ALLY ? LOG_TEAM.ALLY : team === TEAM.ENEMY ? LOG_TEAM.ENEMY : LOG_TEAM.NEUTRAL);
@@ -340,7 +340,7 @@
     team: asLogTeam(team),
     actor,
     move,
-    title: `${actor} used ${move}!`,
+    title: `${actor}の ${move}！`,
     lines: []
   });
 
@@ -355,7 +355,7 @@
     trimLog();
   };
 
-  const pushSystemLog = (lines, title = "Battle Event", team = LOG_TEAM.NEUTRAL) => {
+  const pushSystemLog = (lines, title = "バトルイベント", team = LOG_TEAM.NEUTRAL) => {
     if (!lines || lines.length === 0) return;
     commitLogEntry({
       type: "system",
@@ -458,7 +458,7 @@
     }
     if (effect.type === "drain" && target) {
       healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
-      if (actionLog) appendActionLine(actionLog, `${actor.name} restored some HP!`);
+      if (actionLog) appendActionLine(actionLog, `${actor.name}は 体力を回復した！`);
     }
   };
 
@@ -480,7 +480,7 @@
       }
     });
     if (lines.length > 0) {
-      pushSystemLog(lines, `${unit.name}'s ability activated!`, asLogTeam(unit.team));
+      pushSystemLog(lines, `${unit.name}の とくせいが発動！`, asLogTeam(unit.team));
     }
   };
 
@@ -509,7 +509,7 @@
       if (move.category === "attack") {
         dealt = calcDamage(actor, target, move);
         setHp(target, target.hp - dealt);
-        appendActionLine(actionLog, `It hit ${target.name}!`);
+        appendActionLine(actionLog, `${target.name}に 命中！`);
       }
 
       move.afterDamage.forEach((effectTemplate) => {
@@ -518,9 +518,9 @@
       });
 
       triggerAbilityHook(actor, "onAfterDamage", { target });
-      if (!isAlive(target)) appendActionLine(actionLog, `${target.name} fainted!`);
+      if (!isAlive(target)) appendActionLine(actionLog, `${target.name}は たおれた！`);
     });
-    if (actionLog.lines.length === 0) appendActionLine(actionLog, "But nothing happened.");
+    if (actionLog.lines.length === 0) appendActionLine(actionLog, "しかし 何も起こらなかった。");
     commitLogEntry(actionLog);
   };
 
@@ -540,9 +540,9 @@
       type: "action",
       team: asLogTeam(action.team),
       actor: reserve.name,
-      move: "Switch",
-      title: `${reserve.name} switched in!`,
-      lines: outgoing ? [`${outgoing.name} switched out.`] : []
+      move: "交代",
+      title: `${reserve.name}が 繰り出された！`,
+      lines: outgoing ? [`${outgoing.name}は 引っ込んだ。`] : []
     });
 
   };
@@ -567,15 +567,15 @@
         if (getStatusByKind(unit, "poison")) {
           const poisonDmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
           setHp(unit, unit.hp - poisonDmg);
-          systemLines.push(`${unit.name} was hurt by poison!`);
-          if (!isAlive(unit)) systemLines.push(`${unit.name} fainted!`);
+          systemLines.push(`${unit.name}は どくのダメージを受けた！`);
+          if (!isAlive(unit)) systemLines.push(`${unit.name}は たおれた！`);
         }
 
         unit.statuses.forEach((s) => { s.duration -= 1; });
         unit.statuses
           .filter((s) => s.duration <= 0)
           .forEach((s) => {
-            const toText = STATUS_FADE_TEXT[s.kind] || ((name) => `${name}'s ${STATUS_LABELS[s.kind] || s.kind} faded.`);
+            const toText = STATUS_FADE_TEXT[s.kind] || ((name) => `${name}の ${STATUS_LABELS[s.kind] || s.kind}が消えた。`);
             systemLines.push(toText(unit.name));
           });
         unit.statuses = removeExpiredStatuses(unit.statuses);
@@ -585,7 +585,7 @@
       teamState.statuses
         .filter((s) => s.duration <= 0)
         .forEach((s) => {
-          systemLines.push(`The ${team === TEAM.ALLY ? "allied" : "enemy"} ${STATUS_LABELS[s.kind] || s.kind} faded.`);
+          systemLines.push(`${team === TEAM.ALLY ? "味方側" : "敵側"}の ${STATUS_LABELS[s.kind] || s.kind}が切れた。`);
         });
       teamState.statuses = removeExpiredStatuses(teamState.statuses);
     });
@@ -594,10 +594,10 @@
     gameState.globalStatuses
       .filter((s) => s.duration <= 0)
       .forEach((s) => {
-        systemLines.push(`The ${STATUS_LABELS[s.kind] || s.kind} faded.`);
+        systemLines.push(`${STATUS_LABELS[s.kind] || s.kind}が消えた。`);
       });
     gameState.globalStatuses = removeExpiredStatuses(gameState.globalStatuses);
-    pushSystemLog(systemLines, "End of turn effects", LOG_TEAM.NEUTRAL);
+    pushSystemLog(systemLines, "ターン終了時の効果", LOG_TEAM.NEUTRAL);
   };
 
   const checkWinLose = () => {
@@ -926,7 +926,7 @@
   const formatEnemyHpPercent = (unit) => `${Math.round((unit.hp / unit.maxHp) * 100)}%`;
   const formatAllyHp = (unit) => `${unit.hp} / ${unit.maxHp}`;
   const formatHpByTeam = (unit) => unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit) : formatAllyHp(unit);
-  const statusText = (status) => `${STATUS_LABELS[status.kind] || status.kind} (${status.duration} turn${status.duration === 1 ? "" : "s"})`;
+  const statusText = (status) => `${STATUS_LABELS[status.kind] || status.kind}（${status.duration}ターン）`;
   const toJaMoveName = (move) => move.name;
   const MOVE_TARGET_DESCRIPTION = {
     front: "単体 / 前方",
@@ -968,7 +968,7 @@
   const createStatusList = (items) => {
     const list = createEl("div", "field-list");
     if (!items || items.length === 0) {
-      list.appendChild(createEl("div", "field-empty", "None"));
+      list.appendChild(createEl("div", "field-empty", "なし"));
       return list;
     }
     items.forEach((status) => {
@@ -979,27 +979,27 @@
 
   const renderFieldStatusPanel = () => {
     const panel = createEl("div", "field-panel");
-    panel.appendChild(createEl("div", "field-title", "Field Status"));
+    panel.appendChild(createEl("div", "field-title", "フィールド状態"));
 
     const buckets = getFieldStatusBuckets();
 
     const weatherRow = createEl("div", "field-row");
-    weatherRow.appendChild(createEl("div", "field-row-title", "Weather"));
+    weatherRow.appendChild(createEl("div", "field-row-title", "天候"));
     weatherRow.appendChild(createStatusList(buckets.weather));
     panel.appendChild(weatherRow);
 
     const fieldRow = createEl("div", "field-row");
-    fieldRow.appendChild(createEl("div", "field-row-title", "Field Effects"));
+    fieldRow.appendChild(createEl("div", "field-row-title", "フィールド効果"));
     fieldRow.appendChild(createStatusList(buckets.field));
     panel.appendChild(fieldRow);
 
     const allyRow = createEl("div", "field-row");
-    allyRow.appendChild(createEl("div", "field-row-title", "Allies"));
+    allyRow.appendChild(createEl("div", "field-row-title", "味方"));
     allyRow.appendChild(createStatusList(gameState.teams.ally.statuses));
     panel.appendChild(allyRow);
 
     const enemyRow = createEl("div", "field-row");
-    enemyRow.appendChild(createEl("div", "field-row-title", "Enemies"));
+    enemyRow.appendChild(createEl("div", "field-row-title", "敵"));
     enemyRow.appendChild(createStatusList(gameState.teams.enemy.statuses));
     panel.appendChild(enemyRow);
 
@@ -1156,28 +1156,28 @@
   };
 
   const getNavigationMessageText = () => {
-    if (gameState.phase === PHASE.GAMEOVER) return "Battle complete.";
+    if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
 
     if (gameState.ui.commandMode === "switch") {
       if (gameState.ui.selectedReserveIndex === null) {
-        return "Select a reserve unit to switch.";
+        return "交代する控えを選んでください。";
       }
       if (gameState.ui.selectedSwitchDestination === null) {
-        return "Select the destination ally slot.";
+        return "入れ替える味方スロットを選んでください。";
       }
-      return "Switch ready. Select another unit or continue planning.";
+      return "交代を選択しました。次の行動を選んでください。";
     }
 
     if (gameState.ui.commandMode === "fight") {
       const selectedMove = MOVES[gameState.ui.previewMoveId];
-      if (!selectedMove) return "Select a move.";
+      if (!selectedMove) return "わざを選んでください。";
       if (selectedMove.targetMode === "single") {
-        return "Select a target on the highlighted cells.";
+        return "ハイライトされたマスから対象を選んでください。";
       }
-      return "This move affects all highlighted targets.";
+      return "このわざはハイライトされた対象すべてに当たります。";
     }
 
-    return "Select a move.";
+    return "わざを選んでください。";
   };
 
   const renderNavigationMessage = () => {
