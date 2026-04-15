@@ -300,14 +300,69 @@
     unit.hp = clamp(hpValue, 0, unit.maxHp);
   };
 
-  const BATTLE_LOG_TYPES = new Set(["turnStart", "moveUsed", "damage", "status", "ko", "turnEnd"]);
+  const LOG_TEAM = {
+    ALLY: "ally",
+    ENEMY: "enemy",
+    NEUTRAL: "neutral"
+  };
 
-  const pushLog = (text, type = "ui") => {
-    if (!BATTLE_LOG_TYPES.has(type)) return;
-    gameState.log.push(text);
+  const STATUS_LABELS = {
+    poison: "poison",
+    barrier: "barrier",
+    atkUp: "attack boost",
+    defUp: "defense boost"
+  };
+
+  const STATUS_APPLY_TEXT = {
+    poison: (name) => `${name} was poisoned!`,
+    barrier: (name) => `${name} was protected by a barrier!`,
+    atkUp: (name) => `${name}'s Attack rose!`,
+    defUp: (name) => `${name}'s Defense rose!`
+  };
+
+  const STATUS_FADE_TEXT = {
+    poison: (name) => `${name} recovered from poison.`,
+    barrier: (name) => `${name}'s barrier faded.`,
+    atkUp: (name) => `${name}'s attack boost faded.`,
+    defUp: (name) => `${name}'s defense boost faded.`
+  };
+
+  const asLogTeam = (team) => (team === TEAM.ALLY ? LOG_TEAM.ALLY : team === TEAM.ENEMY ? LOG_TEAM.ENEMY : LOG_TEAM.NEUTRAL);
+
+  const trimLog = () => {
     if (gameState.log.length > CONFIG.MAX_LOG_LINES) {
       gameState.log.splice(0, gameState.log.length - CONFIG.MAX_LOG_LINES);
     }
+  };
+
+  const startActionLog = ({ team, actor, move }) => ({
+    type: "action",
+    team: asLogTeam(team),
+    actor,
+    move,
+    title: `${actor} used ${move}!`,
+    lines: []
+  });
+
+  const appendActionLine = (entry, text) => {
+    if (!entry) return;
+    entry.lines.push(text);
+  };
+
+  const commitLogEntry = (entry) => {
+    if (!entry) return;
+    gameState.log.push(entry);
+    trimLog();
+  };
+
+  const pushSystemLog = (lines, title = "Battle Event", team = LOG_TEAM.NEUTRAL) => {
+    if (!lines || lines.length === 0) return;
+    commitLogEntry({
+      type: "system",
+      team,
+      title,
+      lines: [...lines]
+    });
   };
 
   const createEl = (tag, className, text) => {
@@ -390,35 +445,43 @@
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
   };
 
-  const applyStatusToUnit = (unit, statusKind, duration) => {
+  const applyStatusToUnit = (unit, statusKind, duration, actionLog = null) => {
     const status = cloneStatus(statusKind, duration);
     addStatusToContainer(unit.statuses, status);
-    pushLog(`${unit.name} に ${status.kind}（${status.duration}T）付与。`, "status");
+    const toText = STATUS_APPLY_TEXT[status.kind] || ((name) => `${name} gained ${STATUS_LABELS[status.kind] || status.kind}!`);
+    if (actionLog) appendActionLine(actionLog, toText(unit.name));
   };
 
-  const runEffect = ({ actor, target, effect }) => {
+  const runEffect = ({ actor, target, effect, actionLog }) => {
     if (effect.type === "applyStatus" && target) {
-      applyStatusToUnit(target, effect.status, effect.duration);
+      applyStatusToUnit(target, effect.status, effect.duration, actionLog);
     }
     if (effect.type === "drain" && target) {
-      const healed = healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
-      pushLog(`${actor.name} はHPを ${healed} 回復。`, "status");
+      healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
+      if (actionLog) appendActionLine(actionLog, `${actor.name} restored some HP!`);
     }
   };
 
-  const triggerAbilityHook = (unit, hookName, context) => {
+  const triggerAbilityHook = (unit, hookName, context = {}) => {
     if (!unit || !unit.abilityId) return;
     const ability = ABILITIES[unit.abilityId];
     if (!ability || !ability[hookName]) return;
+    const lines = [];
 
     ability[hookName].forEach((effect) => {
       if (effect.type === "applyStatus") {
         const target = effect.target === "self" ? unit : context?.target;
         if (target && isAlive(target)) {
-          applyStatusToUnit(target, effect.status, effect.duration);
+          const status = cloneStatus(effect.status, effect.duration);
+          addStatusToContainer(target.statuses, status);
+          const toText = STATUS_APPLY_TEXT[status.kind] || ((name) => `${name} gained ${STATUS_LABELS[status.kind] || status.kind}!`);
+          lines.push(toText(target.name));
         }
       }
     });
+    if (lines.length > 0) {
+      pushSystemLog(lines, `${unit.name}'s ability activated!`, asLogTeam(unit.team));
+    }
   };
 
   const executeFightAction = (actor, action) => {
@@ -434,29 +497,31 @@
 
     if (targets.length === 0) return;
 
-    pushLog(`${actor.name} の ${move.name}！`, "moveUsed");
+    const actionLog = startActionLog({ team: actor.team, actor: actor.name, move: move.name });
 
     targets.forEach((targetCell) => {
       const target = getUnitAt({ x: targetCell.x, y: targetCell.y });
       if (!target || !isAlive(target)) return;
 
-      move.beforeDamage.forEach((effect) => runEffect({ actor, target, effect }));
+      move.beforeDamage.forEach((effect) => runEffect({ actor, target, effect, actionLog }));
 
       let dealt = 0;
       if (move.category === "attack") {
         dealt = calcDamage(actor, target, move);
         setHp(target, target.hp - dealt);
-        pushLog(`- ${target.name} に ${dealt} ダメージ（${target.hp}/${target.maxHp}）。`, "damage");
+        appendActionLine(actionLog, `It hit ${target.name}!`);
       }
 
       move.afterDamage.forEach((effectTemplate) => {
         const effect = { ...effectTemplate, lastDamage: dealt };
-        runEffect({ actor, target, effect });
+        runEffect({ actor, target, effect, actionLog });
       });
 
       triggerAbilityHook(actor, "onAfterDamage", { target });
-      if (!isAlive(target)) pushLog(`☠ ${target.name} はたおれた。`, "ko");
+      if (!isAlive(target)) appendActionLine(actionLog, `${target.name} fainted!`);
     });
+    if (actionLog.lines.length === 0) appendActionLine(actionLog, "But nothing happened.");
+    commitLogEntry(actionLog);
   };
 
   const executeSwitchAction = (action) => {
@@ -471,6 +536,14 @@
     reserve.slot = toSlot;
     teamState.reserve[action.reserveIndex] = outgoing;
     if (outgoing) outgoing.slot = `r${action.reserveIndex}`;
+    commitLogEntry({
+      type: "action",
+      team: asLogTeam(action.team),
+      actor: reserve.name,
+      move: "Switch",
+      title: `${reserve.name} switched in!`,
+      lines: outgoing ? [`${outgoing.name} switched out.`] : []
+    });
 
   };
 
@@ -484,6 +557,7 @@
   };
 
   const applyEndTurnEffects = () => {
+    const systemLines = [];
     [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
       const teamState = getTeamState(team);
 
@@ -493,20 +567,37 @@
         if (getStatusByKind(unit, "poison")) {
           const poisonDmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
           setHp(unit, unit.hp - poisonDmg);
-          pushLog(`${unit.name} はどくで ${poisonDmg} ダメージ。`, "damage");
-          if (!isAlive(unit)) pushLog(`☠ ${unit.name} はどくでたおれた。`, "ko");
+          systemLines.push(`${unit.name} was hurt by poison!`);
+          if (!isAlive(unit)) systemLines.push(`${unit.name} fainted!`);
         }
 
         unit.statuses.forEach((s) => { s.duration -= 1; });
+        unit.statuses
+          .filter((s) => s.duration <= 0)
+          .forEach((s) => {
+            const toText = STATUS_FADE_TEXT[s.kind] || ((name) => `${name}'s ${STATUS_LABELS[s.kind] || s.kind} faded.`);
+            systemLines.push(toText(unit.name));
+          });
         unit.statuses = removeExpiredStatuses(unit.statuses);
       });
 
       teamState.statuses.forEach((s) => { s.duration -= 1; });
+      teamState.statuses
+        .filter((s) => s.duration <= 0)
+        .forEach((s) => {
+          systemLines.push(`The ${team === TEAM.ALLY ? "allied" : "enemy"} ${STATUS_LABELS[s.kind] || s.kind} faded.`);
+        });
       teamState.statuses = removeExpiredStatuses(teamState.statuses);
     });
 
     gameState.globalStatuses.forEach((s) => { s.duration -= 1; });
+    gameState.globalStatuses
+      .filter((s) => s.duration <= 0)
+      .forEach((s) => {
+        systemLines.push(`The ${STATUS_LABELS[s.kind] || s.kind} faded.`);
+      });
     gameState.globalStatuses = removeExpiredStatuses(gameState.globalStatuses);
+    pushSystemLog(systemLines, "End of turn effects", LOG_TEAM.NEUTRAL);
   };
 
   const checkWinLose = () => {
@@ -526,7 +617,6 @@
   };
 
   const resolveTurn = () => {
-    pushLog(`--- ターン${gameState.turn} 開始 ---`, "turnStart");
     const queue = [];
 
     Object.values(gameState.plannedActions).forEach((action) => queue.push(action));
@@ -549,7 +639,6 @@
     queue.forEach(executeAction);
     applyEndTurnEffects();
     checkWinLose();
-    pushLog(`--- ターン${gameState.turn} 終了 ---`, "turnEnd");
 
     gameState.turn += 1;
     gameState.plannedActions = {};
@@ -837,7 +926,7 @@
   const formatEnemyHpPercent = (unit) => `${Math.round((unit.hp / unit.maxHp) * 100)}%`;
   const formatAllyHp = (unit) => `${unit.hp} / ${unit.maxHp}`;
   const formatHpByTeam = (unit) => unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit) : formatAllyHp(unit);
-  const statusText = (status) => `${status.kind}:${status.duration}`;
+  const statusText = (status) => `${STATUS_LABELS[status.kind] || status.kind} (${status.duration} turn${status.duration === 1 ? "" : "s"})`;
   const toJaMoveName = (move) => move.name;
   const MOVE_TARGET_DESCRIPTION = {
     front: "単体 / 前方",
@@ -864,6 +953,72 @@
       frag.appendChild(chip);
     });
     return frag;
+  };
+
+  const getFieldStatusBuckets = () => {
+    const weather = [];
+    const field = [];
+    gameState.globalStatuses.forEach((status) => {
+      if (status.category === "weather" || status.tags?.includes("weather")) weather.push(status);
+      else field.push(status);
+    });
+    return { weather, field };
+  };
+
+  const createStatusList = (items) => {
+    const list = createEl("div", "field-list");
+    if (!items || items.length === 0) {
+      list.appendChild(createEl("div", "field-empty", "None"));
+      return list;
+    }
+    items.forEach((status) => {
+      list.appendChild(createEl("div", "field-item", statusText(status)));
+    });
+    return list;
+  };
+
+  const renderFieldStatusPanel = () => {
+    const panel = createEl("div", "field-panel");
+    panel.appendChild(createEl("div", "field-title", "Field Status"));
+
+    const buckets = getFieldStatusBuckets();
+
+    const weatherRow = createEl("div", "field-row");
+    weatherRow.appendChild(createEl("div", "field-row-title", "Weather"));
+    weatherRow.appendChild(createStatusList(buckets.weather));
+    panel.appendChild(weatherRow);
+
+    const fieldRow = createEl("div", "field-row");
+    fieldRow.appendChild(createEl("div", "field-row-title", "Field Effects"));
+    fieldRow.appendChild(createStatusList(buckets.field));
+    panel.appendChild(fieldRow);
+
+    const allyRow = createEl("div", "field-row");
+    allyRow.appendChild(createEl("div", "field-row-title", "Allies"));
+    allyRow.appendChild(createStatusList(gameState.teams.ally.statuses));
+    panel.appendChild(allyRow);
+
+    const enemyRow = createEl("div", "field-row");
+    enemyRow.appendChild(createEl("div", "field-row-title", "Enemies"));
+    enemyRow.appendChild(createStatusList(gameState.teams.enemy.statuses));
+    panel.appendChild(enemyRow);
+
+    return panel;
+  };
+
+  const renderLogEntry = (entry) => {
+    const teamClass = entry.team || LOG_TEAM.NEUTRAL;
+    const card = createEl("article", `log-entry ${teamClass}`);
+    card.appendChild(createEl("div", "log-title", entry.title));
+    const body = createEl("div", "log-lines");
+    (entry.lines || []).forEach((line) => {
+      body.appendChild(createEl("div", "log-line", line));
+    });
+    if (!entry.lines || entry.lines.length === 0) {
+      body.appendChild(createEl("div", "log-line", "—"));
+    }
+    card.appendChild(body);
+    return card;
   };
 
   const renderMoveBadge = (move) => {
@@ -1131,8 +1286,11 @@
     side.appendChild(footer);
 
     const log = createEl("div", "log");
-    log.textContent = gameState.log.slice(-CONFIG.LOG_VISIBLE_LINES).reverse().join("\n");
+    gameState.log.forEach((entry) => {
+      log.appendChild(renderLogEntry(entry));
+    });
     side.appendChild(log);
+    side.appendChild(renderFieldStatusPanel());
 
     return side;
   };
