@@ -81,6 +81,20 @@ body {
   box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
 }
 
+.ally-selector.current {
+  border-color: #ffe163;
+  box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
+}
+
+.ally-selector.completed {
+  border-color: #6ed39b;
+  background: rgba(25, 62, 44, 0.92);
+}
+
+.ally-selector.pending {
+  border-color: #4e638d;
+}
+
 .ally-selector.dead {
   opacity: 0.5;
   filter: grayscale(1);
@@ -149,6 +163,18 @@ body {
   box-shadow:
     0 0 0 3px rgba(255, 227, 94, 0.52),
     inset 0 0 24px rgba(255, 235, 146, 0.26);
+}
+
+.cell.active-actor {
+  border-color: #ffe163;
+  box-shadow:
+    0 0 0 3px rgba(255, 225, 99, 0.4),
+    inset 0 0 22px rgba(255, 224, 113, 0.18);
+}
+
+.cell.planned-target {
+  outline: 2px dashed rgba(150, 238, 188, 0.8);
+  outline-offset: -6px;
 }
 
 .cell.valid-enemy { box-shadow: inset 0 0 0 2px #ff6a6a; }

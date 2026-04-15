@@ -25,6 +25,8 @@
   const PHASE = {
     START: "start",
     PLAYING: "playing",
+    WAITING_ENEMY: "waiting_enemy",
+    RESOLVING: "resolving",
     GAMEOVER: "gameover"
   };
 
@@ -207,9 +209,12 @@
     plannedActions: {},
     enemyPlannedActions: {},
     ui: {
+      currentPlanningSlot: 0,
       selectedAllySlot: 0,
       commandMode: "fight",
       selectedMoveId: null,
+      previewMoveId: null,
+      previewTargets: [],
       selectedReserveIndex: null,
       selectedSwitchDestination: null,
       targetCandidates: [],
@@ -344,7 +349,6 @@
 
   const clearTempArrays = () => {
     gameState.temp.renderCells.length = 0;
-    gameState.ui.targetCandidates.length = 0;
   };
 
   // ------------------------------------------------------------
@@ -653,87 +657,123 @@
     return livingSlots.every((slot) => !!gameState.plannedActions[slot]);
   };
 
-  const autoAdvanceTurnIfReady = () => {
-    if (gameState.phase !== PHASE.PLAYING) return;
-    if (!allLivingAlliesPlanned()) return;
-
-    gameState.enemyPlannedActions = buildEnemyPlans();
-    pushLog(`--- ターン${gameState.turn} 解決 ---`);
-    resolveTurn();
+  const findNextLivingAllySlot = (fromSlot = -1) => {
+    for (let slot = fromSlot + 1; slot < CONFIG.BOARD_COLS; slot += 1) {
+      const unit = gameState.teams.ally.active[slot];
+      if (isAlive(unit)) return slot;
+    }
+    return null;
   };
 
-  const selectAlly = (slot) => {
-    const actor = gameState.teams.ally.active[slot];
-    if (!actor || !isAlive(actor) || gameState.phase !== PHASE.PLAYING) return;
+  const setPlanningSlot = (slot) => {
+    gameState.ui.currentPlanningSlot = slot;
     gameState.ui.selectedAllySlot = slot;
+  };
+
+  const clearTargetPreview = () => {
     gameState.ui.selectedMoveId = null;
+    gameState.ui.previewMoveId = null;
+    gameState.ui.previewTargets = [];
+    gameState.ui.targetCandidates = [];
     gameState.ui.selectedTargetPos = null;
     gameState.ui.selectedReserveIndex = null;
     gameState.ui.selectedSwitchDestination = null;
+  };
+
+  const initializePlanningTurn = () => {
+    const firstLivingSlot = findNextLivingAllySlot(-1);
+    if (firstLivingSlot === null) return;
+    setPlanningSlot(firstLivingSlot);
+    clearTargetPreview();
+    gameState.ui.commandMode = "fight";
+  };
+
+  const advancePlanningSlot = () => {
+    const nextSlot = findNextLivingAllySlot(gameState.ui.currentPlanningSlot);
+    if (nextSlot === null) return false;
+    setPlanningSlot(nextSlot);
+    clearTargetPreview();
+    return true;
+  };
+
+  const queueTurnResolution = () => {
+    if (gameState.phase !== PHASE.PLAYING || !allLivingAlliesPlanned()) return;
+    gameState.phase = PHASE.WAITING_ENEMY;
+    clearTargetPreview();
+    pushLog("味方の行動を決定。敵の行動を待機中...");
+    render();
+
+    window.setTimeout(() => {
+      if (gameState.phase !== PHASE.WAITING_ENEMY) return;
+      gameState.enemyPlannedActions = buildEnemyPlans();
+      gameState.phase = PHASE.RESOLVING;
+      pushLog(`--- ターン${gameState.turn} 解決 ---`);
+      resolveTurn();
+      if (gameState.phase !== PHASE.GAMEOVER) {
+        gameState.phase = PHASE.PLAYING;
+        initializePlanningTurn();
+      }
+      render();
+    }, 280);
   };
 
   const chooseMode = (mode) => {
+    if (gameState.phase !== PHASE.PLAYING) return;
     gameState.ui.commandMode = mode;
-    gameState.ui.selectedMoveId = null;
-    gameState.ui.selectedTargetPos = null;
-    gameState.ui.selectedReserveIndex = null;
-    gameState.ui.selectedSwitchDestination = null;
+    clearTargetPreview();
   };
 
   const setFightMove = (moveId) => {
-    const slot = gameState.ui.selectedAllySlot;
+    if (gameState.phase !== PHASE.PLAYING) return;
+    const slot = gameState.ui.currentPlanningSlot;
     const actor = gameState.teams.ally.active[slot];
     if (!actor || !isAlive(actor)) return;
 
     const move = MOVES[moveId];
     const candidates = getValidTargetsForMove(actor, move);
     gameState.ui.selectedMoveId = moveId;
+    gameState.ui.previewMoveId = moveId;
+    gameState.ui.previewTargets = candidates.map((c) => ({ x: c.x, y: c.y }));
     gameState.ui.targetCandidates = candidates;
-
-    if (move.targetMode === "allPattern") {
-      gameState.plannedActions[slot] = {
-        type: "fight",
-        team: TEAM.ALLY,
-        slot,
-        moveId,
-        targetPos: null
-      };
-      pushLog(`${actor.name}：${move.name}（範囲）を選択。`);
-      autoAdvanceTurnIfReady();
-    } else if (candidates.length === 1) {
-      gameState.plannedActions[slot] = {
-        type: "fight",
-        team: TEAM.ALLY,
-        slot,
-        moveId,
-        targetPos: { x: candidates[0].x, y: candidates[0].y }
-      };
-      gameState.ui.selectedTargetPos = { x: candidates[0].x, y: candidates[0].y };
-      pushLog(`${actor.name}：${move.name} の対象を確定。`);
-      autoAdvanceTurnIfReady();
-    }
+    gameState.ui.selectedTargetPos = null;
+    pushLog(`${actor.name}：${move.name} を選択。対象をボードで指定してください。`);
   };
 
-  const chooseFightTarget = (x, y) => {
-    const slot = gameState.ui.selectedAllySlot;
-    const move = MOVES[gameState.ui.selectedMoveId];
-    if (!move || move.targetMode !== "single") return;
-
-    const match = gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y);
-    if (!match) return;
-
-    gameState.ui.selectedTargetPos = { x, y };
+  const confirmCurrentFightAction = ({ slot, move, targetPos }) => {
     gameState.plannedActions[slot] = {
       type: "fight",
       team: TEAM.ALLY,
       slot,
       moveId: move.id,
-      targetPos: { x, y }
+      targetPos: targetPos ? { ...targetPos } : null
     };
 
+    gameState.ui.selectedTargetPos = targetPos ? { ...targetPos } : null;
     const actor = gameState.teams.ally.active[slot];
-    pushLog(`${actor.name}：${move.name} → マス(${x + 1},${y + 1})。`);
-    autoAdvanceTurnIfReady();
+    if (targetPos) {
+      pushLog(`${actor.name}：${move.name} → マス(${targetPos.x + 1},${targetPos.y + 1})を確定。`);
+    } else {
+      pushLog(`${actor.name}：${move.name}（範囲）を確定。`);
+    }
+
+    if (!advancePlanningSlot()) {
+      queueTurnResolution();
+    }
+  };
+
+  const chooseFightTarget = (x, y) => {
+    if (gameState.phase !== PHASE.PLAYING) return;
+    const slot = gameState.ui.currentPlanningSlot;
+    const move = MOVES[gameState.ui.previewMoveId];
+    if (!move) return;
+    const match = gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y);
+    if (!match) return;
+
+    if (move.targetMode === "allPattern") {
+      confirmCurrentFightAction({ slot, move, targetPos: null });
+      return;
+    }
+    confirmCurrentFightAction({ slot, move, targetPos: { x, y } });
   };
 
   const chooseReserve = (reserveIndex) => {
@@ -743,8 +783,9 @@
   };
 
   const chooseSwitchDestination = (toSlot) => {
+    if (gameState.phase !== PHASE.PLAYING) return;
     gameState.ui.selectedSwitchDestination = toSlot;
-    const slot = gameState.ui.selectedAllySlot;
+    const slot = gameState.ui.currentPlanningSlot;
     const actor = gameState.teams.ally.active[slot];
     if (!actor || !isAlive(actor)) return;
     if (gameState.ui.selectedReserveIndex === null) return;
@@ -758,24 +799,27 @@
     };
     const reserve = gameState.teams.ally.reserve[gameState.ui.selectedReserveIndex];
     pushLog(`${actor.name}：こうたい ${reserve.name} → スロット${toSlot + 1}。`);
-    autoAdvanceTurnIfReady();
+    if (!advancePlanningSlot()) {
+      queueTurnResolution();
+    }
   };
 
   const startBattle = () => {
     gameState.phase = PHASE.PLAYING;
+    initializePlanningTurn();
     pushLog("バトル開始。");
   };
 
   const resetBattle = () => {
     gameState = createInitialState();
     gameState.phase = PHASE.PLAYING;
+    initializePlanningTurn();
   };
 
   const dispatch = (action) => {
     switch (action.type) {
       case "START": startBattle(); break;
       case "RESET": resetBattle(); break;
-      case "SELECT_ALLY": selectAlly(action.slot); break;
       case "MODE": chooseMode(action.mode); break;
       case "MOVE": setFightMove(action.moveId); break;
       case "TARGET": chooseFightTarget(action.x, action.y); break;
@@ -817,8 +861,8 @@
   const getMoveTargetDescription = (move) => MOVE_TARGET_DESCRIPTION[move.patternId] || "単体";
   const isTargetPreviewActive = () => (
     gameState.ui.commandMode === "fight" &&
-    !!gameState.ui.selectedMoveId &&
-    gameState.ui.targetCandidates.length > 0
+    !!gameState.ui.previewMoveId &&
+    gameState.ui.previewTargets.length > 0
   );
 
   const renderStatusChips = (statuses) => {
@@ -885,13 +929,19 @@
     const selectors = createEl("div", "ally-selectors");
     gameState.teams.ally.active.forEach((unit, slot) => {
       const plan = gameState.plannedActions[slot];
+      const isCurrent = slot === gameState.ui.currentPlanningSlot && gameState.phase === PHASE.PLAYING;
+      const selectorState = !isAlive(unit)
+        ? " dead"
+        : isCurrent
+          ? " current"
+          : plan
+            ? " completed"
+            : " pending";
       const btn = createEl(
         "button",
-        `ally-selector${slot === gameState.ui.selectedAllySlot ? " active" : ""}${!isAlive(unit) ? " dead" : ""}`
+        `ally-selector${selectorState}`
       );
-      btn.dataset.action = "select-ally";
-      btn.dataset.slot = String(slot);
-      if (!isAlive(unit)) btn.disabled = true;
+      btn.disabled = true;
 
       btn.appendChild(createEl("div", "name", `${slot + 1}. ${unit.name}`));
       btn.appendChild(createEl("div", "stats", `HP ${formatAllyHp(unit)}`));
@@ -908,9 +958,15 @@
   const renderBoardCell = (x, y) => {
     const cell = createEl("div", "cell");
     const unit = getUnitAt({ x, y });
-    const isCandidate = gameState.ui.targetCandidates.some((c) => c.x === x && c.y === y);
+    const currentSlot = gameState.ui.currentPlanningSlot;
+    const activeActorPos = toBoardPos(TEAM.ALLY, currentSlot);
+    const isCandidate = gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
     const selectedTarget = gameState.ui.selectedTargetPos;
     const targetPreviewActive = isTargetPreviewActive();
+
+    if (activeActorPos.x === x && activeActorPos.y === y && gameState.phase === PHASE.PLAYING) {
+      cell.classList.add("active-actor");
+    }
 
     if (isCandidate) {
       cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
@@ -920,6 +976,13 @@
     }
     if (selectedTarget && selectedTarget.x === x && selectedTarget.y === y) {
       cell.classList.add("targeted");
+    }
+
+    const hasPlannedTarget = Object.values(gameState.plannedActions).some(
+      (action) => action.type === "fight" && action.targetPos && action.targetPos.x === x && action.targetPos.y === y
+    );
+    if (hasPlannedTarget) {
+      cell.classList.add("planned-target");
     }
 
     cell.dataset.action = "target-cell";
@@ -947,9 +1010,9 @@
 
   const renderCommandArea = () => {
     const wrap = createEl("div", "command");
-    const actor = gameState.teams.ally.active[gameState.ui.selectedAllySlot];
+    const actor = gameState.teams.ally.active[gameState.ui.currentPlanningSlot];
 
-    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}（スロット${gameState.ui.selectedAllySlot + 1}）`));
+    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}（スロット${gameState.ui.currentPlanningSlot + 1}）`));
 
     const actions = createEl("div", "actions");
     const fightBtn = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
@@ -971,20 +1034,20 @@
         btn.appendChild(info);
         btn.dataset.action = "pick-move";
         btn.dataset.moveId = moveId;
-        if (gameState.plannedActions[gameState.ui.selectedAllySlot]?.moveId === moveId) {
+        if (gameState.ui.previewMoveId === moveId) {
           btn.classList.add("active");
         }
         movesWrap.appendChild(btn);
       });
       wrap.appendChild(movesWrap);
 
-      const selectedMove = MOVES[gameState.ui.selectedMoveId];
+      const selectedMove = MOVES[gameState.ui.previewMoveId];
       if (selectedMove) {
         wrap.appendChild(createEl("div", "move-target-description", `対象: ${getMoveTargetDescription(selectedMove)}`));
         if (selectedMove.targetMode === "single") {
           wrap.appendChild(createEl("div", "stats", "ハイライトされた対象マスを選んでください。"));
         } else {
-          wrap.appendChild(createEl("div", "stats", "範囲わざを確定しました。"));
+          wrap.appendChild(createEl("div", "stats", "ハイライト範囲をクリックして確定してください。"));
         }
       }
     }
@@ -1094,7 +1157,6 @@
     const action = target.dataset.action;
     if (action === "start") dispatch({ type: "START" });
     if (action === "reset") dispatch({ type: "RESET" });
-    if (action === "select-ally") dispatch({ type: "SELECT_ALLY", slot: Number(target.dataset.slot) });
     if (action === "mode-fight") dispatch({ type: "MODE", mode: "fight" });
     if (action === "mode-switch") dispatch({ type: "MODE", mode: "switch" });
     if (action === "pick-move") dispatch({ type: "MOVE", moveId: target.dataset.moveId });
@@ -1104,6 +1166,7 @@
   });
 
   gameState.phase = PHASE.PLAYING;
-  pushLog("戦闘フェーズ開始。生存中の味方全員の行動を選択してください。");
+  initializePlanningTurn();
+  pushLog("戦闘フェーズ開始。左から順番に味方の行動を決定してください。");
   render();
 })();
