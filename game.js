@@ -86,50 +86,50 @@
 
   const MOVES = {
     clawStrike: {
-      id: "clawStrike", name: "Claw Strike", category: "attack", type: "fire", power: 32,
+      id: "clawStrike", name: "クロー・ストライク", category: "attack", type: "fire", power: 32,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     drainBite: {
-      id: "drainBite", name: "Drain Bite", category: "attack", type: "nature", power: 28,
+      id: "drainBite", name: "ドレインバイト", category: "attack", type: "nature", power: 28,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }]
     },
     quakeWave: {
-      id: "quakeWave", name: "Quake Wave", category: "attack", type: "earth", power: 24,
+      id: "quakeWave", name: "クエイクウェーブ", category: "attack", type: "earth", power: 24,
       patternId: "front3", targetRule: "enemy", targetMode: "allPattern",
       beforeDamage: [], afterDamage: []
     },
     frostLance: {
-      id: "frostLance", name: "Frost Lance", category: "attack", type: "water", power: 34,
+      id: "frostLance", name: "フロストランス", category: "attack", type: "water", power: 34,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     toxicSpit: {
-      id: "toxicSpit", name: "Toxic Spit", category: "attack", type: "shadow", power: 18,
+      id: "toxicSpit", name: "トキシックスピット", category: "attack", type: "shadow", power: 18,
       patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     ironGuard: {
-      id: "ironGuard", name: "Iron Guard", category: "status", type: "earth", power: 0,
+      id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0,
       patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }],
       afterDamage: []
     },
     rallyHowl: {
-      id: "rallyHowl", name: "Rally Howl", category: "status", type: "light", power: 0,
+      id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0,
       patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
       afterDamage: []
     },
     shellStance: {
-      id: "shellStance", name: "Shell Stance", category: "status", type: "water", power: 0,
+      id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0,
       patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }],
       afterDamage: []
     },
     venomBless: {
-      id: "venomBless", name: "Venom Bless", category: "status", type: "shadow", power: 0,
+      id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0,
       patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
       afterDamage: []
@@ -155,16 +155,16 @@
   };
 
   const UNIT_LIBRARY = {
-    emberlynx: { id: "emberlynx", name: "Ember Lynx", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    mossblob: { id: "mossblob", name: "Moss Blob", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
-    frostfang: { id: "frostfang", name: "Frost Fang", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
-    stormimp: { id: "stormimp", name: "Storm Imp", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "venomBless", "ironGuard"] },
-    ironboar: { id: "ironboar", name: "Iron Boar", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
-    wyvern: { id: "wyvern", name: "Blue Wyvern", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    golem: { id: "golem", name: "Rock Golem", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
-    thunderroc: { id: "thunderroc", name: "Thunder Roc", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
-    venomtoad: { id: "venomtoad", name: "Venom Toad", portrait: "venomtoad", hp: 92, atk: 29, def: 27, spd: 20, abilityId: "venomTouch", moves: ["toxicSpit", "drainBite", "ironGuard", "rallyHowl"] },
-    duskmoth: { id: "duskmoth", name: "Dusk Moth", portrait: "duskmoth", hp: 74, atk: 32, def: 19, spd: 41, abilityId: null, moves: ["toxicSpit", "frostLance", "venomBless", "shellStance"] }
+    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
+    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
+    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "venomBless", "ironGuard"] },
+    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
+    thunderroc: { id: "thunderroc", name: "サンダーロック", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
+    venomtoad: { id: "venomtoad", name: "ベノムトード", portrait: "venomtoad", hp: 92, atk: 29, def: 27, spd: 20, abilityId: "venomTouch", moves: ["toxicSpit", "drainBite", "ironGuard", "rallyHowl"] },
+    duskmoth: { id: "duskmoth", name: "ダスクモス", portrait: "duskmoth", hp: 74, atk: 32, def: 19, spd: 41, abilityId: null, moves: ["toxicSpit", "frostLance", "venomBless", "shellStance"] }
   };
 
   // ------------------------------------------------------------
@@ -300,14 +300,69 @@
     unit.hp = clamp(hpValue, 0, unit.maxHp);
   };
 
-  const BATTLE_LOG_TYPES = new Set(["turnStart", "moveUsed", "damage", "status", "ko", "turnEnd"]);
+  const LOG_TEAM = {
+    ALLY: "ally",
+    ENEMY: "enemy",
+    NEUTRAL: "neutral"
+  };
 
-  const pushLog = (text, type = "ui") => {
-    if (!BATTLE_LOG_TYPES.has(type)) return;
-    gameState.log.push(text);
+  const STATUS_LABELS = {
+    poison: "どく",
+    barrier: "バリア",
+    atkUp: "こうげきアップ",
+    defUp: "ぼうぎょアップ"
+  };
+
+  const STATUS_APPLY_TEXT = {
+    poison: (name) => `${name}は どく状態になった！`,
+    barrier: (name) => `${name}は バリアに守られた！`,
+    atkUp: (name) => `${name}の こうげきが上がった！`,
+    defUp: (name) => `${name}の ぼうぎょが上がった！`
+  };
+
+  const STATUS_FADE_TEXT = {
+    poison: (name) => `${name}の どく状態が治った。`,
+    barrier: (name) => `${name}の バリアが消えた。`,
+    atkUp: (name) => `${name}の こうげきアップが切れた。`,
+    defUp: (name) => `${name}の ぼうぎょアップが切れた。`
+  };
+
+  const asLogTeam = (team) => (team === TEAM.ALLY ? LOG_TEAM.ALLY : team === TEAM.ENEMY ? LOG_TEAM.ENEMY : LOG_TEAM.NEUTRAL);
+
+  const trimLog = () => {
     if (gameState.log.length > CONFIG.MAX_LOG_LINES) {
       gameState.log.splice(0, gameState.log.length - CONFIG.MAX_LOG_LINES);
     }
+  };
+
+  const startActionLog = ({ team, actor, move }) => ({
+    type: "action",
+    team: asLogTeam(team),
+    actor,
+    move,
+    title: `${actor}の ${move}！`,
+    lines: []
+  });
+
+  const appendActionLine = (entry, text) => {
+    if (!entry) return;
+    entry.lines.push(text);
+  };
+
+  const commitLogEntry = (entry) => {
+    if (!entry) return;
+    gameState.log.push(entry);
+    trimLog();
+  };
+
+  const pushSystemLog = (lines, title = "バトルイベント", team = LOG_TEAM.NEUTRAL) => {
+    if (!lines || lines.length === 0) return;
+    commitLogEntry({
+      type: "system",
+      team,
+      title,
+      lines: [...lines]
+    });
   };
 
   const createEl = (tag, className, text) => {
@@ -390,35 +445,43 @@
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
   };
 
-  const applyStatusToUnit = (unit, statusKind, duration) => {
+  const applyStatusToUnit = (unit, statusKind, duration, actionLog = null) => {
     const status = cloneStatus(statusKind, duration);
     addStatusToContainer(unit.statuses, status);
-    pushLog(`${unit.name} に ${status.kind}（${status.duration}T）付与。`, "status");
+    const toText = STATUS_APPLY_TEXT[status.kind] || ((name) => `${name} gained ${STATUS_LABELS[status.kind] || status.kind}!`);
+    if (actionLog) appendActionLine(actionLog, toText(unit.name));
   };
 
-  const runEffect = ({ actor, target, effect }) => {
+  const runEffect = ({ actor, target, effect, actionLog }) => {
     if (effect.type === "applyStatus" && target) {
-      applyStatusToUnit(target, effect.status, effect.duration);
+      applyStatusToUnit(target, effect.status, effect.duration, actionLog);
     }
     if (effect.type === "drain" && target) {
-      const healed = healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
-      pushLog(`${actor.name} はHPを ${healed} 回復。`, "status");
+      healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
+      if (actionLog) appendActionLine(actionLog, `${actor.name}は 体力を回復した！`);
     }
   };
 
-  const triggerAbilityHook = (unit, hookName, context) => {
+  const triggerAbilityHook = (unit, hookName, context = {}) => {
     if (!unit || !unit.abilityId) return;
     const ability = ABILITIES[unit.abilityId];
     if (!ability || !ability[hookName]) return;
+    const lines = [];
 
     ability[hookName].forEach((effect) => {
       if (effect.type === "applyStatus") {
         const target = effect.target === "self" ? unit : context?.target;
         if (target && isAlive(target)) {
-          applyStatusToUnit(target, effect.status, effect.duration);
+          const status = cloneStatus(effect.status, effect.duration);
+          addStatusToContainer(target.statuses, status);
+          const toText = STATUS_APPLY_TEXT[status.kind] || ((name) => `${name} gained ${STATUS_LABELS[status.kind] || status.kind}!`);
+          lines.push(toText(target.name));
         }
       }
     });
+    if (lines.length > 0) {
+      pushSystemLog(lines, `${unit.name}の とくせいが発動！`, asLogTeam(unit.team));
+    }
   };
 
   const executeFightAction = (actor, action) => {
@@ -434,29 +497,31 @@
 
     if (targets.length === 0) return;
 
-    pushLog(`${actor.name} の ${move.name}！`, "moveUsed");
+    const actionLog = startActionLog({ team: actor.team, actor: actor.name, move: move.name });
 
     targets.forEach((targetCell) => {
       const target = getUnitAt({ x: targetCell.x, y: targetCell.y });
       if (!target || !isAlive(target)) return;
 
-      move.beforeDamage.forEach((effect) => runEffect({ actor, target, effect }));
+      move.beforeDamage.forEach((effect) => runEffect({ actor, target, effect, actionLog }));
 
       let dealt = 0;
       if (move.category === "attack") {
         dealt = calcDamage(actor, target, move);
         setHp(target, target.hp - dealt);
-        pushLog(`- ${target.name} に ${dealt} ダメージ（${target.hp}/${target.maxHp}）。`, "damage");
+        appendActionLine(actionLog, `${target.name}に 命中！`);
       }
 
       move.afterDamage.forEach((effectTemplate) => {
         const effect = { ...effectTemplate, lastDamage: dealt };
-        runEffect({ actor, target, effect });
+        runEffect({ actor, target, effect, actionLog });
       });
 
       triggerAbilityHook(actor, "onAfterDamage", { target });
-      if (!isAlive(target)) pushLog(`☠ ${target.name} はたおれた。`, "ko");
+      if (!isAlive(target)) appendActionLine(actionLog, `${target.name}は たおれた！`);
     });
+    if (actionLog.lines.length === 0) appendActionLine(actionLog, "しかし 何も起こらなかった。");
+    commitLogEntry(actionLog);
   };
 
   const executeSwitchAction = (action) => {
@@ -471,6 +536,14 @@
     reserve.slot = toSlot;
     teamState.reserve[action.reserveIndex] = outgoing;
     if (outgoing) outgoing.slot = `r${action.reserveIndex}`;
+    commitLogEntry({
+      type: "action",
+      team: asLogTeam(action.team),
+      actor: reserve.name,
+      move: "交代",
+      title: `${reserve.name}が 繰り出された！`,
+      lines: outgoing ? [`${outgoing.name}は 引っ込んだ。`] : []
+    });
 
   };
 
@@ -484,6 +557,7 @@
   };
 
   const applyEndTurnEffects = () => {
+    const systemLines = [];
     [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
       const teamState = getTeamState(team);
 
@@ -493,20 +567,37 @@
         if (getStatusByKind(unit, "poison")) {
           const poisonDmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
           setHp(unit, unit.hp - poisonDmg);
-          pushLog(`${unit.name} はどくで ${poisonDmg} ダメージ。`, "damage");
-          if (!isAlive(unit)) pushLog(`☠ ${unit.name} はどくでたおれた。`, "ko");
+          systemLines.push(`${unit.name}は どくのダメージを受けた！`);
+          if (!isAlive(unit)) systemLines.push(`${unit.name}は たおれた！`);
         }
 
         unit.statuses.forEach((s) => { s.duration -= 1; });
+        unit.statuses
+          .filter((s) => s.duration <= 0)
+          .forEach((s) => {
+            const toText = STATUS_FADE_TEXT[s.kind] || ((name) => `${name}の ${STATUS_LABELS[s.kind] || s.kind}が消えた。`);
+            systemLines.push(toText(unit.name));
+          });
         unit.statuses = removeExpiredStatuses(unit.statuses);
       });
 
       teamState.statuses.forEach((s) => { s.duration -= 1; });
+      teamState.statuses
+        .filter((s) => s.duration <= 0)
+        .forEach((s) => {
+          systemLines.push(`${team === TEAM.ALLY ? "味方側" : "敵側"}の ${STATUS_LABELS[s.kind] || s.kind}が切れた。`);
+        });
       teamState.statuses = removeExpiredStatuses(teamState.statuses);
     });
 
     gameState.globalStatuses.forEach((s) => { s.duration -= 1; });
+    gameState.globalStatuses
+      .filter((s) => s.duration <= 0)
+      .forEach((s) => {
+        systemLines.push(`${STATUS_LABELS[s.kind] || s.kind}が消えた。`);
+      });
     gameState.globalStatuses = removeExpiredStatuses(gameState.globalStatuses);
+    pushSystemLog(systemLines, "ターン終了時の効果", LOG_TEAM.NEUTRAL);
   };
 
   const checkWinLose = () => {
@@ -526,7 +617,6 @@
   };
 
   const resolveTurn = () => {
-    pushLog(`--- ターン${gameState.turn} 開始 ---`, "turnStart");
     const queue = [];
 
     Object.values(gameState.plannedActions).forEach((action) => queue.push(action));
@@ -549,7 +639,6 @@
     queue.forEach(executeAction);
     applyEndTurnEffects();
     checkWinLose();
-    pushLog(`--- ターン${gameState.turn} 終了 ---`, "turnEnd");
 
     gameState.turn += 1;
     gameState.plannedActions = {};
@@ -837,7 +926,7 @@
   const formatEnemyHpPercent = (unit) => `${Math.round((unit.hp / unit.maxHp) * 100)}%`;
   const formatAllyHp = (unit) => `${unit.hp} / ${unit.maxHp}`;
   const formatHpByTeam = (unit) => unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit) : formatAllyHp(unit);
-  const statusText = (status) => `${status.kind}:${status.duration}`;
+  const statusText = (status) => `${STATUS_LABELS[status.kind] || status.kind}（${status.duration}ターン）`;
   const toJaMoveName = (move) => move.name;
   const MOVE_TARGET_DESCRIPTION = {
     front: "単体 / 前方",
@@ -864,6 +953,72 @@
       frag.appendChild(chip);
     });
     return frag;
+  };
+
+  const getFieldStatusBuckets = () => {
+    const weather = [];
+    const field = [];
+    gameState.globalStatuses.forEach((status) => {
+      if (status.category === "weather" || status.tags?.includes("weather")) weather.push(status);
+      else field.push(status);
+    });
+    return { weather, field };
+  };
+
+  const createStatusList = (items) => {
+    const list = createEl("div", "field-list");
+    if (!items || items.length === 0) {
+      list.appendChild(createEl("div", "field-empty", "なし"));
+      return list;
+    }
+    items.forEach((status) => {
+      list.appendChild(createEl("div", "field-item", statusText(status)));
+    });
+    return list;
+  };
+
+  const renderFieldStatusPanel = () => {
+    const panel = createEl("div", "field-panel");
+    panel.appendChild(createEl("div", "field-title", "フィールド状態"));
+
+    const buckets = getFieldStatusBuckets();
+
+    const weatherRow = createEl("div", "field-row");
+    weatherRow.appendChild(createEl("div", "field-row-title", "天候"));
+    weatherRow.appendChild(createStatusList(buckets.weather));
+    panel.appendChild(weatherRow);
+
+    const fieldRow = createEl("div", "field-row");
+    fieldRow.appendChild(createEl("div", "field-row-title", "フィールド効果"));
+    fieldRow.appendChild(createStatusList(buckets.field));
+    panel.appendChild(fieldRow);
+
+    const allyRow = createEl("div", "field-row");
+    allyRow.appendChild(createEl("div", "field-row-title", "味方"));
+    allyRow.appendChild(createStatusList(gameState.teams.ally.statuses));
+    panel.appendChild(allyRow);
+
+    const enemyRow = createEl("div", "field-row");
+    enemyRow.appendChild(createEl("div", "field-row-title", "敵"));
+    enemyRow.appendChild(createStatusList(gameState.teams.enemy.statuses));
+    panel.appendChild(enemyRow);
+
+    return panel;
+  };
+
+  const renderLogEntry = (entry) => {
+    const teamClass = entry.team || LOG_TEAM.NEUTRAL;
+    const card = createEl("article", `log-entry ${teamClass}`);
+    card.appendChild(createEl("div", "log-title", entry.title));
+    const body = createEl("div", "log-lines");
+    (entry.lines || []).forEach((line) => {
+      body.appendChild(createEl("div", "log-line", line));
+    });
+    if (!entry.lines || entry.lines.length === 0) {
+      body.appendChild(createEl("div", "log-line", "—"));
+    }
+    card.appendChild(body);
+    return card;
   };
 
   const renderMoveBadge = (move) => {
@@ -1001,28 +1156,28 @@
   };
 
   const getNavigationMessageText = () => {
-    if (gameState.phase === PHASE.GAMEOVER) return "Battle complete.";
+    if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
 
     if (gameState.ui.commandMode === "switch") {
       if (gameState.ui.selectedReserveIndex === null) {
-        return "Select a reserve unit to switch.";
+        return "交代する控えを選んでください。";
       }
       if (gameState.ui.selectedSwitchDestination === null) {
-        return "Select the destination ally slot.";
+        return "入れ替える味方スロットを選んでください。";
       }
-      return "Switch ready. Select another unit or continue planning.";
+      return "交代を選択しました。次の行動を選んでください。";
     }
 
     if (gameState.ui.commandMode === "fight") {
       const selectedMove = MOVES[gameState.ui.previewMoveId];
-      if (!selectedMove) return "Select a move.";
+      if (!selectedMove) return "わざを選んでください。";
       if (selectedMove.targetMode === "single") {
-        return "Select a target on the highlighted cells.";
+        return "ハイライトされたマスから対象を選んでください。";
       }
-      return "This move affects all highlighted targets.";
+      return "このわざはハイライトされた対象すべてに当たります。";
     }
 
-    return "Select a move.";
+    return "わざを選んでください。";
   };
 
   const renderNavigationMessage = () => {
@@ -1131,8 +1286,11 @@
     side.appendChild(footer);
 
     const log = createEl("div", "log");
-    log.textContent = gameState.log.slice(-CONFIG.LOG_VISIBLE_LINES).reverse().join("\n");
+    gameState.log.forEach((entry) => {
+      log.appendChild(renderLogEntry(entry));
+    });
     side.appendChild(log);
+    side.appendChild(renderFieldStatusPanel());
 
     return side;
   };
