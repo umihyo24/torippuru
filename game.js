@@ -8,6 +8,7 @@
     BOARD_COLS: 3,
     BOARD_ROWS: 2,
     MAX_LOG_LINES: 120,
+    LOG_VISIBLE_LINES: 8,
     MAX_TURNS: 60,
     POISON_RATIO: 0.1,
     BARRIER_RATIO: 0.5,
@@ -220,7 +221,7 @@
       targetCandidates: [],
       selectedTargetPos: null
     },
-    log: ["バトル準備完了。味方3体の行動を決めてください。"],
+    log: [],
     temp: {
       renderCells: []
     }
@@ -291,7 +292,10 @@
     unit.hp = clamp(hpValue, 0, unit.maxHp);
   };
 
-  const pushLog = (text) => {
+  const BATTLE_LOG_TYPES = new Set(["turnStart", "moveUsed", "damage", "status", "ko", "turnEnd"]);
+
+  const pushLog = (text, type = "ui") => {
+    if (!BATTLE_LOG_TYPES.has(type)) return;
     gameState.log.push(text);
     if (gameState.log.length > CONFIG.MAX_LOG_LINES) {
       gameState.log.splice(0, gameState.log.length - CONFIG.MAX_LOG_LINES);
@@ -378,7 +382,7 @@
   const applyStatusToUnit = (unit, statusKind, duration) => {
     const status = cloneStatus(statusKind, duration);
     addStatusToContainer(unit.statuses, status);
-    pushLog(`${unit.name} に ${status.kind}（${status.duration}T）付与。`);
+    pushLog(`${unit.name} に ${status.kind}（${status.duration}T）付与。`, "status");
   };
 
   const runEffect = ({ actor, target, effect }) => {
@@ -387,7 +391,7 @@
     }
     if (effect.type === "drain" && target) {
       const healed = healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
-      pushLog(`${actor.name} はHPを ${healed} 回復。`);
+      pushLog(`${actor.name} はHPを ${healed} 回復。`, "status");
     }
   };
 
@@ -401,7 +405,6 @@
         const target = effect.target === "self" ? unit : context?.target;
         if (target && isAlive(target)) {
           applyStatusToUnit(target, effect.status, effect.duration);
-          pushLog(`${unit.name} の特性 ${ability.id} が発動。`);
         }
       }
     });
@@ -412,21 +415,15 @@
     if (!move) return;
 
     const candidates = getValidTargetsForMove(actor, move);
-    if (candidates.length === 0) {
-      pushLog(`${actor.name} の ${move.name} は有効対象なし。`);
-      return;
-    }
+    if (candidates.length === 0) return;
 
     const targets = move.targetMode === "single"
       ? candidates.filter((c) => c.x === action.targetPos?.x && c.y === action.targetPos?.y)
       : candidates;
 
-    if (targets.length === 0) {
-      pushLog(`${actor.name} の ${move.name} は不発（対象不正）。`);
-      return;
-    }
+    if (targets.length === 0) return;
 
-    pushLog(`${actor.name} の ${move.name}！`);
+    pushLog(`${actor.name} の ${move.name}！`, "moveUsed");
 
     targets.forEach((targetCell) => {
       const target = getUnitAt({ x: targetCell.x, y: targetCell.y });
@@ -438,7 +435,7 @@
       if (move.category === "attack") {
         dealt = calcDamage(actor, target, move);
         setHp(target, target.hp - dealt);
-        pushLog(`- ${target.name} に ${dealt} ダメージ（${target.hp}/${target.maxHp}）。`);
+        pushLog(`- ${target.name} に ${dealt} ダメージ（${target.hp}/${target.maxHp}）。`, "damage");
       }
 
       move.afterDamage.forEach((effectTemplate) => {
@@ -447,19 +444,16 @@
       });
 
       triggerAbilityHook(actor, "onAfterDamage", { target });
-      if (!isAlive(target)) pushLog(`☠ ${target.name} はたおれた。`);
+      if (!isAlive(target)) pushLog(`☠ ${target.name} はたおれた。`, "ko");
     });
   };
 
-  const executeSwitchAction = (actor, action) => {
-    const teamState = getTeamState(actor.team);
+  const executeSwitchAction = (action) => {
+    const teamState = getTeamState(action.team);
     const reserve = teamState.reserve[action.reserveIndex];
     const toSlot = action.toSlot;
 
-    if (!reserve || toSlot === null || toSlot === undefined) {
-      pushLog(`${actor.name} のこうたいは失敗。`);
-      return;
-    }
+    if (!reserve || toSlot === null || toSlot === undefined) return;
 
     const outgoing = teamState.active[toSlot] || null;
     teamState.active[toSlot] = reserve;
@@ -467,7 +461,6 @@
     teamState.reserve[action.reserveIndex] = outgoing;
     if (outgoing) outgoing.slot = `r${action.reserveIndex}`;
 
-    pushLog(`${actor.name} がこうたい：${reserve.name} がスロット${toSlot + 1}へ。`);
   };
 
   const executeAction = (action) => {
@@ -476,7 +469,7 @@
     if (!actor || !isAlive(actor)) return;
 
     if (action.type === "fight") executeFightAction(actor, action);
-    if (action.type === "switch") executeSwitchAction(actor, action);
+    if (action.type === "switch") executeSwitchAction(action);
   };
 
   const applyEndTurnEffects = () => {
@@ -489,8 +482,8 @@
         if (getStatusByKind(unit, "poison")) {
           const poisonDmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
           setHp(unit, unit.hp - poisonDmg);
-          pushLog(`${unit.name} はどくで ${poisonDmg} ダメージ。`);
-          if (!isAlive(unit)) pushLog(`☠ ${unit.name} はどくでたおれた。`);
+          pushLog(`${unit.name} はどくで ${poisonDmg} ダメージ。`, "damage");
+          if (!isAlive(unit)) pushLog(`☠ ${unit.name} はどくでたおれた。`, "ko");
         }
 
         unit.statuses.forEach((s) => { s.duration -= 1; });
@@ -512,19 +505,17 @@
     if (!allyAlive && !enemyAlive) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = "draw";
-      pushLog("結果：引き分け。");
     } else if (!enemyAlive) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = TEAM.ALLY;
-      pushLog("勝利！敵を全滅させた。");
     } else if (!allyAlive) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = TEAM.ENEMY;
-      pushLog("敗北…味方が全滅した。");
     }
   };
 
   const resolveTurn = () => {
+    pushLog(`--- ターン${gameState.turn} 開始 ---`, "turnStart");
     const queue = [];
 
     Object.values(gameState.plannedActions).forEach((action) => queue.push(action));
@@ -547,6 +538,7 @@
     queue.forEach(executeAction);
     applyEndTurnEffects();
     checkWinLose();
+    pushLog(`--- ターン${gameState.turn} 終了 ---`, "turnEnd");
 
     gameState.turn += 1;
     gameState.plannedActions = {};
@@ -560,7 +552,6 @@
     if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = "draw";
-      pushLog(`${CONFIG.MAX_TURNS}ターン到達。強制引き分け。`);
     }
   };
 
@@ -700,14 +691,12 @@
     if (gameState.phase !== PHASE.PLAYING || !allLivingAlliesPlanned()) return;
     gameState.phase = PHASE.WAITING_ENEMY;
     clearTargetPreview();
-    pushLog("味方の行動を決定。敵の行動を待機中...");
     render();
 
     window.setTimeout(() => {
       if (gameState.phase !== PHASE.WAITING_ENEMY) return;
       gameState.enemyPlannedActions = buildEnemyPlans();
       gameState.phase = PHASE.RESOLVING;
-      pushLog(`--- ターン${gameState.turn} 解決 ---`);
       resolveTurn();
       if (gameState.phase !== PHASE.GAMEOVER) {
         gameState.phase = PHASE.PLAYING;
@@ -736,7 +725,6 @@
     gameState.ui.previewTargets = candidates.map((c) => ({ x: c.x, y: c.y }));
     gameState.ui.targetCandidates = candidates;
     gameState.ui.selectedTargetPos = null;
-    pushLog(`${actor.name}：${move.name} を選択。対象をボードで指定してください。`);
   };
 
   const confirmCurrentFightAction = ({ slot, move, targetPos }) => {
@@ -749,12 +737,6 @@
     };
 
     gameState.ui.selectedTargetPos = targetPos ? { ...targetPos } : null;
-    const actor = gameState.teams.ally.active[slot];
-    if (targetPos) {
-      pushLog(`${actor.name}：${move.name} → マス(${targetPos.x + 1},${targetPos.y + 1})を確定。`);
-    } else {
-      pushLog(`${actor.name}：${move.name}（範囲）を確定。`);
-    }
 
     if (!advancePlanningSlot()) {
       queueTurnResolution();
@@ -797,8 +779,6 @@
       reserveIndex: gameState.ui.selectedReserveIndex,
       toSlot
     };
-    const reserve = gameState.teams.ally.reserve[gameState.ui.selectedReserveIndex];
-    pushLog(`${actor.name}：こうたい ${reserve.name} → スロット${toSlot + 1}。`);
     if (!advancePlanningSlot()) {
       queueTurnResolution();
     }
@@ -807,7 +787,6 @@
   const startBattle = () => {
     gameState.phase = PHASE.PLAYING;
     initializePlanningTurn();
-    pushLog("バトル開始。");
   };
 
   const resetBattle = () => {
@@ -1113,7 +1092,7 @@
     side.appendChild(footer);
 
     const log = createEl("div", "log");
-    log.textContent = gameState.log.slice().reverse().join("\n");
+    log.textContent = gameState.log.slice(-CONFIG.LOG_VISIBLE_LINES).reverse().join("\n");
     side.appendChild(log);
 
     return side;
@@ -1167,6 +1146,5 @@
 
   gameState.phase = PHASE.PLAYING;
   initializePlanningTurn();
-  pushLog("戦闘フェーズ開始。左から順番に味方の行動を決定してください。");
   render();
 })();
