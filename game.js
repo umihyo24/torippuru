@@ -805,6 +805,21 @@
   const formatHpByTeam = (unit) => unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit) : formatAllyHp(unit);
   const statusText = (status) => `${status.kind}:${status.duration}`;
   const toJaMoveName = (move) => move.name;
+  const MOVE_TARGET_DESCRIPTION = {
+    front: "単体 / 前方",
+    adjacentEnemy: "単体 / 前方",
+    front3: "前列3体",
+    allyLine: "前列3体",
+    self: "単体 / 自分",
+    all: "全体"
+  };
+
+  const getMoveTargetDescription = (move) => MOVE_TARGET_DESCRIPTION[move.patternId] || "単体";
+  const isTargetPreviewActive = () => (
+    gameState.ui.commandMode === "fight" &&
+    !!gameState.ui.selectedMoveId &&
+    gameState.ui.targetCandidates.length > 0
+  );
 
   const renderStatusChips = (statuses) => {
     const frag = document.createDocumentFragment();
@@ -857,34 +872,37 @@
     return btn;
   };
 
-  const renderUnitPanel = ({ unit, team, slot, selected }) => {
-    const panel = createEl("div", `panel ${team}${selected ? " selected" : ""}${!isAlive(unit) ? " dead" : ""}`);
-    panel.dataset.action = "select-ally";
-    panel.dataset.slot = String(slot);
+  const renderBattleHud = () => {
+    const hud = createEl("div", "battle-hud");
+    const enemyAlive = gameState.teams.enemy.active.filter(isAlive).length;
+    const allyAlive = gameState.teams.ally.active.filter(isAlive).length;
 
-    panel.appendChild(createEl("div", "name", unit ? unit.name : "空き"));
-    panel.appendChild(createEl("div", "stats", `Lv.${CONFIG.LEVEL}  SPD ${unit.spd}`));
+    const infoRow = createEl("div", "hud-row");
+    infoRow.appendChild(createEl("div", "hud-title", `敵 ${enemyAlive}/3 生存`));
+    infoRow.appendChild(createEl("div", "hud-title", `味方 ${allyAlive}/3 生存`));
+    hud.appendChild(infoRow);
 
-    panel.appendChild(createImageWithFallback({
-      src: getAssetPath("portraits", unit.portrait),
-      alt: unit.name,
-      mirror: team === TEAM.ALLY
-    }));
+    const selectors = createEl("div", "ally-selectors");
+    gameState.teams.ally.active.forEach((unit, slot) => {
+      const plan = gameState.plannedActions[slot];
+      const btn = createEl(
+        "button",
+        `ally-selector${slot === gameState.ui.selectedAllySlot ? " active" : ""}${!isAlive(unit) ? " dead" : ""}`
+      );
+      btn.dataset.action = "select-ally";
+      btn.dataset.slot = String(slot);
+      if (!isAlive(unit)) btn.disabled = true;
 
-    const hpRow = createEl("div");
-    const hpText = team === TEAM.ALLY ? formatAllyHp(unit) : formatEnemyHpPercent(unit);
-    hpRow.appendChild(createEl("div", "stats", `HP ${hpText}`));
-    const bar = createEl("div", "hpbar");
-    const fill = createEl("span");
-    fill.style.width = `${Math.round((unit.hp / unit.maxHp) * 100)}%`;
-    bar.appendChild(fill);
-    hpRow.appendChild(bar);
-    panel.appendChild(hpRow);
+      btn.appendChild(createEl("div", "name", `${slot + 1}. ${unit.name}`));
+      btn.appendChild(createEl("div", "stats", `HP ${formatAllyHp(unit)}`));
+      if (plan?.type === "fight") btn.appendChild(createEl("div", "stats", `予定: ${toJaMoveName(MOVES[plan.moveId])}`));
+      else if (plan?.type === "switch") btn.appendChild(createEl("div", "stats", "予定: こうたい"));
+      else btn.appendChild(createEl("div", "stats", "予定: 未選択"));
+      selectors.appendChild(btn);
+    });
 
-    const statusWrap = createEl("div");
-    statusWrap.appendChild(renderStatusChips(unit.statuses));
-    panel.appendChild(statusWrap);
-    return panel;
+    hud.appendChild(selectors);
+    return hud;
   };
 
   const renderBoardCell = (x, y) => {
@@ -892,9 +910,13 @@
     const unit = getUnitAt({ x, y });
     const isCandidate = gameState.ui.targetCandidates.some((c) => c.x === x && c.y === y);
     const selectedTarget = gameState.ui.selectedTargetPos;
+    const targetPreviewActive = isTargetPreviewActive();
 
     if (isCandidate) {
       cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
+    }
+    if (targetPreviewActive && !isCandidate) {
+      cell.classList.add("dimmed");
     }
     if (selectedTarget && selectedTarget.x === x && selectedTarget.y === y) {
       cell.classList.add("targeted");
@@ -957,10 +979,13 @@
       wrap.appendChild(movesWrap);
 
       const selectedMove = MOVES[gameState.ui.selectedMoveId];
-      if (selectedMove && selectedMove.targetMode === "single") {
-        wrap.appendChild(createEl("div", "stats", "ハイライトされた対象マスを選んでください。"));
-      } else if (selectedMove) {
-        wrap.appendChild(createEl("div", "stats", "範囲わざを確定しました。"));
+      if (selectedMove) {
+        wrap.appendChild(createEl("div", "move-target-description", `対象: ${getMoveTargetDescription(selectedMove)}`));
+        if (selectedMove.targetMode === "single") {
+          wrap.appendChild(createEl("div", "stats", "ハイライトされた対象マスを選んでください。"));
+        } else {
+          wrap.appendChild(createEl("div", "stats", "範囲わざを確定しました。"));
+        }
       }
     }
 
@@ -1038,16 +1063,7 @@
 
     const main = createEl("div", "main");
 
-    const enemyRow = createEl("div", "unit-row");
-    gameState.teams.enemy.active.forEach((unit, slot) => {
-      enemyRow.appendChild(renderUnitPanel({
-        unit,
-        team: TEAM.ENEMY,
-        slot,
-        selected: false
-      }));
-    });
-    main.appendChild(enemyRow);
+    main.appendChild(renderBattleHud());
 
     const board = createEl("div", "board");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
@@ -1058,17 +1074,6 @@
       }
     }
     main.appendChild(board);
-
-    const allyRow = createEl("div", "unit-row");
-    gameState.teams.ally.active.forEach((unit, slot) => {
-      allyRow.appendChild(renderUnitPanel({
-        unit,
-        team: TEAM.ALLY,
-        slot,
-        selected: slot === gameState.ui.selectedAllySlot
-      }));
-    });
-    main.appendChild(allyRow);
 
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
