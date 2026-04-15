@@ -300,10 +300,19 @@
     return el;
   };
 
-  const createImageWithFallback = ({ src, alt, mirror = false }) => {
-    const wrap = createEl("div", `portrait-wrap${mirror ? " mirror" : ""}`);
+  const createImageWithFallback = ({
+    src,
+    alt,
+    mirror = false,
+    wrapperClass = "portrait-wrap",
+    placeholderLabel = "画像なし",
+    placeholderSubLabel = "NO SIGNAL"
+  }) => {
+    const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
     const img = document.createElement("img");
-    const placeholder = createEl("div", "img-placeholder", "イメージ準備中");
+    const placeholder = createEl("div", "img-placeholder");
+    const label = createEl("div", "img-placeholder-label", placeholderLabel);
+    const subLabel = createEl("div", "img-placeholder-sub", placeholderSubLabel);
     img.alt = alt;
     img.src = src;
     img.loading = "lazy";
@@ -311,8 +320,26 @@
       img.style.display = "none";
       placeholder.style.display = "flex";
     };
+    placeholder.append(label, subLabel);
     wrap.append(img, placeholder);
     return wrap;
+  };
+
+  const applyBoardBackgroundWithFallback = (boardEl, src) => {
+    const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
+    boardEl.style.backgroundImage = gradient;
+    boardEl.style.backgroundSize = "cover";
+    boardEl.style.backgroundPosition = "center";
+    if (!src) return;
+
+    const bg = new Image();
+    bg.onload = () => {
+      boardEl.style.backgroundImage = `${gradient}, url('${src}')`;
+    };
+    bg.onerror = () => {
+      boardEl.style.backgroundImage = gradient;
+    };
+    bg.src = src;
   };
 
   const clearTempArrays = () => {
@@ -789,8 +816,16 @@
   };
 
   const renderMoveBadge = (move) => {
-    const icon = move.category === "attack" ? "⚔" : "✦";
-    const badge = createEl("span", "move-icon-badge", icon);
+    const iconKey = move.category === "attack" ? "attack" : "status";
+    const iconWrap = createImageWithFallback({
+      src: getAssetPath("icons", iconKey),
+      alt: `${move.category} icon`,
+      wrapperClass: "move-icon-asset",
+      placeholderLabel: move.category === "attack" ? "ATK" : "STS",
+      placeholderSubLabel: "ICON"
+    });
+    const badge = createEl("span", "move-icon-badge");
+    badge.appendChild(iconWrap);
     badge.title = MOVE_CATEGORY_LABEL[move.category] || move.category;
     return badge;
   };
@@ -1015,9 +1050,7 @@
     main.appendChild(enemyRow);
 
     const board = createEl("div", "board");
-    board.style.backgroundImage = `linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2)), url('${gameState.battlefield.background}')`;
-    board.style.backgroundSize = "cover";
-    board.style.backgroundPosition = "center";
+    applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
 
     for (let y = 0; y < CONFIG.BOARD_ROWS; y += 1) {
       for (let x = 0; x < CONFIG.BOARD_COLS; x += 1) {
