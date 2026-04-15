@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deterministic 3v3 Battle Prototype</title>
+  <title>決定論3v3バトルプロトタイプ</title>
   <style>
     :root {
       color-scheme: dark;
@@ -27,12 +27,12 @@
       background: #1a2233;
       box-shadow: 0 20px 40px rgba(0,0,0,.45);
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: 1fr 280px;
       min-height: 90vh;
     }
     .main {
       display: grid;
-      grid-template-rows: auto 1fr auto auto;
+      grid-template-rows: auto 1fr auto auto auto;
       gap: 8px;
       padding: 10px;
       background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
@@ -47,7 +47,7 @@
       border-radius: 10px;
       background: rgba(19,26,42,.92);
       padding: 8px;
-      min-height: 128px;
+      min-height: 138px;
       display: grid;
       grid-template-rows: auto auto 1fr auto;
       gap: 4px;
@@ -57,14 +57,14 @@
     .panel.ally { border-color: #5f9c66; }
     .panel.selected { outline: 3px solid #ffd34a; }
     .panel.dead { opacity: .45; filter: grayscale(1); }
-    .name { font-weight: 700; letter-spacing: .2px; }
+    .name { font-weight: 700; letter-spacing: .2px; font-size: 14px; }
     .stats { font-size: 12px; color: #c2cce0; }
     .portrait-wrap {
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 64px;
+      height: 70px;
       border: 1px solid #45557a;
       border-radius: 8px;
       background: rgba(0,0,0,.26);
@@ -82,15 +82,17 @@
       display: none;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
-      color: #d4d7de;
+      font-size: 12px;
+      color: #eef1f8;
+      text-shadow: 0 1px 0 rgba(0,0,0,.55);
       background: repeating-linear-gradient(
-        45deg,
-        rgba(90, 98, 122, 0.7),
-        rgba(90, 98, 122, 0.7) 10px,
-        rgba(40, 46, 58, 0.75) 10px,
-        rgba(40, 46, 58, 0.75) 20px
+        135deg,
+        rgba(66, 73, 98, 0.75),
+        rgba(66, 73, 98, 0.75) 12px,
+        rgba(35, 40, 56, 0.86) 12px,
+        rgba(35, 40, 56, 0.86) 24px
       );
+      border: 1px dashed rgba(245, 245, 255, 0.42);
     }
     .hpbar {
       height: 12px;
@@ -113,17 +115,18 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       grid-template-rows: repeat(2, 1fr);
       gap: 10px;
-      min-height: 230px;
+      min-height: 280px;
     }
     .cell {
       border: 2px solid rgba(255,255,255,.24);
-      border-radius: 8px;
-      padding: 6px;
-      background: rgba(0,0,0,.2);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: 88px;
+      border-radius: 10px;
+      padding: 8px;
+      background: linear-gradient(180deg, rgba(15,17,23,.28), rgba(22,26,35,.46));
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 8px;
+      align-items: center;
+      min-height: 122px;
       transition: .12s ease;
       cursor: pointer;
     }
@@ -132,7 +135,26 @@
     .cell:hover { transform: translateY(-2px); }
     .cell.targeted { outline: 3px solid #ffe35e; }
     .cell .mini { font-size: 12px; color: #dbe5f7; }
-    .cell .slot { font-size: 11px; opacity: .85; }
+    .cell .slot { display: none; }
+    .cell.empty {
+      cursor: default;
+      opacity: .65;
+      border-color: rgba(255,255,255,.12);
+      background: rgba(18, 22, 30, 0.35);
+    }
+    .cell-unit-main { display: grid; gap: 4px; }
+    .cell-hp {
+      font-size: 12px;
+      font-weight: 700;
+      color: #f5f7ff;
+    }
+    .cell-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f0f4ff;
+    }
+    .mini-portrait { height: 48px; border-radius: 8px; }
+    .mini-portrait .img-placeholder { font-size: 9px; }
     .command {
       border: 2px solid #576a8c;
       border-radius: 10px;
@@ -146,6 +168,7 @@
     .moves,
     .switches,
     .destinations { display: flex; flex-wrap: wrap; gap: 8px; }
+    .moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     button {
       background: #3f4f73;
       color: #f6fbff;
@@ -158,8 +181,33 @@
     button:hover:not(:disabled) { filter: brightness(1.15); }
     button:disabled { opacity: .45; cursor: not-allowed; }
     .action-btn.active { outline: 2px solid #ffd14a; }
-    .move.attack { border-left: 5px solid #f47a4d; }
-    .move.status { border-left: 5px solid #6ac7ff; }
+    .move {
+      min-height: 66px;
+      text-align: left;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      border-width: 2px;
+    }
+    .move.active { outline: 2px solid #ffd14a; }
+    .move-icon-badge {
+      min-width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.45);
+    }
+    .move-name { font-size: 13px; font-weight: 700; line-height: 1.2; }
+    .move-meta { font-size: 11px; color: #d8e2f8; }
+    .move.attack { border-left: 6px solid #f47a4d; }
+    .move.status { border-left: 6px solid #6ac7ff; }
     .type-fire { background: #7c3a2d; }
     .type-water { background: #274f8c; }
     .type-earth { background: #5d5136; }
@@ -194,7 +242,7 @@
       padding: 8px;
       overflow-y: auto;
       background: rgba(0,0,0,.32);
-      font-size: 13px;
+      font-size: 12px;
       line-height: 1.35;
       white-space: pre-line;
     }
@@ -213,9 +261,32 @@
       gap: 6px;
       flex-wrap: wrap;
     }
+    .section-title {
+      font-size: 12px;
+      letter-spacing: .6px;
+      color: #d7e1f4;
+      font-weight: 700;
+      opacity: .9;
+    }
+    .reserve-card {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 8px;
+      align-items: center;
+      min-width: 180px;
+      padding: 6px 8px;
+      border: 1px solid #6c82ad;
+      border-radius: 8px;
+      background: rgba(31, 39, 60, 0.95);
+      cursor: pointer;
+    }
+    .reserve-card.active { outline: 2px solid #ffd34a; }
+    .reserve-card:disabled { opacity: .45; cursor: not-allowed; }
+    .dest-btn.active { outline: 2px solid #ffe162; }
     @media (max-width: 1060px) {
       #app { grid-template-columns: 1fr; }
       .sidebar { border-left: none; border-top: 2px solid #3e4e6f; min-height: 240px; }
+      .moves { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -434,7 +505,7 @@
       targetCandidates: [],
       selectedTargetPos: null
     },
-    log: ["Battle prototype ready. Plan actions for all allies."],
+    log: ["バトル準備完了。味方3体の行動を決めてください。"],
     temp: {
       renderCells: []
     }
@@ -523,7 +594,7 @@
   const createImageWithFallback = ({ src, alt, mirror = false }) => {
     const wrap = createEl("div", `portrait-wrap${mirror ? " mirror" : ""}`);
     const img = document.createElement("img");
-    const placeholder = createEl("div", "img-placeholder", "NO IMAGE");
+    const placeholder = createEl("div", "img-placeholder", "イメージ準備中");
     img.alt = alt;
     img.src = src;
     img.loading = "lazy";
@@ -567,7 +638,7 @@
   const applyStatusToUnit = (unit, statusKind, duration) => {
     const status = cloneStatus(statusKind, duration);
     addStatusToContainer(unit.statuses, status);
-    pushLog(`${unit.name} gained ${status.kind} (${status.duration}T).`);
+    pushLog(`${unit.name} に ${status.kind}（${status.duration}T）付与。`);
   };
 
   const runEffect = ({ actor, target, effect }) => {
@@ -577,7 +648,7 @@
     if (effect.type === "drain" && target) {
       // Drain amount calculated from this action's damage bookkeeping
       const healed = healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
-      pushLog(`${actor.name} drained ${healed} HP.`);
+      pushLog(`${actor.name} はHPを ${healed} 回復。`);
     }
   };
 
@@ -591,7 +662,7 @@
         const target = effect.target === "self" ? unit : context?.target;
         if (target && isAlive(target)) {
           applyStatusToUnit(target, effect.status, effect.duration);
-          pushLog(`${unit.name}'s ability ${ability.id} activated.`);
+          pushLog(`${unit.name} の特性 ${ability.id} が発動。`);
         }
       }
     });
@@ -603,7 +674,7 @@
 
     const candidates = getValidTargetsForMove(actor, move);
     if (candidates.length === 0) {
-      pushLog(`${actor.name} used ${move.name}, but no valid targets.`);
+      pushLog(`${actor.name} の ${move.name} は有効対象なし。`);
       return;
     }
 
@@ -612,11 +683,11 @@
       : candidates;
 
     if (targets.length === 0) {
-      pushLog(`${actor.name}'s ${move.name} failed (invalid target).`);
+      pushLog(`${actor.name} の ${move.name} は不発（対象不正）。`);
       return;
     }
 
-    pushLog(`${actor.name} used ${move.name}.`);
+    pushLog(`${actor.name} の ${move.name}！`);
 
     targets.forEach((targetCell) => {
       const target = getUnitAt({ x: targetCell.x, y: targetCell.y });
@@ -628,7 +699,7 @@
       if (move.category === "attack") {
         dealt = calcDamage(actor, target, move);
         setHp(target, target.hp - dealt);
-        pushLog(`- ${target.name} took ${dealt} damage (${target.hp}/${target.maxHp}).`);
+        pushLog(`- ${target.name} に ${dealt} ダメージ（${target.hp}/${target.maxHp}）。`);
       }
 
       move.afterDamage.forEach((effectTemplate) => {
@@ -637,7 +708,7 @@
       });
 
       triggerAbilityHook(actor, "onAfterDamage", { target });
-      if (!isAlive(target)) pushLog(`☠ ${target.name} was defeated.`);
+      if (!isAlive(target)) pushLog(`☠ ${target.name} はたおれた。`);
     });
   };
 
@@ -647,7 +718,7 @@
     const toSlot = action.toSlot;
 
     if (!reserve || toSlot === null || toSlot === undefined) {
-      pushLog(`${actor.name} failed to switch.`);
+      pushLog(`${actor.name} のこうたいは失敗。`);
       return;
     }
 
@@ -657,7 +728,7 @@
     teamState.reserve[action.reserveIndex] = outgoing;
     if (outgoing) outgoing.slot = `r${action.reserveIndex}`;
 
-    pushLog(`${actor.name} switched: ${reserve.name} entered slot ${toSlot + 1}.`);
+    pushLog(`${actor.name} がこうたい：${reserve.name} がスロット${toSlot + 1}へ。`);
   };
 
   const executeAction = (action) => {
@@ -679,8 +750,8 @@
         if (getStatusByKind(unit, "poison")) {
           const poisonDmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
           setHp(unit, unit.hp - poisonDmg);
-          pushLog(`${unit.name} took ${poisonDmg} poison damage.`);
-          if (!isAlive(unit)) pushLog(`☠ ${unit.name} fell to poison.`);
+          pushLog(`${unit.name} はどくで ${poisonDmg} ダメージ。`);
+          if (!isAlive(unit)) pushLog(`☠ ${unit.name} はどくでたおれた。`);
         }
 
         unit.statuses.forEach((s) => { s.duration -= 1; });
@@ -702,15 +773,15 @@
     if (!allyAlive && !enemyAlive) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = "draw";
-      pushLog("Result: Draw.");
+      pushLog("結果：引き分け。");
     } else if (!enemyAlive) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = TEAM.ALLY;
-      pushLog("Victory! Enemies were defeated.");
+      pushLog("勝利！敵を全滅させた。");
     } else if (!allyAlive) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = TEAM.ENEMY;
-      pushLog("Defeat... Allies were wiped out.");
+      pushLog("敗北…味方が全滅した。");
     }
   };
 
@@ -750,7 +821,7 @@
     if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
       gameState.phase = PHASE.GAMEOVER;
       gameState.winner = "draw";
-      pushLog(`Reached turn ${CONFIG.MAX_TURNS}. Forced draw.`);
+      pushLog(`${CONFIG.MAX_TURNS}ターン到達。強制引き分け。`);
     }
   };
 
@@ -852,7 +923,7 @@
     if (!allLivingAlliesPlanned()) return;
 
     gameState.enemyPlannedActions = buildEnemyPlans();
-    pushLog(`--- Turn ${gameState.turn} Resolution ---`);
+    pushLog(`--- ターン${gameState.turn} 解決 ---`);
     resolveTurn();
   };
 
@@ -892,7 +963,7 @@
         moveId,
         targetPos: null
       };
-      pushLog(`${actor.name} planned ${move.name} (pattern).`);
+      pushLog(`${actor.name}：${move.name}（範囲）を選択。`);
       autoAdvanceTurnIfReady();
     } else if (candidates.length === 1) {
       gameState.plannedActions[slot] = {
@@ -903,7 +974,7 @@
         targetPos: { x: candidates[0].x, y: candidates[0].y }
       };
       gameState.ui.selectedTargetPos = { x: candidates[0].x, y: candidates[0].y };
-      pushLog(`${actor.name} planned ${move.name} on target.`);
+      pushLog(`${actor.name}：${move.name} の対象を確定。`);
       autoAdvanceTurnIfReady();
     }
   };
@@ -926,7 +997,7 @@
     };
 
     const actor = gameState.teams.ally.active[slot];
-    pushLog(`${actor.name} targeted cell (${x + 1},${y + 1}) with ${move.name}.`);
+    pushLog(`${actor.name}：${move.name} → マス(${x + 1},${y + 1})。`);
     autoAdvanceTurnIfReady();
   };
 
@@ -951,13 +1022,13 @@
       toSlot
     };
     const reserve = gameState.teams.ally.reserve[gameState.ui.selectedReserveIndex];
-    pushLog(`${actor.name} planned switch -> ${reserve.name} to slot ${toSlot + 1}.`);
+    pushLog(`${actor.name}：こうたい ${reserve.name} → スロット${toSlot + 1}。`);
     autoAdvanceTurnIfReady();
   };
 
   const startBattle = () => {
     gameState.phase = PHASE.PLAYING;
-    pushLog("Battle started.");
+    pushLog("バトル開始。");
   };
 
   const resetBattle = () => {
@@ -984,16 +1055,63 @@
   // 9) rendering
   // ------------------------------------------------------------
   const moveTypeClass = (move) => `type-${move.type}`;
+  const MOVE_CATEGORY_LABEL = { attack: "こうげき", status: "へんか" };
+  const TYPE_LABEL = {
+    fire: "ほのお",
+    water: "みず",
+    earth: "だいち",
+    nature: "しぜん",
+    light: "ひかり",
+    shadow: "かげ"
+  };
 
   const formatEnemyHpPercent = (unit) => `${Math.round((unit.hp / unit.maxHp) * 100)}%`;
+  const formatAllyHp = (unit) => `${unit.hp} / ${unit.maxHp}`;
+  const formatHpByTeam = (unit) => unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit) : formatAllyHp(unit);
+  const statusText = (status) => `${status.kind}:${status.duration}`;
+  const toJaMoveName = (move) => move.name;
 
   const renderStatusChips = (statuses) => {
     const frag = document.createDocumentFragment();
     statuses.forEach((s) => {
-      const chip = createEl("span", "status-chip", `${s.kind}:${s.duration}`);
+      const chip = createEl("span", "status-chip", statusText(s));
       frag.appendChild(chip);
     });
     return frag;
+  };
+
+  const renderMoveBadge = (move) => {
+    const icon = move.category === "attack" ? "⚔" : "✦";
+    const badge = createEl("span", "move-icon-badge", icon);
+    badge.title = MOVE_CATEGORY_LABEL[move.category] || move.category;
+    return badge;
+  };
+
+  const renderMiniBattleUnit = (unit, mirror = false) => {
+    const miniWrap = createImageWithFallback({
+      src: ASSETS.portraits[unit.portrait] || "",
+      alt: unit.name,
+      mirror
+    });
+    miniWrap.classList.add("mini-portrait");
+    return miniWrap;
+  };
+
+  const renderReserveCard = (unit, idx) => {
+    const btn = createEl("button", `reserve-card${gameState.ui.selectedReserveIndex === idx ? " active" : ""}`);
+    btn.dataset.action = "pick-reserve";
+    btn.dataset.reserveIndex = String(idx);
+    if (!unit) {
+      btn.disabled = true;
+      btn.textContent = "空き";
+      return btn;
+    }
+    btn.appendChild(renderMiniBattleUnit(unit, true));
+    const info = createEl("div");
+    info.appendChild(createEl("div", "name", unit.name));
+    info.appendChild(createEl("div", "stats", `HP ${formatAllyHp(unit)}`));
+    btn.appendChild(info);
+    return btn;
   };
 
   const renderUnitPanel = ({ unit, team, slot, selected }) => {
@@ -1001,7 +1119,7 @@
     panel.dataset.action = "select-ally";
     panel.dataset.slot = String(slot);
 
-    panel.appendChild(createEl("div", "name", unit ? unit.name : "(empty)"));
+    panel.appendChild(createEl("div", "name", unit ? unit.name : "空き"));
     panel.appendChild(createEl("div", "stats", `Lv.${CONFIG.LEVEL}  SPD ${unit.spd}`));
 
     panel.appendChild(createImageWithFallback({
@@ -1011,7 +1129,7 @@
     }));
 
     const hpRow = createEl("div");
-    const hpText = team === TEAM.ALLY ? `${unit.hp} / ${unit.maxHp}` : formatEnemyHpPercent(unit);
+    const hpText = team === TEAM.ALLY ? formatAllyHp(unit) : formatEnemyHpPercent(unit);
     hpRow.appendChild(createEl("div", "stats", `HP ${hpText}`));
     const bar = createEl("div", "hpbar");
     const fill = createEl("span");
@@ -1043,13 +1161,19 @@
     cell.dataset.x = String(x);
     cell.dataset.y = String(y);
 
-    cell.appendChild(createEl("div", "slot", `(${x + 1},${y + 1})`));
     if (unit) {
-      cell.appendChild(createEl("div", "mini", `${unit.name} ${unit.hp}/${unit.maxHp}`));
-      const statLine = createEl("div", "mini", unit.statuses.map((s) => `${s.kind}(${s.duration})`).join(" ") || "-");
-      cell.appendChild(statLine);
+      const mirror = unit.team === TEAM.ALLY;
+      cell.appendChild(renderMiniBattleUnit(unit, mirror));
+      const main = createEl("div", "cell-unit-main");
+      main.appendChild(createEl("div", "cell-name", unit.name));
+      main.appendChild(createEl("div", "cell-hp", `HP ${formatHpByTeam(unit)}`));
+      const statLine = createEl("div", "mini", unit.statuses.map((s) => `${s.kind}(${s.duration})`).join(" ") || "状態なし");
+      main.appendChild(statLine);
+      cell.appendChild(main);
     } else {
-      cell.appendChild(createEl("div", "mini", "[ empty ]"));
+      cell.classList.add("empty");
+      cell.appendChild(createEl("div", "mini", "—"));
+      cell.appendChild(createEl("div", "mini", "待機マス"));
     }
 
     gameState.temp.renderCells.push(cell);
@@ -1060,12 +1184,12 @@
     const wrap = createEl("div", "command");
     const actor = gameState.teams.ally.active[gameState.ui.selectedAllySlot];
 
-    wrap.appendChild(createEl("h3", "", `Command: ${actor ? actor.name : "-"} (slot ${gameState.ui.selectedAllySlot + 1})`));
+    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}（スロット${gameState.ui.selectedAllySlot + 1}）`));
 
     const actions = createEl("div", "actions");
-    const fightBtn = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "Fight");
+    const fightBtn = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
     fightBtn.dataset.action = "mode-fight";
-    const switchBtn = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "Switch");
+    const switchBtn = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "こうたい");
     switchBtn.dataset.action = "mode-switch";
     actions.append(fightBtn, switchBtn);
     wrap.appendChild(actions);
@@ -1075,8 +1199,11 @@
       actor.moveIds.forEach((moveId) => {
         const move = MOVES[moveId];
         const btn = createEl("button", `move ${move.category} ${moveTypeClass(move)}`);
-        const icon = move.category === "attack" ? "⚔" : "✦";
-        btn.innerHTML = `<span class="icon">${icon}</span>${move.name}`;
+        const info = createEl("div");
+        info.appendChild(createEl("div", "move-name", toJaMoveName(move)));
+        info.appendChild(createEl("div", "move-meta", `${MOVE_CATEGORY_LABEL[move.category]} / ${TYPE_LABEL[move.type] || move.type}`));
+        btn.appendChild(renderMoveBadge(move));
+        btn.appendChild(info);
         btn.dataset.action = "pick-move";
         btn.dataset.moveId = moveId;
         if (gameState.plannedActions[gameState.ui.selectedAllySlot]?.moveId === moveId) {
@@ -1088,33 +1215,29 @@
 
       const selectedMove = MOVES[gameState.ui.selectedMoveId];
       if (selectedMove && selectedMove.targetMode === "single") {
-        wrap.appendChild(createEl("div", "stats", "Select a highlighted target cell on the board."));
+        wrap.appendChild(createEl("div", "stats", "ハイライトされた対象マスを選んでください。"));
       } else if (selectedMove) {
-        wrap.appendChild(createEl("div", "stats", "Pattern move locked in."));
+        wrap.appendChild(createEl("div", "stats", "範囲わざを確定しました。"));
       }
     }
 
     if (gameState.ui.commandMode === "switch") {
       const switches = createEl("div", "switches");
       gameState.teams.ally.reserve.forEach((unit, idx) => {
-        const btn = createEl("button", gameState.ui.selectedReserveIndex === idx ? "active" : "", unit ? `${unit.name}` : "[empty]");
-        btn.dataset.action = "pick-reserve";
-        btn.dataset.reserveIndex = String(idx);
-        if (!unit) btn.disabled = true;
-        switches.appendChild(btn);
+        switches.appendChild(renderReserveCard(unit, idx));
       });
-      wrap.appendChild(createEl("div", "stats", "1) Select reserve unit"));
+      wrap.appendChild(createEl("div", "section-title", "1) こうたい先（控え）を選択"));
       wrap.appendChild(switches);
 
       const dests = createEl("div", "destinations");
       for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
         const unit = gameState.teams.ally.active[i];
-        const btn = createEl("button", gameState.ui.selectedSwitchDestination === i ? "active" : "", `Slot ${i + 1}: ${unit ? unit.name : "empty"}`);
+        const btn = createEl("button", `dest-btn${gameState.ui.selectedSwitchDestination === i ? " active" : ""}`, `スロット${i + 1} ← ${unit ? unit.name : "空き"}`);
         btn.dataset.action = "pick-destination";
         btn.dataset.toSlot = String(i);
         dests.appendChild(btn);
       }
-      wrap.appendChild(createEl("div", "stats", "2) Select destination slot"));
+      wrap.appendChild(createEl("div", "section-title", "2) 入れ替える味方スロットを選択"));
       wrap.appendChild(dests);
     }
 
@@ -1127,14 +1250,14 @@
       const box = createEl("div", "plan-box");
       const unit = gameState.teams.ally.active[i];
       const action = gameState.plannedActions[i];
-      let text = "No action";
-      if (!unit || !isAlive(unit)) text = "Cannot act";
-      else if (action?.type === "fight") text = `Fight: ${MOVES[action.moveId].name}`;
+      let text = "未選択";
+      if (!unit || !isAlive(unit)) text = "行動不能";
+      else if (action?.type === "fight") text = `たたかう: ${toJaMoveName(MOVES[action.moveId])}`;
       else if (action?.type === "switch") {
         const reserve = gameState.teams.ally.reserve[action.reserveIndex];
-        text = `Switch: ${reserve ? reserve.name : "?"} -> ${action.toSlot + 1}`;
+        text = `こうたい: ${reserve ? reserve.name : "?"} → ${action.toSlot + 1}`;
       }
-      box.textContent = `Ally ${i + 1}: ${text}`;
+      box.textContent = `味方${i + 1}: ${text}`;
       plans.appendChild(box);
     }
     return plans;
@@ -1142,19 +1265,19 @@
 
   const renderSidebar = () => {
     const side = createEl("div", "sidebar");
-    side.appendChild(createEl("div", "stats", `Turn ${gameState.turn} | Phase: ${gameState.phase}`));
+    side.appendChild(createEl("div", "stats", `ターン ${gameState.turn} | フェーズ: ${gameState.phase}`));
 
     const footer = createEl("div", "footer");
     if (gameState.phase === PHASE.START) {
-      const start = createEl("button", "", "Start Battle");
+      const start = createEl("button", "", "バトル開始");
       start.dataset.action = "start";
       footer.appendChild(start);
     }
     if (gameState.phase === PHASE.GAMEOVER) {
-      const reset = createEl("button", "", "Restart");
+      const reset = createEl("button", "", "もう一度");
       reset.dataset.action = "reset";
       footer.appendChild(reset);
-      footer.appendChild(createEl("div", "stats", `Winner: ${gameState.winner}`));
+      footer.appendChild(createEl("div", "stats", `勝者: ${gameState.winner}`));
     }
     side.appendChild(footer);
 
@@ -1235,7 +1358,7 @@
   });
 
   gameState.phase = PHASE.PLAYING;
-  pushLog("Phase switched to playing. Build action plans for all living allies each turn.");
+  pushLog("戦闘フェーズ開始。生存中の味方全員の行動を選択してください。");
   render();
 })();
 </script>
