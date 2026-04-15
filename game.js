@@ -70,6 +70,14 @@
     adjacentEnemy: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 }],
     allyLine: [{ x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }],
     self: [{ x: 0, y: 0 }],
+    allyAdjacent: [{ x: -1, y: 0 }, { x: 1, y: 0 }],
+    singleAttackReach: [
+      { x: -1, y: -1 },
+      { x: 0, y: -1 },
+      { x: 1, y: -1 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 }
+    ],
     all: [
       { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
       { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }
@@ -79,12 +87,12 @@
   const MOVES = {
     clawStrike: {
       id: "clawStrike", name: "Claw Strike", category: "attack", type: "fire", power: 32,
-      patternId: "adjacentEnemy", targetRule: "enemy", targetMode: "single",
+      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     drainBite: {
       id: "drainBite", name: "Drain Bite", category: "attack", type: "nature", power: 28,
-      patternId: "front", targetRule: "enemy", targetMode: "single",
+      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }]
     },
     quakeWave: {
@@ -94,35 +102,35 @@
     },
     frostLance: {
       id: "frostLance", name: "Frost Lance", category: "attack", type: "water", power: 34,
-      patternId: "adjacentEnemy", targetRule: "enemy", targetMode: "single",
+      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     toxicSpit: {
       id: "toxicSpit", name: "Toxic Spit", category: "attack", type: "shadow", power: 18,
-      patternId: "adjacentEnemy", targetRule: "enemy", targetMode: "single",
+      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
       beforeDamage: [], afterDamage: []
     },
     ironGuard: {
       id: "ironGuard", name: "Iron Guard", category: "status", type: "earth", power: 0,
-      patternId: "self", targetRule: "ally", targetMode: "single",
+      patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }],
       afterDamage: []
     },
     rallyHowl: {
       id: "rallyHowl", name: "Rally Howl", category: "status", type: "light", power: 0,
-      patternId: "allyLine", targetRule: "ally", targetMode: "allPattern",
+      patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
       afterDamage: []
     },
     shellStance: {
       id: "shellStance", name: "Shell Stance", category: "status", type: "water", power: 0,
-      patternId: "self", targetRule: "ally", targetMode: "single",
+      patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }],
       afterDamage: []
     },
     venomBless: {
       id: "venomBless", name: "Venom Bless", category: "status", type: "shadow", power: 0,
-      patternId: "self", targetRule: "ally", targetMode: "single",
+      patternId: "self", targetRule: "selfOnly", targetMode: "single",
       beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
       afterDamage: []
     }
@@ -360,7 +368,7 @@
   // ------------------------------------------------------------
   const getValidTargetsForMove = (actor, move) => {
     const actorPos = toBoardPos(actor.team, actor.slot);
-    const orientation = actor.team === TEAM.ALLY ? -1 : 1;
+    const orientation = actor.team === TEAM.ALLY ? 1 : -1;
     const offsets = patterns[move.patternId] || [];
 
     return offsets
@@ -374,6 +382,9 @@
         if (move.targetRule === "ally") return unit.team === actor.team;
         if (move.targetRule === "self") return unit.uid === actor.uid;
         if (move.targetRule === "any") return true;
+        if (move.targetRule === "selfOnly") return unit.uid === actor.uid;
+        if (move.targetRule === "allyOtherSingle") return unit.team === actor.team && unit.uid !== actor.uid;
+        if (move.targetRule === "anyOtherSingle") return unit.uid !== actor.uid;
         return false;
       })
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
@@ -834,6 +845,8 @@
     front3: "前列3体",
     allyLine: "前列3体",
     self: "単体 / 自分",
+    allyAdjacent: "単体 / 隣接味方",
+    singleAttackReach: "単体 / 前列+隣接",
     all: "全体"
   };
 
