@@ -9,22 +9,27 @@ body {
   margin: 0;
   background: #151922;
   color: #f3f7ff;
-  min-height: 100vh;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   padding: 12px;
+  overflow: auto;
 }
 
 #app {
-  width: min(1320px, 100%);
+  width: 1600px;
+  min-width: 1600px;
+  max-width: 1600px;
+  height: 900px;
+  min-height: 900px;
+  max-height: 900px;
   border: 2px solid #3e4e6f;
   border-radius: 14px;
   overflow: hidden;
   background: #1a2233;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
   display: grid;
-  grid-template-columns: 1fr 280px;
-  min-height: 90vh;
+  grid-template-columns: 1fr 360px;
 }
 
 .main {
@@ -332,6 +337,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 12px;
   line-height: 1.35;
   white-space: pre-line;
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
 }
 
 .status-chip {
@@ -375,16 +383,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .reserve-card.active { outline: 2px solid #ffd34a; }
 .reserve-card:disabled { opacity: 0.45; cursor: not-allowed; }
 .dest-btn.active { outline: 2px solid #ffe162; }
-
-@media (max-width: 1060px) {
-  #app { grid-template-columns: 1fr; }
-  .sidebar {
-    border-left: none;
-    border-top: 2px solid #3e4e6f;
-    min-height: 240px;
-  }
-  .moves { grid-template-columns: 1fr; }
-}
 
 .move-target-description {
   border: 1px solid #667da8;
