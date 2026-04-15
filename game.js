@@ -1000,6 +1000,37 @@
     return cell;
   };
 
+  const getNavigationMessageText = () => {
+    if (gameState.phase === PHASE.GAMEOVER) return "Battle complete.";
+
+    if (gameState.ui.commandMode === "switch") {
+      if (gameState.ui.selectedReserveIndex === null) {
+        return "Select a reserve unit to switch.";
+      }
+      if (gameState.ui.selectedSwitchDestination === null) {
+        return "Select the destination ally slot.";
+      }
+      return "Switch ready. Select another unit or continue planning.";
+    }
+
+    if (gameState.ui.commandMode === "fight") {
+      const selectedMove = MOVES[gameState.ui.previewMoveId];
+      if (!selectedMove) return "Select a move.";
+      if (selectedMove.targetMode === "single") {
+        return "Select a target on the highlighted cells.";
+      }
+      return "This move affects all highlighted targets.";
+    }
+
+    return "Select a move.";
+  };
+
+  const renderNavigationMessage = () => {
+    const nav = createEl("div", "nav-message");
+    nav.appendChild(createEl("div", "nav-message-text", getNavigationMessageText()));
+    return nav;
+  };
+
   const renderCommandArea = () => {
     const wrap = createEl("div", "command");
     const actor = gameState.teams.ally.active[gameState.ui.currentPlanningSlot];
@@ -1036,11 +1067,6 @@
       const selectedMove = MOVES[gameState.ui.previewMoveId];
       if (selectedMove) {
         wrap.appendChild(createEl("div", "move-target-description", `対象: ${getMoveTargetDescription(selectedMove)}`));
-        if (selectedMove.targetMode === "single") {
-          wrap.appendChild(createEl("div", "stats", "ハイライトされた対象マスを選んでください。"));
-        } else {
-          wrap.appendChild(createEl("div", "stats", "ハイライト範囲をクリックして確定してください。"));
-        }
       }
     }
 
@@ -1129,6 +1155,7 @@
       }
     }
     main.appendChild(board);
+    main.appendChild(renderNavigationMessage());
 
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());

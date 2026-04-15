@@ -34,7 +34,7 @@ body {
 
 .main {
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  grid-template-rows: auto 390px 48px 240px auto;
   gap: 8px;
   padding: 10px;
   background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
@@ -122,7 +122,8 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, 1fr);
   gap: 10px;
-  min-height: 360px;
+  height: 390px;
+  min-height: 390px;
 }
 
 .cell {
@@ -212,6 +213,23 @@ body {
 .mini-portrait { height: 66px; border-radius: 8px; position: relative; z-index: 1; }
 .mini-portrait .img-placeholder { font-size: 9px; }
 
+
+.nav-message {
+  border: 2px solid #5a7099;
+  border-radius: 10px;
+  background: rgba(19, 28, 43, 0.9);
+  min-height: 44px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+}
+
+.nav-message-text {
+  font-size: 13px;
+  color: #deebff;
+  letter-spacing: 0.01em;
+}
+
 .command {
   border: 2px solid #576a8c;
   border-radius: 10px;
@@ -219,6 +237,9 @@ body {
   padding: 10px;
   display: grid;
   gap: 8px;
+  min-height: 240px;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .command h3 { margin: 0; font-size: 15px; }
