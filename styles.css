@@ -34,7 +34,7 @@ body {
 
 .main {
   display: grid;
-  grid-template-rows: 390px 48px 288px auto;
+  grid-template-rows: 390px 48px 288px var(--summary-h, 128px);
   gap: 8px;
   padding: 10px;
   background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
@@ -262,7 +262,12 @@ button {
 }
 
 button:hover:not(:disabled) { filter: brightness(1.15); }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  border-color: #607299;
+}
 .action-btn.active { outline: 2px solid #ffd14a; }
 
 .move {
@@ -325,19 +330,40 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .type-shadow { background: #4b3f63; }
 .icon { margin-right: 4px; }
 
-.plans {
+.command-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   font-size: 12px;
+  height: var(--summary-h, 128px);
+  min-height: var(--summary-h, 128px);
+  max-height: var(--summary-h, 128px);
 }
 
-.plan-box {
+.summary-card {
   border: 1px solid #5f739d;
   border-radius: 6px;
   padding: 6px;
   background: rgba(24, 31, 50, 0.8);
-  min-height: 42px;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.summary-title {
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.summary-line {
+  color: #deebff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar {
@@ -479,11 +505,30 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .reserve-card:disabled { opacity: 0.45; cursor: not-allowed; }
 .dest-btn.active { outline: 2px solid #ffe162; }
 
-.move-target-description {
+.move-detail-panel {
   border: 1px solid #667da8;
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 12px;
   color: #deebff;
   background: rgba(38, 50, 78, 0.6);
+  min-height: var(--detail-h, 72px);
+  max-height: var(--detail-h, 72px);
+  overflow: hidden;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+
+.move-detail-line {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.move-detail-placeholder {
+  opacity: 0.72;
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
