@@ -11,7 +11,7 @@
     ATK_UP_RATIO: 0.25,
     DEF_UP_RATIO: 0.25,
     MOVE_DETAIL_PANEL_HEIGHT: 72,
-    SUMMARY_PANEL_HEIGHT: 128,
+    SUMMARY_PANEL_HEIGHT: 96,
     MESSAGE_MIN_MS: 480,
     MESSAGE_AUTO_MS: 1200,
     WAIT_SHORT_MS: 220,
@@ -180,7 +180,8 @@
       selectedReplacementReserveIndex: null,
       selectedSwitchDestination: null,
       targetCandidates: [],
-      fastForwardRequested: false
+      fastForwardRequested: false,
+      isLogOpen: false
     },
     battleFlow: {
       mode: "command",
@@ -437,7 +438,10 @@
 
   const appendBattleLogEntry = (text) => {
     gameState.battleFlow.turnLogEntries.push(text);
-    gameState.log.push({ title: `ターン ${Math.max(1, gameState.turn - 1)} ログ`, lines: [text] });
+    const turnNumber = Math.max(1, gameState.turn - 1);
+    const hasTurnHeader = gameState.log.some((entry) => entry?.type === "turn" && entry.turn === turnNumber);
+    if (!hasTurnHeader) gameState.log.push({ type: "turn", turn: turnNumber, text: `ターン${turnNumber}` });
+    gameState.log.push({ type: "line", turn: turnNumber, text });
     if (gameState.log.length > CONFIG.MAX_LOG_LINES) gameState.log.splice(0, gameState.log.length - CONFIG.MAX_LOG_LINES);
   };
 
@@ -1298,6 +1302,11 @@
     initializePlanningTurn();
   };
 
+
+  const toggleBattleLogPanel = () => {
+    gameState.ui.isLogOpen = !gameState.ui.isLogOpen;
+  };
+
   const dispatch = (action) => {
     switch (action.type) {
       case "RESET": resetBattle(); break;
@@ -1309,6 +1318,7 @@
       case "CANCEL": cancelCurrentSelection(); break;
       case "UNDO": undoLastConfirmedCommand(); break;
       case "FAST_FORWARD": if (isPlaybackBusy()) gameState.ui.fastForwardRequested = true; break;
+      case "TOGGLE_LOG": toggleBattleLogPanel(); break;
       default: break;
     }
     render();
@@ -1393,13 +1403,17 @@
 
   const renderBattleLogPanel = () => {
     const log = createEl("div", "log");
+    if (!Array.isArray(gameState.log) || gameState.log.length === 0) {
+      log.appendChild(createEl("div", "log-empty", "ログはまだありません。"));
+      return log;
+    }
     gameState.log.forEach((entry) => {
-      const card = createEl("article", "log-entry neutral");
-      card.appendChild(createEl("div", "log-title", entry.title));
-      const body = createEl("div", "log-lines");
-      (entry.lines || []).forEach((line) => body.appendChild(createEl("div", "log-line", line)));
-      card.appendChild(body);
-      log.appendChild(card);
+      if (!entry || typeof entry.text !== "string") return;
+      if (entry.type === "turn") {
+        log.appendChild(createEl("div", "log-turn", entry.text));
+        return;
+      }
+      log.appendChild(createEl("div", "log-line", entry.text));
     });
     return log;
   };
@@ -1423,13 +1437,6 @@
     return sprite;
   };
 
-  const getReserveCountInfo = (team) => {
-    const teamState = gameState?.teams?.[team];
-    const reserveList = Array.isArray(teamState?.reserve) ? teamState.reserve : [];
-    const total = reserveList.length;
-    const alive = reserveList.reduce((count, unit) => count + (isAlive(unit) ? 1 : 0), 0);
-    return { total, alive };
-  };
 
   const applyUnitHighlightState = (cell, x, y) => {
     const unit = getUnitAtFromState(gameState, { x, y });
@@ -1474,19 +1481,18 @@
     return btn;
   };
 
-  const renderReservePips = (team) => {
-    const { total: reserveTotal, alive: reserveAlive } = getReserveCountInfo(team);
-    const reserve = createEl("div", "reserve-indicator");
-    reserve.appendChild(createEl("span", "reserve-label", "控え"));
-    const pipWrap = createEl("div", "reserve-pips");
-    const pipCount = Math.max(0, reserveTotal);
-    for (let i = 0; i < pipCount; i += 1) {
-      const pipClass = i < reserveAlive ? "reserve-pip is-alive" : "reserve-pip";
-      pipWrap.appendChild(createEl("span", pipClass, "●"));
-    }
-    reserve.appendChild(pipWrap);
-    reserve.appendChild(createEl("span", "reserve-count", `${reserveAlive}/${reserveTotal}`));
-    return reserve;
+  const renderStatusIcons = (unit) => {
+    const wrap = createEl("div", "status-icons");
+    const statuses = Array.isArray(unit?.statuses) ? unit.statuses : [];
+    statuses.forEach((status) => {
+      const kind = status?.kind;
+      const label = STATUS_LABELS[kind] || kind || "状態";
+      const icon = createEl("span", "status-icon", label);
+      icon.title = statusText(status);
+      wrap.appendChild(icon);
+    });
+    if (wrap.childElementCount === 0) wrap.appendChild(createEl("span", "status-empty", "-"));
+    return wrap;
   };
 
   const renderStatusPanel = (x, y) => {
@@ -1502,18 +1508,15 @@
     const hpPct = Math.round((hp / unit.maxHp) * 100);
 
     const top = createEl("div", "status-top");
-    const nameBlock = createEl("div", "status-main");
-    nameBlock.appendChild(createEl("div", "unit-name", unit.name));
-    nameBlock.appendChild(createEl("div", "unit-status", unit.statuses.map(statusText).join(" / ") || "状態なし"));
-    top.append(nameBlock, renderReservePips(unit.team));
+    top.appendChild(createEl("div", "unit-name", unit.name));
+    top.appendChild(renderStatusIcons(unit));
 
     const hpBlock = createEl("div", "status-hp");
-    hpBlock.appendChild(createEl("div", "unit-hp", `HP ${unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)}`));
     const bar = createEl("div", "hp-bar");
     const fill = createEl("div", "hp-bar-fill");
     fill.style.width = `${hpPct}%`;
     bar.appendChild(fill);
-    hpBlock.appendChild(bar);
+    hpBlock.append(bar, createEl("div", "unit-hp", unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)));
 
     panel.append(top, hpBlock);
     return panel;
@@ -1599,8 +1602,17 @@
     const undo = createEl("button", "action-btn", "前の選択に戻る");
     undo.dataset.action = "undo-command";
     undo.disabled = !canUndoPreviousCommand() || isPlaybackBusy();
-    controls.append(cancel, undo);
+    const logToggle = createEl("button", "action-btn", gameState.ui.isLogOpen ? "ログを閉じる" : "ログを開く");
+    logToggle.dataset.action = "toggle-log";
+    logToggle.disabled = isPlaybackBusy();
+    controls.append(cancel, undo, logToggle);
     wrap.appendChild(controls);
+
+    if (gameState.ui.isLogOpen) {
+      const logWrap = createEl("section", "command-log-panel");
+      logWrap.appendChild(renderBattleLogPanel());
+      wrap.appendChild(logWrap);
+    }
 
     if (gameState.ui.commandMode === "fight" && actor) {
       const moves = createEl("div", "moves");
@@ -1677,7 +1689,6 @@
     footer.appendChild(reset);
     if (gameState.phase === PHASE.GAMEOVER) footer.appendChild(createEl("div", "stats", `勝者: ${gameState.winner}`));
     side.appendChild(footer);
-    side.appendChild(renderBattleLogPanel());
     return side;
   };
 
@@ -1734,6 +1745,7 @@
     if (a === "cancel-selection") dispatch({ type: "CANCEL" });
     if (a === "undo-command") dispatch({ type: "UNDO" });
     if (a === "fast-forward") dispatch({ type: "FAST_FORWARD" });
+    if (a === "toggle-log") dispatch({ type: "TOGGLE_LOG" });
   });
 
   document.addEventListener("keydown", (event) => {
