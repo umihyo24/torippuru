@@ -29,12 +29,13 @@ body {
   background: #1a2233;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
   display: grid;
-  grid-template-columns: 1fr 250px;
+  grid-template-columns: 64px 1fr;
+  position: relative;
 }
 
 .main {
   display: grid;
-  grid-template-rows: 470px 48px 240px var(--summary-h, 96px);
+  grid-template-rows: 36px 470px 48px 240px var(--summary-h, 96px);
   gap: 8px;
   padding: 10px;
   background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
@@ -604,22 +605,6 @@ button:disabled {
   white-space: nowrap;
 }
 
-.sidebar {
-  border-left: 2px solid #3e4e6f;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  padding: 10px;
-  gap: 8px;
-  background: #151f31;
-}
-
-.command-log-panel {
-  border: 1px solid rgba(122, 144, 194, 0.8);
-  border-radius: 8px;
-  padding: 6px;
-  background: rgba(14, 20, 34, 0.8);
-}
-
 .log {
   border: 1px solid rgba(122, 144, 194, 0.55);
   border-radius: 8px;
@@ -648,6 +633,89 @@ button:disabled {
 .log-empty {
   font-size: 12px;
   color: rgba(217, 230, 255, 0.8);
+}
+
+.battle-header {
+  border: 1px solid rgba(126, 146, 189, 0.9);
+  border-radius: 8px;
+  background: rgba(13, 22, 39, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.utility-lane {
+  border-right: 2px solid #3e4e6f;
+  background: linear-gradient(180deg, #111827 0%, #141f33 100%);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 8px;
+  padding: 10px 8px;
+}
+
+.utility-btn {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #6f84ad;
+  border-radius: 10px;
+  background: rgba(33, 48, 78, 0.95);
+  color: #f0f6ff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.utility-btn:hover { filter: brightness(1.08); }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(4, 9, 18, 0.62);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.modal {
+  width: min(760px, 100%);
+  max-height: 100%;
+  border: 2px solid #7088b9;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(22, 31, 50, 0.98), rgba(16, 23, 38, 0.98));
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.45);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  padding: 12px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.modal-body {
+  min-height: 0;
+}
+
+.log.modal-log {
+  max-height: min(560px, 65vh);
+}
+
+.menu-list {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-list button {
+  width: 100%;
+  min-height: 38px;
 }
 
 .field-panel {
