@@ -15,7 +15,9 @@
     ATK_UP_RATIO: 0.25,
     DEF_UP_RATIO: 0.25,
     LEVEL: 50,
-    TIEBREAKER_TEAM_ORDER: ["ally", "enemy"]
+    TIEBREAKER_TEAM_ORDER: ["ally", "enemy"],
+    MOVE_DETAIL_PANEL_HEIGHT: 72,
+    SUMMARY_PANEL_HEIGHT: 128
   };
 
   const TEAM = {
@@ -26,8 +28,6 @@
   const PHASE = {
     START: "start",
     PLAYING: "playing",
-    WAITING_ENEMY: "waiting_enemy",
-    RESOLVING: "resolving",
     GAMEOVER: "gameover"
   };
 
@@ -215,19 +215,20 @@
       }
     },
     globalStatuses: [],
+    confirmedCommands: [null, null, null],
     plannedActions: {},
     enemyPlannedActions: {},
+    currentActorIndex: 0,
+    selectedMoveId: null,
+    selectedTargets: [],
     ui: {
-      currentPlanningSlot: 0,
-      selectedAllySlot: 0,
       commandMode: "fight",
-      selectedMoveId: null,
-      previewMoveId: null,
+      hoveredMoveId: null,
       previewTargets: [],
       selectedReserveIndex: null,
       selectedSwitchDestination: null,
       targetCandidates: [],
-      selectedTargetPos: null
+      isResolvingTurn: false
     },
     log: [],
     temp: {
@@ -642,10 +643,11 @@
 
     gameState.turn += 1;
     gameState.plannedActions = {};
+    gameState.confirmedCommands = [null, null, null];
     gameState.enemyPlannedActions = {};
 
-    gameState.ui.selectedMoveId = null;
-    gameState.ui.selectedTargetPos = null;
+    gameState.selectedMoveId = null;
+    gameState.selectedTargets = [];
     gameState.ui.selectedReserveIndex = null;
     gameState.ui.selectedSwitchDestination = null;
 
@@ -741,12 +743,13 @@
   // ------------------------------------------------------------
   // 8) input / dispatch logic
   // ------------------------------------------------------------
-  const allLivingAlliesPlanned = () => {
-    const livingSlots = gameState.teams.ally.active
-      .map((unit, idx) => (isAlive(unit) ? idx : null))
-      .filter((v) => v !== null);
-    return livingSlots.every((slot) => !!gameState.plannedActions[slot]);
-  };
+  const getCurrentActor = () => gameState.teams.ally.active[gameState.currentActorIndex] || null;
+
+  const getSelectedMove = () => MOVES[gameState.selectedMoveId] || null;
+
+  const getConfirmedCommand = (slot) => gameState.confirmedCommands[slot] || null;
+
+  const allLivingAlliesPlanned = () => gameState.teams.ally.active.every((unit, slot) => !isAlive(unit) || !!getConfirmedCommand(slot));
 
   const findNextLivingAllySlot = (fromSlot = -1) => {
     for (let slot = fromSlot + 1; slot < CONFIG.BOARD_COLS; slot += 1) {
@@ -757,16 +760,14 @@
   };
 
   const setPlanningSlot = (slot) => {
-    gameState.ui.currentPlanningSlot = slot;
-    gameState.ui.selectedAllySlot = slot;
+    gameState.currentActorIndex = slot;
   };
 
   const clearTargetPreview = () => {
-    gameState.ui.selectedMoveId = null;
-    gameState.ui.previewMoveId = null;
+    gameState.selectedMoveId = null;
+    gameState.selectedTargets = [];
     gameState.ui.previewTargets = [];
     gameState.ui.targetCandidates = [];
-    gameState.ui.selectedTargetPos = null;
     gameState.ui.selectedReserveIndex = null;
     gameState.ui.selectedSwitchDestination = null;
   };
@@ -780,7 +781,7 @@
   };
 
   const advancePlanningSlot = () => {
-    const nextSlot = findNextLivingAllySlot(gameState.ui.currentPlanningSlot);
+    const nextSlot = findNextLivingAllySlot(gameState.currentActorIndex);
     if (nextSlot === null) return false;
     setPlanningSlot(nextSlot);
     clearTargetPreview();
@@ -788,20 +789,20 @@
   };
 
   const queueTurnResolution = () => {
-    if (gameState.phase !== PHASE.PLAYING || !allLivingAlliesPlanned()) return;
-    gameState.phase = PHASE.WAITING_ENEMY;
+    if (gameState.phase !== PHASE.PLAYING || gameState.ui.isResolvingTurn || !allLivingAlliesPlanned()) return;
+    gameState.ui.isResolvingTurn = true;
     clearTargetPreview();
     render();
 
     window.setTimeout(() => {
-      if (gameState.phase !== PHASE.WAITING_ENEMY) return;
+      if (gameState.phase !== PHASE.PLAYING) return;
       gameState.enemyPlannedActions = buildEnemyPlans();
-      gameState.phase = PHASE.RESOLVING;
+      gameState.plannedActions = buildPlannedActionsFromConfirmedCommands();
       resolveTurn();
       if (gameState.phase !== PHASE.GAMEOVER) {
-        gameState.phase = PHASE.PLAYING;
         initializePlanningTurn();
       }
+      gameState.ui.isResolvingTurn = false;
       render();
     }, 280);
   };
@@ -814,29 +815,58 @@
 
   const setFightMove = (moveId) => {
     if (gameState.phase !== PHASE.PLAYING) return;
-    const slot = gameState.ui.currentPlanningSlot;
+    const slot = gameState.currentActorIndex;
     const actor = gameState.teams.ally.active[slot];
     if (!actor || !isAlive(actor)) return;
 
     const move = MOVES[moveId];
     const candidates = getValidTargetsForMove(actor, move);
-    gameState.ui.selectedMoveId = moveId;
-    gameState.ui.previewMoveId = moveId;
+    gameState.selectedMoveId = moveId;
+    gameState.selectedTargets = [];
     gameState.ui.previewTargets = candidates.map((c) => ({ x: c.x, y: c.y }));
     gameState.ui.targetCandidates = candidates;
-    gameState.ui.selectedTargetPos = null;
   };
 
-  const confirmCurrentFightAction = ({ slot, move, targetPos }) => {
-    gameState.plannedActions[slot] = {
+  const createConfirmedFightCommand = ({ slot, actor, move, targets }) => ({
+    actorId: actor.uid,
+    actorName: actor.name,
+    moveId: move.id,
+    moveName: move.name,
+    targetType: move.targetMode === "single" ? "単体" : "範囲",
+    targetIds: targets.map((t) => t.uid),
+    targetNames: targets.map((t) => t.name),
+    action: {
       type: "fight",
       team: TEAM.ALLY,
       slot,
       moveId: move.id,
-      targetPos: targetPos ? { ...targetPos } : null
-    };
+      targetPos: move.targetMode === "single" ? toBoardPos(targets[0].team, targets[0].slot) : null
+    }
+  });
 
-    gameState.ui.selectedTargetPos = targetPos ? { ...targetPos } : null;
+  const buildPlannedActionsFromConfirmedCommands = () => {
+    const planned = {};
+    gameState.confirmedCommands.forEach((command, slot) => {
+      if (command?.action) planned[slot] = { ...command.action };
+    });
+    return planned;
+  };
+
+  const confirmCurrentFightAction = ({ slot, move, targetPos }) => {
+    const actor = gameState.teams.ally.active[slot];
+    if (!actor) return;
+    const validTargets = move.targetMode === "single"
+      ? [getUnitAt(targetPos)].filter(Boolean)
+      : gameState.ui.targetCandidates.map((c) => getUnitAt({ x: c.x, y: c.y })).filter(Boolean);
+    if (validTargets.length === 0) return;
+
+    gameState.confirmedCommands[slot] = createConfirmedFightCommand({
+      slot,
+      actor,
+      move,
+      targets: validTargets
+    });
+    gameState.selectedTargets = validTargets.map((u) => ({ uid: u.uid }));
 
     if (!advancePlanningSlot()) {
       queueTurnResolution();
@@ -845,8 +875,8 @@
 
   const chooseFightTarget = (x, y) => {
     if (gameState.phase !== PHASE.PLAYING) return;
-    const slot = gameState.ui.currentPlanningSlot;
-    const move = MOVES[gameState.ui.previewMoveId];
+    const slot = gameState.currentActorIndex;
+    const move = getSelectedMove();
     if (!move) return;
     const match = gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y);
     if (!match) return;
@@ -867,20 +897,66 @@
   const chooseSwitchDestination = (toSlot) => {
     if (gameState.phase !== PHASE.PLAYING) return;
     gameState.ui.selectedSwitchDestination = toSlot;
-    const slot = gameState.ui.currentPlanningSlot;
+    const slot = gameState.currentActorIndex;
     const actor = gameState.teams.ally.active[slot];
     if (!actor || !isAlive(actor)) return;
     if (gameState.ui.selectedReserveIndex === null) return;
 
-    gameState.plannedActions[slot] = {
-      type: "switch",
-      team: TEAM.ALLY,
-      slot,
-      reserveIndex: gameState.ui.selectedReserveIndex,
-      toSlot
+    const reserve = gameState.teams.ally.reserve[gameState.ui.selectedReserveIndex];
+    gameState.confirmedCommands[slot] = {
+      actorId: actor.uid,
+      actorName: actor.name,
+      moveId: "switch",
+      moveName: "こうたい",
+      targetType: "交代",
+      targetIds: reserve ? [reserve.uid] : [],
+      targetNames: reserve ? [reserve.name] : [],
+      action: {
+        type: "switch",
+        team: TEAM.ALLY,
+        slot,
+        reserveIndex: gameState.ui.selectedReserveIndex,
+        toSlot
+      }
     };
     if (!advancePlanningSlot()) {
       queueTurnResolution();
+    }
+  };
+
+  const canCancelSelection = () => {
+    if (gameState.ui.commandMode !== "fight") return false;
+    if (gameState.selectedTargets.length > 0) return true;
+    return !!gameState.selectedMoveId;
+  };
+
+  const canUndoPreviousCommand = () => gameState.confirmedCommands.some(Boolean);
+
+  const cancelCurrentSelection = () => {
+    if (!canCancelSelection()) return;
+    if (gameState.selectedTargets.length > 0) {
+      gameState.selectedTargets = [];
+      gameState.selectedMoveId = null;
+      gameState.ui.previewTargets = [];
+      gameState.ui.targetCandidates = [];
+      return;
+    }
+    gameState.selectedMoveId = null;
+    gameState.selectedTargets = [];
+    gameState.ui.previewTargets = [];
+    gameState.ui.targetCandidates = [];
+  };
+
+  const undoLastConfirmedCommand = () => {
+    if (!canUndoPreviousCommand()) return;
+    for (let slot = CONFIG.BOARD_COLS - 1; slot >= 0; slot -= 1) {
+      if (gameState.confirmedCommands[slot]) {
+        gameState.confirmedCommands[slot] = null;
+        setPlanningSlot(slot);
+        clearTargetPreview();
+        gameState.ui.commandMode = "fight";
+        return;
+      }
     }
   };
 
@@ -904,6 +980,8 @@
       case "TARGET": chooseFightTarget(action.x, action.y); break;
       case "RESERVE": chooseReserve(action.reserveIndex); break;
       case "DEST": chooseSwitchDestination(action.toSlot); break;
+      case "CANCEL": cancelCurrentSelection(); break;
+      case "UNDO": undoLastConfirmedCommand(); break;
       default: break;
     }
     render();
@@ -942,9 +1020,14 @@
   const getMoveTargetDescription = (move) => MOVE_TARGET_DESCRIPTION[move.patternId] || "単体";
   const isTargetPreviewActive = () => (
     gameState.ui.commandMode === "fight" &&
-    !!gameState.ui.previewMoveId &&
+    !!gameState.selectedMoveId &&
     gameState.ui.previewTargets.length > 0
   );
+
+  const formatTargetSummary = (command) => {
+    if (!command || !command.targetNames || command.targetNames.length === 0) return "未選択";
+    return `${command.targetType}: ${command.targetNames.join("、")}`;
+  };
 
   const renderStatusChips = (statuses) => {
     const frag = document.createDocumentFragment();
@@ -1075,8 +1158,8 @@
 
     const selectors = createEl("div", "ally-selectors");
     gameState.teams.ally.active.forEach((unit, slot) => {
-      const plan = gameState.plannedActions[slot];
-      const isCurrent = slot === gameState.ui.currentPlanningSlot && gameState.phase === PHASE.PLAYING;
+      const plan = getConfirmedCommand(slot);
+      const isCurrent = slot === gameState.currentActorIndex && gameState.phase === PHASE.PLAYING;
       const selectorState = !isAlive(unit)
         ? " dead"
         : isCurrent
@@ -1092,8 +1175,8 @@
 
       btn.appendChild(createEl("div", "name", `${slot + 1}. ${unit.name}`));
       btn.appendChild(createEl("div", "stats", `HP ${formatAllyHp(unit)}`));
-      if (plan?.type === "fight") btn.appendChild(createEl("div", "stats", `予定: ${toJaMoveName(MOVES[plan.moveId])}`));
-      else if (plan?.type === "switch") btn.appendChild(createEl("div", "stats", "予定: こうたい"));
+      if (plan?.action?.type === "fight") btn.appendChild(createEl("div", "stats", `予定: ${plan.moveName}`));
+      else if (plan?.action?.type === "switch") btn.appendChild(createEl("div", "stats", "予定: こうたい"));
       else btn.appendChild(createEl("div", "stats", "予定: 未選択"));
       selectors.appendChild(btn);
     });
@@ -1105,10 +1188,9 @@
   const renderBoardCell = (x, y) => {
     const cell = createEl("div", "cell");
     const unit = getUnitAt({ x, y });
-    const currentSlot = gameState.ui.currentPlanningSlot;
+    const currentSlot = gameState.currentActorIndex;
     const activeActorPos = toBoardPos(TEAM.ALLY, currentSlot);
     const isCandidate = gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
-    const selectedTarget = gameState.ui.selectedTargetPos;
     const targetPreviewActive = isTargetPreviewActive();
 
     if (activeActorPos.x === x && activeActorPos.y === y && gameState.phase === PHASE.PLAYING) {
@@ -1121,12 +1203,11 @@
     if (targetPreviewActive && !isCandidate) {
       cell.classList.add("dimmed");
     }
-    if (selectedTarget && selectedTarget.x === x && selectedTarget.y === y) {
-      cell.classList.add("targeted");
-    }
-
-    const hasPlannedTarget = Object.values(gameState.plannedActions).some(
-      (action) => action.type === "fight" && action.targetPos && action.targetPos.x === x && action.targetPos.y === y
+    const hasPlannedTarget = gameState.confirmedCommands.some(
+      (command) => command?.action?.type === "fight" &&
+        command.action.targetPos &&
+        command.action.targetPos.x === x &&
+        command.action.targetPos.y === y
     );
     if (hasPlannedTarget) {
       cell.classList.add("planned-target");
@@ -1157,6 +1238,7 @@
 
   const getNavigationMessageText = () => {
     if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
+    if (gameState.ui.isResolvingTurn) return "行動を解決中です…";
 
     if (gameState.ui.commandMode === "switch") {
       if (gameState.ui.selectedReserveIndex === null) {
@@ -1169,7 +1251,7 @@
     }
 
     if (gameState.ui.commandMode === "fight") {
-      const selectedMove = MOVES[gameState.ui.previewMoveId];
+      const selectedMove = getSelectedMove();
       if (!selectedMove) return "わざを選んでください。";
       if (selectedMove.targetMode === "single") {
         return "ハイライトされたマスから対象を選んでください。";
@@ -1186,11 +1268,30 @@
     return nav;
   };
 
+  const renderMoveDetailPanel = () => {
+    const panel = createEl("div", "move-detail-panel");
+    const selectedMove = getSelectedMove();
+    if (!selectedMove) {
+      panel.appendChild(createEl("div", "move-detail-placeholder", "技を選ぶとここに対象と効果が表示されます"));
+      return panel;
+    }
+    panel.appendChild(createEl("div", "move-detail-line", `選択した技: ${selectedMove.name}`));
+    panel.appendChild(createEl("div", "move-detail-line", `対象: ${getMoveTargetDescription(selectedMove)}`));
+    const previewNames = gameState.ui.targetCandidates
+      .map((c) => getUnitAt({ x: c.x, y: c.y }))
+      .filter(Boolean)
+      .map((unit) => unit.name);
+    if (previewNames.length > 0) {
+      panel.appendChild(createEl("div", "move-detail-line", `${selectedMove.targetMode === "single" ? "単体" : "範囲"}: ${previewNames.join("、")}`));
+    }
+    return panel;
+  };
+
   const renderCommandArea = () => {
     const wrap = createEl("div", "command");
-    const actor = gameState.teams.ally.active[gameState.ui.currentPlanningSlot];
+    const actor = getCurrentActor();
 
-    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}（スロット${gameState.ui.currentPlanningSlot + 1}）`));
+    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}（スロット${gameState.currentActorIndex + 1}）`));
 
     const actions = createEl("div", "actions");
     const fightBtn = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
@@ -1198,7 +1299,16 @@
     const switchBtn = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "こうたい");
     switchBtn.dataset.action = "mode-switch";
     actions.append(fightBtn, switchBtn);
-    wrap.appendChild(actions);
+      wrap.appendChild(actions);
+    const controls = createEl("div", "actions");
+    const cancelBtn = createEl("button", "action-btn", "キャンセル");
+    cancelBtn.dataset.action = "cancel-selection";
+    cancelBtn.disabled = !canCancelSelection();
+    const undoBtn = createEl("button", "action-btn", "前の選択に戻る");
+    undoBtn.dataset.action = "undo-command";
+    undoBtn.disabled = !canUndoPreviousCommand();
+    controls.append(cancelBtn, undoBtn);
+    wrap.appendChild(controls);
 
     if (gameState.ui.commandMode === "fight") {
       const movesWrap = createEl("div", "moves");
@@ -1212,17 +1322,13 @@
         btn.appendChild(info);
         btn.dataset.action = "pick-move";
         btn.dataset.moveId = moveId;
-        if (gameState.ui.previewMoveId === moveId) {
+        if (gameState.selectedMoveId === moveId) {
           btn.classList.add("active");
         }
         movesWrap.appendChild(btn);
       });
       wrap.appendChild(movesWrap);
-
-      const selectedMove = MOVES[gameState.ui.previewMoveId];
-      if (selectedMove) {
-        wrap.appendChild(createEl("div", "move-target-description", `対象: ${getMoveTargetDescription(selectedMove)}`));
-      }
+      wrap.appendChild(renderMoveDetailPanel());
     }
 
     if (gameState.ui.commandMode === "switch") {
@@ -1248,20 +1354,16 @@
     return wrap;
   };
 
-  const renderPlanSummary = () => {
-    const plans = createEl("div", "plans");
+  const renderCommandSummaryCards = () => {
+    const plans = createEl("div", "command-summary");
     for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
-      const box = createEl("div", "plan-box");
+      const box = createEl("div", "summary-card");
       const unit = gameState.teams.ally.active[i];
-      const action = gameState.plannedActions[i];
-      let text = "未選択";
-      if (!unit || !isAlive(unit)) text = "行動不能";
-      else if (action?.type === "fight") text = `たたかう: ${toJaMoveName(MOVES[action.moveId])}`;
-      else if (action?.type === "switch") {
-        const reserve = gameState.teams.ally.reserve[action.reserveIndex];
-        text = `こうたい: ${reserve ? reserve.name : "?"} → ${action.toSlot + 1}`;
-      }
-      box.textContent = `味方${i + 1}: ${text}`;
+      const command = getConfirmedCommand(i);
+      box.appendChild(createEl("div", "summary-title", `${i + 1}. ${unit ? unit.name : `味方${i + 1}`}`));
+      box.appendChild(createEl("div", "summary-line", `技: ${command?.moveName || "未選択"}`));
+      box.appendChild(createEl("div", "summary-line", `対象モード: ${command?.targetType || "未選択"}`));
+      box.appendChild(createEl("div", "summary-line", formatTargetSummary(command)));
       plans.appendChild(box);
     }
     return plans;
@@ -1299,6 +1401,8 @@
     clearTempArrays();
     const app = document.getElementById("app");
     app.innerHTML = "";
+    app.style.setProperty("--detail-h", `${CONFIG.MOVE_DETAIL_PANEL_HEIGHT}px`);
+    app.style.setProperty("--summary-h", `${CONFIG.SUMMARY_PANEL_HEIGHT}px`);
 
     const main = createEl("div", "main");
 
@@ -1315,7 +1419,7 @@
 
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
-      main.appendChild(renderPlanSummary());
+      main.appendChild(renderCommandSummaryCards());
     }
 
     app.appendChild(main);
@@ -1338,6 +1442,8 @@
     if (action === "target-cell") dispatch({ type: "TARGET", x: Number(target.dataset.x), y: Number(target.dataset.y) });
     if (action === "pick-reserve") dispatch({ type: "RESERVE", reserveIndex: Number(target.dataset.reserveIndex) });
     if (action === "pick-destination") dispatch({ type: "DEST", toSlot: Number(target.dataset.toSlot) });
+    if (action === "cancel-selection") dispatch({ type: "CANCEL" });
+    if (action === "undo-command") dispatch({ type: "UNDO" });
   });
 
   gameState.phase = PHASE.PLAYING;
