@@ -1302,8 +1302,6 @@
 
     const main = createEl("div", "main");
 
-    main.appendChild(renderBattleHud());
-
     const board = createEl("div", "board");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
 

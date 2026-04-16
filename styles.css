@@ -34,7 +34,7 @@ body {
 
 .main {
   display: grid;
-  grid-template-rows: auto 390px 48px 240px auto;
+  grid-template-rows: 390px 48px 288px auto;
   gap: 8px;
   padding: 10px;
   background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
@@ -237,8 +237,8 @@ body {
   padding: 10px;
   display: grid;
   gap: 8px;
-  min-height: 240px;
-  max-height: 240px;
+  min-height: 288px;
+  max-height: 288px;
   overflow-y: auto;
 }
 
