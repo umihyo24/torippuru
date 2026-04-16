@@ -620,16 +620,27 @@
 
   const applySwitchResult = (event) => {
     const teamState = gameState.teams[event.team];
-    const reserve = teamState.reserve[event.reserveIn.reserveIndex];
-    if (!reserve) return;
+    const reserveIndex = teamState.reserve.findIndex((unit) => unit?.uid === event.reserveIn.uid);
+    if (reserveIndex < 0) return;
+
+    const reserve = teamState.reserve[reserveIndex];
     const outgoing = teamState.active[event.slot] || null;
-    if (outgoing) clearSwitchSensitiveStatuses(outgoing);
+
+    if (outgoing) {
+      clearSwitchSensitiveStatuses(outgoing);
+      delete gameState.displayState.hpDisplay[outgoing.uid];
+      delete gameState.displayState.hpAnimations[outgoing.uid];
+    }
+
     teamState.active[event.slot] = reserve;
     reserve.slot = event.slot;
     clearSwitchFlags(reserve);
-    teamState.reserve[event.reserveIn.reserveIndex] = outgoing;
+    gameState.displayState.hpDisplay[reserve.uid] = reserve.hp;
+    delete gameState.displayState.hpAnimations[reserve.uid];
+
+    teamState.reserve[reserveIndex] = outgoing;
     if (outgoing) {
-      outgoing.slot = `r${event.reserveIn.reserveIndex}`;
+      outgoing.slot = `r${reserveIndex}`;
       clearSwitchFlags(outgoing);
     }
   };
