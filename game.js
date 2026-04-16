@@ -1416,15 +1416,22 @@
       src: getUnitPortraitPath(unit),
       alt: unit.name,
       mirror: shouldMirror,
-      wrapperClass: "battle-sprite",
+      wrapperClass: "unit-portrait",
       placeholderLabel: unit.name,
       placeholderSubLabel: "NO SPRITE"
     });
     return sprite;
   };
 
-  const renderBattlePosition = (x, y) => {
-    const slot = createEl("button", "battle-slot");
+  const getReserveCountInfo = (team) => {
+    const teamState = gameState?.teams?.[team];
+    const reserveList = Array.isArray(teamState?.reserve) ? teamState.reserve : [];
+    const total = reserveList.length;
+    const alive = reserveList.reduce((count, unit) => count + (isAlive(unit) ? 1 : 0), 0);
+    return { total, alive };
+  };
+
+  const applyUnitPanelState = (panel, x, y) => {
     const unit = getUnitAtFromState(gameState, { x, y });
     const showPreview = gameState.phase === PHASE.PLAYING && !isPlaybackBusy();
     const candidate = showPreview && gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
@@ -1432,64 +1439,8 @@
       && gameState.battleFlow.koReplacement.activeTeam === TEAM.ALLY
       && y === 1
       && gameState.battleFlow.koReplacement.pendingSlots.includes(x);
-    if (candidate) slot.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
-    if (replacementCandidate) slot.classList.add("valid-ally", "replacement-target");
-    const highlight = gameState.battleHighlight;
-    if (isPlaybackBusy() && highlight.active === true && unit?.uid) {
-      const sourceSet = new Set(highlight.sources || []);
-      const targetSet = new Set(highlight.targets || []);
-      const isSource = sourceSet.has(unit.uid);
-      const isTarget = targetSet.has(unit.uid);
-      if (isSource) slot.classList.add(highlight.effectType === "trait" ? "source-trait" : "active-actor");
-      if (isTarget) {
-        if (highlight.effectType === "status" && highlight.statusKind === "poison") slot.classList.add("targeted-status-poison");
-        else if (highlight.effectType === "status") slot.classList.add("targeted-status-default");
-        else if (highlight.effectType === "statusRemove") slot.classList.add("targeted-status-remove");
-        else if (highlight.effectType === "trait") slot.classList.add("targeted-trait");
-        else if (highlight.effectType === "aoe") slot.classList.add("targeted-aoe");
-        else slot.classList.add("targeted-single");
-      }
-    } else if (replacementCandidate && gameState.ui.selectedReplacementReserveIndex !== null) {
-      slot.classList.add("targeted");
-    } else if (!isPlaybackBusy() && gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
-      slot.classList.add("active-actor");
-    }
-
-    slot.dataset.action = "target-cell";
-    slot.dataset.x = String(x);
-    slot.dataset.y = String(y);
-    slot.disabled = !!(isPlaybackBusy() || gameState.phase !== PHASE.PLAYING);
-
-    if (!unit) {
-      slot.classList.add("empty");
-      slot.appendChild(createEl("div", "battle-slot-empty", "待機"));
-      return slot;
-    }
-
-    const body = createEl("div", "battle-slot-body");
-    body.appendChild(renderBattleSprite(unit));
-    body.appendChild(createEl("div", "battle-sprite-name", unit.name));
-    slot.appendChild(body);
-    return slot;
-  };
-
-  const renderStatusPanel = (unit, x, y) => {
-    const panel = createEl("button", "status-panel");
-    panel.dataset.action = "target-cell";
-    panel.dataset.x = String(x);
-    panel.dataset.y = String(y);
-    panel.disabled = !!(isPlaybackBusy() || gameState.phase !== PHASE.PLAYING);
-
-    const showPreview = gameState.phase === PHASE.PLAYING && !isPlaybackBusy();
-    const candidate = showPreview && gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
-    const replacementCandidate = isKoReplacementPhase()
-      && gameState.battleFlow.koReplacement.activeTeam === TEAM.ALLY
-      && y === 1
-      && gameState.battleFlow.koReplacement.pendingSlots.includes(x);
-
     if (candidate) panel.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
     if (replacementCandidate) panel.classList.add("valid-ally", "replacement-target");
-
     const highlight = gameState.battleHighlight;
     if (isPlaybackBusy() && highlight.active === true && unit?.uid) {
       const sourceSet = new Set(highlight.sources || []);
@@ -1510,23 +1461,57 @@
     } else if (!isPlaybackBusy() && gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
       panel.classList.add("active-actor");
     }
+  };
+
+  const renderUnitPanel = (x, y) => {
+    const panel = createEl("button", "unit-panel");
+    const unit = getUnitAtFromState(gameState, { x, y });
+    panel.dataset.action = "target-cell";
+    panel.dataset.x = String(x);
+    panel.dataset.y = String(y);
+    panel.disabled = !!(isPlaybackBusy() || gameState.phase !== PHASE.PLAYING);
+    applyUnitPanelState(panel, x, y);
 
     if (!unit) {
       panel.classList.add("empty");
-      panel.appendChild(createEl("div", "status-empty", "待機"));
+      panel.appendChild(createEl("div", "unit-empty", "待機"));
       return panel;
     }
 
+    const sideClass = unit.team === TEAM.ENEMY ? "enemy" : "ally";
+    panel.classList.add(`team-${sideClass}`);
+
     const hp = getDisplayHp(unit);
     const hpPct = Math.round((hp / unit.maxHp) * 100);
-    panel.appendChild(createEl("div", "status-name", unit.name));
-    panel.appendChild(createEl("div", "status-hp", `HP ${unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)}`));
+    const { total: reserveTotal, alive: reserveAlive } = getReserveCountInfo(unit.team);
+
+    const portraitArea = createEl("div", "unit-portrait-box");
+    portraitArea.appendChild(renderBattleSprite(unit));
+    panel.appendChild(portraitArea);
+
+    const info = createEl("div", "unit-info");
+    info.appendChild(createEl("div", "unit-name", unit.name));
+    info.appendChild(createEl("div", "unit-hp", `HP ${unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)}`));
     const bar = createEl("div", "hp-bar");
     const fill = createEl("div", "hp-bar-fill");
     fill.style.width = `${hpPct}%`;
     bar.appendChild(fill);
-    panel.appendChild(bar);
-    panel.appendChild(createEl("div", "status-effects", unit.statuses.map(statusText).join(" / ") || "状態なし"));
+    info.appendChild(bar);
+    info.appendChild(createEl("div", "unit-status", unit.statuses.map(statusText).join(" / ") || "状態なし"));
+    panel.appendChild(info);
+
+    const reserve = createEl("div", "reserve-indicator");
+    reserve.appendChild(createEl("span", "reserve-label", "控え"));
+    const pipWrap = createEl("div", "reserve-pips");
+    const pipCount = Math.max(0, reserveTotal);
+    for (let i = 0; i < pipCount; i += 1) {
+      const pipClass = i < reserveAlive ? "reserve-pip is-alive" : "reserve-pip";
+      pipWrap.appendChild(createEl("span", pipClass, "●"));
+    }
+    reserve.appendChild(pipWrap);
+    reserve.appendChild(createEl("span", "reserve-count", `${reserveAlive}/${reserveTotal}`));
+    panel.appendChild(reserve);
+
     return panel;
   };
 
@@ -1534,19 +1519,15 @@
     const board = createEl("section", "battlefield");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
 
-    const enemyStatusCol = createEl("div", "status-column enemy-status");
-    const allyStatusCol = createEl("div", "status-column ally-status");
-    const enemySpriteRow = createEl("div", "sprite-row enemy-row");
-    const allySpriteRow = createEl("div", "sprite-row ally-row");
+    const enemyRow = createEl("div", "unit-row enemy-row");
+    const allyRow = createEl("div", "unit-row ally-row");
 
     for (let x = 0; x < CONFIG.BOARD_COLS; x += 1) {
-      enemyStatusCol.appendChild(renderStatusPanel(gameState.teams.enemy.active[x], x, 0));
-      allyStatusCol.appendChild(renderStatusPanel(gameState.teams.ally.active[x], x, 1));
-      enemySpriteRow.appendChild(renderBattlePosition(x, 0));
-      allySpriteRow.appendChild(renderBattlePosition(x, 1));
+      enemyRow.appendChild(renderUnitPanel(x, 0));
+      allyRow.appendChild(renderUnitPanel(x, 1));
     }
 
-    board.append(enemyStatusCol, enemySpriteRow, allySpriteRow, allyStatusCol);
+    board.append(enemyRow, allyRow);
     return board;
   };
 
