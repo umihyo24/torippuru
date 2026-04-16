@@ -702,6 +702,7 @@
 
   const queueTurnResolution = () => {
     if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || !allLivingAlliesPlanned()) return;
+    clearTargetPreview();
     gameState.battleFlow.mode = "resolve";
     gameState.enemyPlannedActions = buildEnemyPlans();
     gameState.plannedActions = buildPlannedActionsFromConfirmedCommands();
@@ -900,7 +901,8 @@
   const renderBoardCell = (x, y) => {
     const cell = createEl("div", "cell");
     const unit = getUnitAtFromState(gameState, { x, y });
-    const candidate = gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
+    const showPreview = gameState.phase === PHASE.PLAYING && !isPlaybackBusy();
+    const candidate = showPreview && gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
     if (candidate) cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
     if (isPlaybackBusy() && (gameState.displayState.highlightActorId || gameState.displayState.highlightTargetId)) {
       if (unit?.uid === gameState.displayState.highlightActorId) cell.classList.add("active-actor");

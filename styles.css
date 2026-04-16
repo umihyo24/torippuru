@@ -402,10 +402,13 @@ button:disabled {
   border: 2px solid #5f739d;
   border-radius: 8px;
   padding: 8px;
-  overflow-y: auto;
   background: rgba(0, 0, 0, 0.32);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-y: auto;
   min-height: 330px;
 }
 
