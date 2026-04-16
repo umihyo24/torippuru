@@ -25,19 +25,19 @@
   const PHASE = { START: "start", PLAYING: "playing", GAMEOVER: "gameover" };
 
   const ASSETS = {
-    backgrounds: { battle: "/assets/backgrounds/background_battle.jpg" },
-    icons: { attack: "/assets/icons/icon_attack.png", status: "/assets/icons/icon_status.png" },
+    backgrounds: { battle: "./assets/backgrounds/background_battle.jpg" },
+    icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
     portraits: {
-      emberlynx: "/assets/portraits/ally_emberlynx.png",
-      mossblob: "/assets/portraits/ally_mossblob.png",
-      frostfang: "/assets/portraits/ally_frostfang.png",
-      stormimp: "/assets/portraits/ally_stormimp.png",
-      ironboar: "/assets/portraits/ally_ironboar.png",
-      wyvern: "/assets/portraits/enemy_wyvern.png",
-      golem: "/assets/portraits/enemy_golem.png",
-      thunderroc: "/assets/portraits/enemy_thunderroc.png",
-      venomtoad: "/assets/portraits/enemy_venomtoad.png",
-      duskmoth: "/assets/portraits/enemy_duskmoth.png"
+      emberlynx: "./assets/portraits/ally_emberlynx.png",
+      mossblob: "./assets/portraits/ally_mossblob.png",
+      frostfang: "./assets/portraits/ally_frostfang.png",
+      stormimp: "./assets/portraits/ally_stormimp.png",
+      ironboar: "./assets/portraits/ally_ironboar.png",
+      wyvern: "./assets/portraits/enemy_wyvern.png",
+      golem: "./assets/portraits/enemy_golem.png",
+      thunderroc: "./assets/portraits/enemy_thunderroc.png",
+      venomtoad: "./assets/portraits/enemy_venomtoad.png",
+      duskmoth: "./assets/portraits/enemy_duskmoth.png"
     }
   };
 
@@ -821,6 +821,7 @@
       case "FAST_FORWARD": if (isPlaybackBusy()) gameState.ui.fastForwardRequested = true; break;
       default: break;
     }
+    render();
   };
 
   const createEl = (tag, className, text) => {
@@ -1048,13 +1049,16 @@
   };
 
   const update = (now) => {
+    const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
+    const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
+    if (!hasHpAnimations && !hasPlayback) return;
     updateHpAnimations(now);
-    if (gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback") updateBattlePlayback(now);
+    if (hasPlayback) updateBattlePlayback(now);
+    render();
   };
 
   const loop = (now) => {
     update(now);
-    render();
     requestAnimationFrame(loop);
   };
 
@@ -1082,5 +1086,6 @@
   });
 
   initializePlanningTurn();
+  render();
   requestAnimationFrame(loop);
 })();
