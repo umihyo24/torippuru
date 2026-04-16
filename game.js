@@ -524,8 +524,8 @@
       }
       if (a.type === "switch") {
         q.push({ type: "message", text: `${a.reserveOut.name}は 交代した！`, loggable: true });
-        q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
         q.push({ type: "switchApply", ...a });
+        q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
         (a.enterStatusApplies || []).forEach((s) => q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration }));
         a.enterEffects.forEach((line) => q.push({ type: "message", text: line, loggable: true }));
         q.push({ type: "wait", duration: CONFIG.WAIT_SHORT_MS });
