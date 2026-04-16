@@ -39,6 +39,7 @@
     icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
     portraits: {
       emberlynx: "./assets/portraits/ally_emberlynx.png",
+      hittokage: "./assets/portraits/ally_hittokage.png",
       mossblob: "./assets/portraits/ally_mossblob.png",
       frostfang: "./assets/portraits/ally_frostfang.png",
       stormimp: "./assets/portraits/ally_stormimp.png",
@@ -98,6 +99,7 @@
 
   const UNIT_LIBRARY = {
     emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 94, atk: 34, def: 26, spd: 27, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
     frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
     stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "venomBless", "ironGuard"] },
@@ -163,7 +165,7 @@
     winner: null,
     battlefield: { background: getAssetPath("backgrounds", "battle") },
     teams: {
-      ally: { active: [createUnit("emberlynx", TEAM.ALLY, 0), createUnit("mossblob", TEAM.ALLY, 1), createUnit("frostfang", TEAM.ALLY, 2)], reserve: [createUnit("stormimp", TEAM.ALLY, "r0"), createUnit("ironboar", TEAM.ALLY, "r1")], statuses: [], tileEffects: [[], [], []] },
+      ally: { active: [createUnit("emberlynx", TEAM.ALLY, 0), createUnit("hittokage", TEAM.ALLY, 1), createUnit("frostfang", TEAM.ALLY, 2)], reserve: [createUnit("stormimp", TEAM.ALLY, "r0"), createUnit("ironboar", TEAM.ALLY, "r1")], statuses: [], tileEffects: [[], [], []] },
       enemy: { active: [createUnit("wyvern", TEAM.ENEMY, 0), createUnit("golem", TEAM.ENEMY, 1), createUnit("thunderroc", TEAM.ENEMY, 2)], reserve: [], statuses: [], tileEffects: [[], [], []] }
     },
     globalStatuses: [],
@@ -1669,21 +1671,17 @@
     sw.dataset.action = "mode-switch";
     const actorStatusState = actor ? getStatusState(actor) : { canSwitch: false, statuses: [] };
     sw.disabled = isPlaybackBusy() || !actorStatusState.canSwitch;
-    actions.append(fight, sw);
-    wrap.appendChild(actions);
-    if (actor && !actorStatusState.canSwitch) {
-      wrap.appendChild(createEl("div", "mini", "Cannot switch (Bound)"));
-    }
-
-    const controls = createEl("div", "actions");
     const cancel = createEl("button", "action-btn", "キャンセル");
     cancel.dataset.action = "cancel-selection";
     cancel.disabled = !canCancelSelection() || isPlaybackBusy();
     const undo = createEl("button", "action-btn", "前の選択に戻る");
     undo.dataset.action = "undo-command";
     undo.disabled = !canUndoPreviousCommand() || isPlaybackBusy();
-    controls.append(cancel, undo);
-    wrap.appendChild(controls);
+    actions.append(fight, sw, cancel, undo);
+    wrap.appendChild(actions);
+    if (actor && !actorStatusState.canSwitch) {
+      wrap.appendChild(createEl("div", "mini", "Cannot switch (Bound)"));
+    }
 
     if (gameState.ui.commandMode === "fight" && actor) {
       const moves = createEl("div", "moves");

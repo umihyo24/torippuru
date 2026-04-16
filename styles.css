@@ -469,9 +469,6 @@ body {
   padding: 10px;
   display: grid;
   gap: 8px;
-  min-height: 240px;
-  max-height: 240px;
-  overflow-y: auto;
 }
 
 .command.disabled {
@@ -485,8 +482,6 @@ body {
 .moves,
 .switches,
 .destinations { display: flex; flex-wrap: wrap; gap: 8px; }
-
-.actions { flex-wrap: nowrap; overflow-x: auto; }
 
 .moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
