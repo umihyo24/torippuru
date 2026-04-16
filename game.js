@@ -1398,6 +1398,16 @@
 
   const formatEnemyHpPercent = (unit, hp) => `${Math.round((hp / unit.maxHp) * 100)}%`;
   const formatAllyHp = (unit, hp) => `${hp} / ${unit.maxHp}`;
+  const getHpRatio = (unit, hp) => {
+    const maxHp = Math.max(1, Number(unit?.maxHp) || 0);
+    const safeHp = clamp(Number(hp) || 0, 0, maxHp);
+    return safeHp / maxHp;
+  };
+  const getHpFillClass = (ratio) => {
+    if (ratio > 0.5) return "hp-high";
+    if (ratio > 0.2) return "hp-mid";
+    return "hp-low";
+  };
 
   const getDisplayHp = (unit) => gameState.displayState.hpDisplay[unit.uid] ?? unit.hp;
   const statusText = (s) => `${STATUS_LABELS[s.kind] || s.kind}（${s.duration}T）`;
@@ -1587,7 +1597,8 @@
     }
 
     const hp = getDisplayHp(unit);
-    const hpPct = Math.round((hp / unit.maxHp) * 100);
+    const hpRatio = getHpRatio(unit, hp);
+    const hpPct = Math.round(hpRatio * 100);
 
     const top = createEl("div", "status-top");
     top.appendChild(createEl("div", "unit-name", unit.name));
@@ -1595,7 +1606,7 @@
 
     const hpBlock = createEl("div", "status-hp");
     const bar = createEl("div", "hp-bar");
-    const fill = createEl("div", "hp-bar-fill");
+    const fill = createEl("div", `hp-bar-fill ${getHpFillClass(hpRatio)}`);
     fill.style.width = `${hpPct}%`;
     bar.appendChild(fill);
     hpBlock.append(bar, createEl("div", "unit-hp", unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)));
