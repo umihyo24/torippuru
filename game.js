@@ -242,6 +242,14 @@
   const removeExpired = (arr) => arr.filter((s) => s.duration > 0);
 
   const getValidTargetsForMoveInState = (state, actor, move) => {
+    const isRuleMatch = (targetUnit) => {
+      if (!targetUnit || !isAlive(targetUnit)) return false;
+      if (move.targetRule === "enemy") return targetUnit.team !== actor.team;
+      if (move.targetRule === "selfOnly") return targetUnit.uid === actor.uid;
+      if (move.targetRule === "allyOtherSingle") return targetUnit.team === actor.team && targetUnit.uid !== actor.uid;
+      if (move.targetRule === "anyOtherSingle") return targetUnit.uid !== actor.uid;
+      return true;
+    };
     const actorPos = toBoardPos(actor.team, actor.slot);
     const orientation = actor.team === TEAM.ALLY ? 1 : -1;
     const offsets = patterns[move.patternId] || [];
@@ -249,15 +257,25 @@
       .map((o) => ({ x: actorPos.x + o.x, y: actorPos.y + (o.y * orientation) }))
       .filter(inBounds)
       .map((pos) => ({ pos, unit: getUnitAtFromState(state, pos) }))
-      .filter(({ unit }) => {
-        if (!unit || !isAlive(unit)) return false;
-        if (move.targetRule === "enemy") return unit.team !== actor.team;
-        if (move.targetRule === "selfOnly") return unit.uid === actor.uid;
-        if (move.targetRule === "allyOtherSingle") return unit.team === actor.team && unit.uid !== actor.uid;
-        if (move.targetRule === "anyOtherSingle") return unit.uid !== actor.uid;
-        return true;
-      })
+      .filter(({ unit }) => isRuleMatch(unit))
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
+  };
+
+  const getPatternPositionsForMove = (actor, move) => {
+    const actorPos = toBoardPos(actor.team, actor.slot);
+    const orientation = actor.team === TEAM.ALLY ? 1 : -1;
+    return (patterns[move.patternId] || [])
+      .map((o) => ({ x: actorPos.x + o.x, y: actorPos.y + (o.y * orientation) }))
+      .filter(inBounds);
+  };
+
+  const isRuleMatchAtPosition = (actor, move, targetUnit) => {
+    if (!targetUnit || !isAlive(targetUnit)) return false;
+    if (move.targetRule === "enemy") return targetUnit.team !== actor.team;
+    if (move.targetRule === "selfOnly") return targetUnit.uid === actor.uid;
+    if (move.targetRule === "allyOtherSingle") return targetUnit.team === actor.team && targetUnit.uid !== actor.uid;
+    if (move.targetRule === "anyOtherSingle") return targetUnit.uid !== actor.uid;
+    return true;
   };
 
   const isPlaybackBusy = () => gameState.battleFlow.mode === "playback" || gameState.battleFlow.mode === "resolve";
@@ -358,13 +376,15 @@
       }
       const move = MOVES[action.moveId];
       if (!move) return;
-      const candidates = getValidTargetsForMoveInState(sim, actor, move);
-      const targets = move.targetMode === "single" ? candidates.filter((c) => c.x === action.targetPos?.x && c.y === action.targetPos?.y) : candidates;
+      const patternPositions = getPatternPositionsForMove(actor, move);
+      const targets = move.targetMode === "single"
+        ? patternPositions.filter((p) => p.x === action.targetPos?.x && p.y === action.targetPos?.y)
+        : patternPositions;
       const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0 };
 
-      targets.forEach((targetCell) => {
-        const target = getUnitAtFromState(sim, { x: targetCell.x, y: targetCell.y });
-        if (!target || !isAlive(target)) return;
+      targets.forEach((targetPos) => {
+        const target = getUnitAtFromState(sim, targetPos);
+        if (!isRuleMatchAtPosition(actor, move, target)) return;
         const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false };
 
         move.beforeDamage.forEach((effect) => {
