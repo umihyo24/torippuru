@@ -1766,9 +1766,11 @@
     app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
 
     const main = createEl("div", "main");
-    main.appendChild(renderBattleTopHeader());
-    main.appendChild(renderBattlefield());
-    main.appendChild(renderBattleMessageBox());
+    const battleStage = createEl("div", "battle-stage");
+    battleStage.appendChild(renderBattleTopHeader());
+    battleStage.appendChild(renderBattlefield());
+    battleStage.appendChild(renderBattleMessageBox());
+    main.appendChild(battleStage);
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
       if (!isKoReplacementPhase()) main.appendChild(renderCommandSummaryCards());
