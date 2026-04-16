@@ -181,7 +181,8 @@
       selectedSwitchDestination: null,
       targetCandidates: [],
       fastForwardRequested: false,
-      isLogOpen: false
+      isLogOpen: false,
+      isMenuOpen: false
     },
     battleFlow: {
       mode: "command",
@@ -1303,8 +1304,21 @@
   };
 
 
-  const toggleBattleLogPanel = () => {
-    gameState.ui.isLogOpen = !gameState.ui.isLogOpen;
+  const closeAuxiliaryPanels = () => {
+    gameState.ui.isLogOpen = false;
+    gameState.ui.isMenuOpen = false;
+  };
+
+  const toggleBattleLogModal = () => {
+    const next = !gameState.ui.isLogOpen;
+    gameState.ui.isLogOpen = next;
+    if (next) gameState.ui.isMenuOpen = false;
+  };
+
+  const toggleMainMenuModal = () => {
+    const next = !gameState.ui.isMenuOpen;
+    gameState.ui.isMenuOpen = next;
+    if (next) gameState.ui.isLogOpen = false;
   };
 
   const dispatch = (action) => {
@@ -1318,7 +1332,9 @@
       case "CANCEL": cancelCurrentSelection(); break;
       case "UNDO": undoLastConfirmedCommand(); break;
       case "FAST_FORWARD": if (isPlaybackBusy()) gameState.ui.fastForwardRequested = true; break;
-      case "TOGGLE_LOG": toggleBattleLogPanel(); break;
+      case "TOGGLE_LOG": toggleBattleLogModal(); break;
+      case "TOGGLE_MENU": toggleMainMenuModal(); break;
+      case "CLOSE_PANELS": closeAuxiliaryPanels(); break;
       default: break;
     }
     render();
@@ -1393,6 +1409,15 @@
     return getSelectedMove().targetMode === "single" ? "ハイライトされたマスから対象を選んでください。" : "このわざはハイライト対象全員に当たります。";
   };
 
+  const renderBattleTopHeader = () => {
+    const header = createEl("section", "battle-header");
+    header.append(
+      createEl("div", "", `ターン ${gameState.turn}`),
+      createEl("div", "", gameState.phase === PHASE.GAMEOVER ? `勝者: ${gameState.winner || "なし"}` : "3v3 Tactical Battle")
+    );
+    return header;
+  };
+
   const renderBattleMessageBox = () => {
     const nav = createEl("button", "nav-message");
     nav.dataset.action = "fast-forward";
@@ -1401,8 +1426,9 @@
     return nav;
   };
 
-  const renderBattleLogPanel = () => {
-    const log = createEl("div", "log");
+  const renderBattleLogPanel = (extraClass = "") => {
+    const className = extraClass ? `log ${extraClass}` : "log";
+    const log = createEl("div", className);
     if (!Array.isArray(gameState.log) || gameState.log.length === 0) {
       log.appendChild(createEl("div", "log-empty", "ログはまだありません。"));
       return log;
@@ -1416,6 +1442,60 @@
       log.appendChild(createEl("div", "log-line", entry.text));
     });
     return log;
+  };
+
+  const renderUtilityLane = () => {
+    const lane = createEl("aside", "utility-lane");
+    const menuBtn = createEl("button", "utility-btn", "☰");
+    menuBtn.dataset.action = "toggle-menu";
+    menuBtn.setAttribute("aria-label", "メニュー");
+    const logBtn = createEl("button", "utility-btn", "ログ");
+    logBtn.dataset.action = "toggle-log";
+    lane.append(menuBtn, logBtn);
+    return lane;
+  };
+
+  const renderLogModal = () => {
+    if (!gameState.ui.isLogOpen) return null;
+    const overlay = createEl("section", "overlay");
+    overlay.dataset.action = "close-panels";
+    const modal = createEl("div", "modal");
+    modal.addEventListener("click", (event) => event.stopPropagation());
+    const header = createEl("div", "modal-header");
+    header.append(createEl("div", "", "バトルログ"), createEl("button", "action-btn", "閉じる"));
+    header.lastChild.dataset.action = "toggle-log";
+    const body = createEl("div", "modal-body");
+    body.appendChild(renderBattleLogPanel("modal-log"));
+    modal.append(header, body);
+    overlay.appendChild(modal);
+    return overlay;
+  };
+
+  const renderMenuModal = () => {
+    if (!gameState.ui.isMenuOpen) return null;
+    const overlay = createEl("section", "overlay");
+    overlay.dataset.action = "close-panels";
+    const modal = createEl("div", "modal");
+    modal.addEventListener("click", (event) => event.stopPropagation());
+
+    const header = createEl("div", "modal-header");
+    header.append(createEl("div", "", "メニュー"), createEl("button", "action-btn", "戻る"));
+    header.lastChild.dataset.action = "toggle-menu";
+
+    const body = createEl("div", "modal-body");
+    const list = createEl("div", "menu-list");
+    const resetBtn = createEl("button", "action-btn", "リセット");
+    resetBtn.dataset.action = "reset";
+    const settingsBtn = createEl("button", "action-btn", "設定（準備中）");
+    settingsBtn.disabled = true;
+    const closeBtn = createEl("button", "action-btn", "バトルに戻る");
+    closeBtn.dataset.action = "toggle-menu";
+    list.append(resetBtn, settingsBtn, closeBtn);
+    body.appendChild(list);
+
+    modal.append(header, body);
+    overlay.appendChild(modal);
+    return overlay;
   };
 
   const getUnitPortraitPath = (unit) => {
@@ -1602,17 +1682,8 @@
     const undo = createEl("button", "action-btn", "前の選択に戻る");
     undo.dataset.action = "undo-command";
     undo.disabled = !canUndoPreviousCommand() || isPlaybackBusy();
-    const logToggle = createEl("button", "action-btn", gameState.ui.isLogOpen ? "ログを閉じる" : "ログを開く");
-    logToggle.dataset.action = "toggle-log";
-    logToggle.disabled = isPlaybackBusy();
-    controls.append(cancel, undo, logToggle);
+    controls.append(cancel, undo);
     wrap.appendChild(controls);
-
-    if (gameState.ui.isLogOpen) {
-      const logWrap = createEl("section", "command-log-panel");
-      logWrap.appendChild(renderBattleLogPanel());
-      wrap.appendChild(logWrap);
-    }
 
     if (gameState.ui.commandMode === "fight" && actor) {
       const moves = createEl("div", "moves");
@@ -1680,17 +1751,6 @@
     return plans;
   };
 
-  const renderSidebar = () => {
-    const side = createEl("div", "sidebar");
-    side.appendChild(createEl("div", "stats", `ターン ${gameState.turn} | フェーズ: ${gameState.phase}`));
-    const footer = createEl("div", "footer");
-    const reset = createEl("button", "", "リセット");
-    reset.dataset.action = "reset";
-    footer.appendChild(reset);
-    if (gameState.phase === PHASE.GAMEOVER) footer.appendChild(createEl("div", "stats", `勝者: ${gameState.winner}`));
-    side.appendChild(footer);
-    return side;
-  };
 
   const render = () => {
     clearTempArrays();
@@ -1708,13 +1768,18 @@
     app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
 
     const main = createEl("div", "main");
+    main.appendChild(renderBattleTopHeader());
     main.appendChild(renderBattlefield());
     main.appendChild(renderBattleMessageBox());
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
       if (!isKoReplacementPhase()) main.appendChild(renderCommandSummaryCards());
     }
-    app.append(main, renderSidebar());
+    app.append(renderUtilityLane(), main);
+    const logModal = renderLogModal();
+    if (logModal) app.appendChild(logModal);
+    const menuModal = renderMenuModal();
+    if (menuModal) app.appendChild(menuModal);
   };
 
   const update = (now) => {
@@ -1746,6 +1811,8 @@
     if (a === "undo-command") dispatch({ type: "UNDO" });
     if (a === "fast-forward") dispatch({ type: "FAST_FORWARD" });
     if (a === "toggle-log") dispatch({ type: "TOGGLE_LOG" });
+    if (a === "toggle-menu") dispatch({ type: "TOGGLE_MENU" });
+    if (a === "close-panels") dispatch({ type: "CLOSE_PANELS" });
   });
 
   document.addEventListener("keydown", (event) => {
