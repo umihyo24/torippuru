@@ -140,6 +140,8 @@
       unitId: base.id,
       name: base.name,
       portrait: base.portrait,
+      allyPortrait: base.allyPortrait || null,
+      enemyPortrait: base.enemyPortrait || null,
       team,
       slot,
       hp: base.hp,
@@ -1402,14 +1404,27 @@
     return log;
   };
 
-  const renderMiniBattleUnit = (unit, mirror = false) => {
-    const mini = createImageWithFallback({ src: getAssetPath("portraits", unit.portrait), alt: unit.name, mirror });
-    mini.classList.add("mini-portrait");
-    return mini;
+  const getUnitPortraitPath = (unit) => {
+    if (!unit) return "";
+    const sideSpecificKey = unit.team === TEAM.ALLY ? unit.allyPortrait : unit.enemyPortrait;
+    return getAssetPath("portraits", sideSpecificKey || unit.portrait);
   };
 
-  const renderBoardCell = (x, y) => {
-    const cell = createEl("div", "cell");
+  const renderBattleSprite = (unit) => {
+    const shouldMirror = unit.team === TEAM.ENEMY;
+    const sprite = createImageWithFallback({
+      src: getUnitPortraitPath(unit),
+      alt: unit.name,
+      mirror: shouldMirror,
+      wrapperClass: "battle-sprite",
+      placeholderLabel: unit.name,
+      placeholderSubLabel: "NO SPRITE"
+    });
+    return sprite;
+  };
+
+  const renderBattlePosition = (x, y) => {
+    const slot = createEl("button", "battle-slot");
     const unit = getUnitAtFromState(gameState, { x, y });
     const showPreview = gameState.phase === PHASE.PLAYING && !isPlaybackBusy();
     const candidate = showPreview && gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
@@ -1417,53 +1432,122 @@
       && gameState.battleFlow.koReplacement.activeTeam === TEAM.ALLY
       && y === 1
       && gameState.battleFlow.koReplacement.pendingSlots.includes(x);
-    if (candidate) cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
-    if (replacementCandidate) cell.classList.add("valid-ally", "replacement-target");
+    if (candidate) slot.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
+    if (replacementCandidate) slot.classList.add("valid-ally", "replacement-target");
     const highlight = gameState.battleHighlight;
     if (isPlaybackBusy() && highlight.active === true && unit?.uid) {
       const sourceSet = new Set(highlight.sources || []);
       const targetSet = new Set(highlight.targets || []);
       const isSource = sourceSet.has(unit.uid);
       const isTarget = targetSet.has(unit.uid);
-      if (isSource) cell.classList.add(highlight.effectType === "trait" ? "source-trait" : "active-actor");
+      if (isSource) slot.classList.add(highlight.effectType === "trait" ? "source-trait" : "active-actor");
       if (isTarget) {
-        if (highlight.effectType === "status" && highlight.statusKind === "poison") cell.classList.add("targeted-status-poison");
-        else if (highlight.effectType === "status") cell.classList.add("targeted-status-default");
-        else if (highlight.effectType === "statusRemove") cell.classList.add("targeted-status-remove");
-        else if (highlight.effectType === "trait") cell.classList.add("targeted-trait");
-        else if (highlight.effectType === "aoe") cell.classList.add("targeted-aoe");
-        else cell.classList.add("targeted-single");
+        if (highlight.effectType === "status" && highlight.statusKind === "poison") slot.classList.add("targeted-status-poison");
+        else if (highlight.effectType === "status") slot.classList.add("targeted-status-default");
+        else if (highlight.effectType === "statusRemove") slot.classList.add("targeted-status-remove");
+        else if (highlight.effectType === "trait") slot.classList.add("targeted-trait");
+        else if (highlight.effectType === "aoe") slot.classList.add("targeted-aoe");
+        else slot.classList.add("targeted-single");
       }
     } else if (replacementCandidate && gameState.ui.selectedReplacementReserveIndex !== null) {
-      cell.classList.add("targeted");
+      slot.classList.add("targeted");
     } else if (!isPlaybackBusy() && gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
-      cell.classList.add("active-actor");
+      slot.classList.add("active-actor");
     }
 
-    cell.dataset.action = "target-cell";
-    cell.dataset.x = String(x);
-    cell.dataset.y = String(y);
+    slot.dataset.action = "target-cell";
+    slot.dataset.x = String(x);
+    slot.dataset.y = String(y);
+    slot.disabled = !!(isPlaybackBusy() || gameState.phase !== PHASE.PLAYING);
 
     if (!unit) {
-      cell.classList.add("empty");
-      cell.append(createEl("div", "mini", "—"), createEl("div", "mini", "待機マス"));
-      return cell;
+      slot.classList.add("empty");
+      slot.appendChild(createEl("div", "battle-slot-empty", "待機"));
+      return slot;
     }
 
-    cell.appendChild(renderMiniBattleUnit(unit, unit.team === TEAM.ALLY));
-    const main = createEl("div", "cell-unit-main");
+    const body = createEl("div", "battle-slot-body");
+    body.appendChild(renderBattleSprite(unit));
+    body.appendChild(createEl("div", "battle-sprite-name", unit.name));
+    slot.appendChild(body);
+    return slot;
+  };
+
+  const renderStatusPanel = (unit, x, y) => {
+    const panel = createEl("button", "status-panel");
+    panel.dataset.action = "target-cell";
+    panel.dataset.x = String(x);
+    panel.dataset.y = String(y);
+    panel.disabled = !!(isPlaybackBusy() || gameState.phase !== PHASE.PLAYING);
+
+    const showPreview = gameState.phase === PHASE.PLAYING && !isPlaybackBusy();
+    const candidate = showPreview && gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
+    const replacementCandidate = isKoReplacementPhase()
+      && gameState.battleFlow.koReplacement.activeTeam === TEAM.ALLY
+      && y === 1
+      && gameState.battleFlow.koReplacement.pendingSlots.includes(x);
+
+    if (candidate) panel.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
+    if (replacementCandidate) panel.classList.add("valid-ally", "replacement-target");
+
+    const highlight = gameState.battleHighlight;
+    if (isPlaybackBusy() && highlight.active === true && unit?.uid) {
+      const sourceSet = new Set(highlight.sources || []);
+      const targetSet = new Set(highlight.targets || []);
+      const isSource = sourceSet.has(unit.uid);
+      const isTarget = targetSet.has(unit.uid);
+      if (isSource) panel.classList.add(highlight.effectType === "trait" ? "source-trait" : "active-actor");
+      if (isTarget) {
+        if (highlight.effectType === "status" && highlight.statusKind === "poison") panel.classList.add("targeted-status-poison");
+        else if (highlight.effectType === "status") panel.classList.add("targeted-status-default");
+        else if (highlight.effectType === "statusRemove") panel.classList.add("targeted-status-remove");
+        else if (highlight.effectType === "trait") panel.classList.add("targeted-trait");
+        else if (highlight.effectType === "aoe") panel.classList.add("targeted-aoe");
+        else panel.classList.add("targeted-single");
+      }
+    } else if (replacementCandidate && gameState.ui.selectedReplacementReserveIndex !== null) {
+      panel.classList.add("targeted");
+    } else if (!isPlaybackBusy() && gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
+      panel.classList.add("active-actor");
+    }
+
+    if (!unit) {
+      panel.classList.add("empty");
+      panel.appendChild(createEl("div", "status-empty", "待機"));
+      return panel;
+    }
+
     const hp = getDisplayHp(unit);
     const hpPct = Math.round((hp / unit.maxHp) * 100);
-    main.appendChild(createEl("div", "cell-name", unit.name));
-    main.appendChild(createEl("div", "cell-hp", `HP ${unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)}`));
+    panel.appendChild(createEl("div", "status-name", unit.name));
+    panel.appendChild(createEl("div", "status-hp", `HP ${unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)}`));
     const bar = createEl("div", "hp-bar");
     const fill = createEl("div", "hp-bar-fill");
     fill.style.width = `${hpPct}%`;
     bar.appendChild(fill);
-    main.appendChild(bar);
-    main.appendChild(createEl("div", "mini", unit.statuses.map(statusText).join(" ") || "状態なし"));
-    cell.appendChild(main);
-    return cell;
+    panel.appendChild(bar);
+    panel.appendChild(createEl("div", "status-effects", unit.statuses.map(statusText).join(" / ") || "状態なし"));
+    return panel;
+  };
+
+  const renderBattlefield = () => {
+    const board = createEl("section", "battlefield");
+    applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
+
+    const enemyStatusCol = createEl("div", "status-column enemy-status");
+    const allyStatusCol = createEl("div", "status-column ally-status");
+    const enemySpriteRow = createEl("div", "sprite-row enemy-row");
+    const allySpriteRow = createEl("div", "sprite-row ally-row");
+
+    for (let x = 0; x < CONFIG.BOARD_COLS; x += 1) {
+      enemyStatusCol.appendChild(renderStatusPanel(gameState.teams.enemy.active[x], x, 0));
+      allyStatusCol.appendChild(renderStatusPanel(gameState.teams.ally.active[x], x, 1));
+      enemySpriteRow.appendChild(renderBattlePosition(x, 0));
+      allySpriteRow.appendChild(renderBattlePosition(x, 1));
+    }
+
+    board.append(enemyStatusCol, enemySpriteRow, allySpriteRow, allyStatusCol);
+    return board;
   };
 
   const renderCommandArea = () => {
@@ -1608,10 +1692,7 @@
     app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
 
     const main = createEl("div", "main");
-    const board = createEl("div", "board");
-    applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
-    for (let y = 0; y < CONFIG.BOARD_ROWS; y += 1) for (let x = 0; x < CONFIG.BOARD_COLS; x += 1) board.appendChild(renderBoardCell(x, y));
-    main.appendChild(board);
+    main.appendChild(renderBattlefield());
     main.appendChild(renderBattleMessageBox());
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
