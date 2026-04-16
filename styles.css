@@ -204,6 +204,21 @@ body {
   color: #f5f7ff;
 }
 
+.hp-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.8);
+  border: 1px solid rgba(160, 178, 218, 0.65);
+  overflow: hidden;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #7df68f 0%, #4fd36f 50%, #2daf57 100%);
+  transition: width 80ms linear;
+}
+
 .cell-name {
   font-size: 13px;
   font-weight: 700;
@@ -218,10 +233,13 @@ body {
   border: 2px solid #5a7099;
   border-radius: 10px;
   background: rgba(19, 28, 43, 0.9);
-  min-height: 44px;
+  min-height: 48px;
+  max-height: 48px;
+  width: 100%;
   padding: 0 12px;
   display: flex;
   align-items: center;
+  text-align: left;
 }
 
 .nav-message-text {
@@ -240,6 +258,11 @@ body {
   min-height: 288px;
   max-height: 288px;
   overflow-y: auto;
+}
+
+.command.disabled {
+  opacity: 0.72;
+  pointer-events: none;
 }
 
 .command h3 { margin: 0; font-size: 15px; }
