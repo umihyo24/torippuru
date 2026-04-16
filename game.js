@@ -524,6 +524,7 @@
       }
       if (a.type === "switch") {
         q.push({ type: "message", text: `${a.reserveOut.name}は 交代した！`, loggable: true });
+        // NOTE: Apply switch state before showing the entry message so the board reflects the new unit immediately.
         q.push({ type: "switchApply", ...a });
         q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
         (a.enterStatusApplies || []).forEach((s) => q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration }));
@@ -619,11 +620,16 @@
   };
 
   const applySwitchResult = (event) => {
+    if (!event || event.team === undefined || event.slot === undefined || !event.reserveIn?.uid) return;
     const teamState = gameState.teams[event.team];
-    const reserveIndex = teamState.reserve.findIndex((unit) => unit?.uid === event.reserveIn.uid);
+    if (!teamState || !Array.isArray(teamState.active) || !Array.isArray(teamState.reserve)) return;
+    const hintedReserveIndex = Number.isInteger(event.reserveIn.reserveIndex) ? event.reserveIn.reserveIndex : -1;
+    const reserveIndexByHint = hintedReserveIndex >= 0 && teamState.reserve[hintedReserveIndex]?.uid === event.reserveIn.uid ? hintedReserveIndex : -1;
+    const reserveIndex = reserveIndexByHint >= 0 ? reserveIndexByHint : teamState.reserve.findIndex((unit) => unit?.uid === event.reserveIn.uid);
     if (reserveIndex < 0) return;
 
     const reserve = teamState.reserve[reserveIndex];
+    if (!reserve) return;
     const outgoing = teamState.active[event.slot] || null;
 
     if (outgoing) {
