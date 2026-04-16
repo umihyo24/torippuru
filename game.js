@@ -275,7 +275,7 @@
     const statusApplies = [];
     const applyEffects = (effects = [], sourceLabel = null, announceAbility = false) => {
       if (!effects.length) return;
-      if (announceAbility && sourceLabel) messages.push(`${unit.name}'s ${sourceLabel} activated!`);
+      if (announceAbility && sourceLabel) messages.push(`${unit.name}の ${sourceLabel}が 発動した！`);
       effects.forEach((effect) => {
         if (effect.type !== "applyStatus") return;
         const duration = effect.duration ?? STATUSES[effect.status]?.duration ?? 1;
@@ -352,14 +352,7 @@
       if (a.team !== b.team) return byTeamOrder(a.team) - byTeamOrder(b.team);
       return a.slot - b.slot;
     };
-    const switchActions = [];
-    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
-      sim.teams[team].active.forEach((unit, slot) => {
-        if (!unit || !isAlive(unit) || !unit.isSwitching || !unit.switchTargetId) return;
-        switchActions.push({ type: "switch", team, slot, actorId: unit.uid, switchTargetId: unit.switchTargetId });
-      });
-    });
-    switchActions.sort(speedSort);
+    const switchActions = actions.filter((a) => a.type === "switch").sort(speedSort);
     const otherActions = actions.filter((a) => a.type !== "switch").sort(speedSort);
 
     const turnResult = {
@@ -434,11 +427,13 @@
       if (!move) return;
       const patternPositions = getPatternPositionsForMove(actor, move);
       const targets = move.targetMode === "single"
-        ? patternPositions.filter((p) => p.x === action.targetPos?.x && p.y === action.targetPos?.y)
+        ? (action.targetPos ? [{ x: action.targetPos.x, y: action.targetPos.y }] : [])
         : patternPositions;
       const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0 };
 
       targets.forEach((targetPos) => {
+        if (!inBounds(targetPos)) return;
+        if (!patternPositions.some((p) => p.x === targetPos.x && p.y === targetPos.y)) return;
         const target = getUnitAtFromState(sim, targetPos);
         if (!isRuleMatchAtPosition(actor, move, target)) return;
         const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false };
@@ -528,8 +523,8 @@
         return;
       }
       if (a.type === "switch") {
-        q.push({ type: "message", text: `[${a.reserveOut.name}] switched out!`, loggable: true });
-        q.push({ type: "message", text: `[${a.reserveIn.name}] entered the battle!`, loggable: true });
+        q.push({ type: "message", text: `${a.reserveOut.name}は 交代した！`, loggable: true });
+        q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
         q.push({ type: "switchApply", ...a });
         (a.enterStatusApplies || []).forEach((s) => q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration }));
         a.enterEffects.forEach((line) => q.push({ type: "message", text: line, loggable: true }));
@@ -1029,8 +1024,6 @@
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
     if (alreadyPickedTargetIds.includes(reserve.uid) || switchingActorIds.includes(reserve.uid)) return;
-    actor.isSwitching = true;
-    actor.switchTargetId = reserve.uid;
     gameState.confirmedCommands[gameState.currentActorIndex] = {
       actorId: actor.uid,
       actorName: actor.name,
@@ -1058,8 +1051,6 @@
     if (!canUndoPreviousCommand() || isPlaybackBusy()) return;
     for (let i = CONFIG.BOARD_COLS - 1; i >= 0; i -= 1) {
       if (!gameState.confirmedCommands[i]) continue;
-      const action = gameState.confirmedCommands[i].action;
-      if (action?.type === "switch") clearSwitchFlags(gameState.teams.ally.active[i]);
       gameState.confirmedCommands[i] = null;
       gameState.currentActorIndex = i;
       clearTargetPreview();
