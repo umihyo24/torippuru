@@ -20,11 +20,13 @@
     SPEED_BASE: 1,
     TIEBREAKER_TEAM_ORDER: ["ally", "enemy"],
     HIGHLIGHT_COLORS: {
-      attacker: "#ffe163",
-      targetSingle: "#ff6a6a",
-      targetAoe: "#ff9f4a",
+      attackSource: "#ffe163",
+      attackTargetSingle: "#ff6a6a",
+      attackTargetAoe: "#ff9f4a",
       statusPoison: "#b07bff",
-      statusDefault: "#7d91ff"
+      statusDefault: "#7d91ff",
+      traitSource: "#55e9ff",
+      traitTarget: "#7bd8ff"
     }
   };
 
@@ -110,6 +112,10 @@
     atkUp: (n) => `${n}の こうげきアップが切れた。`,
     defUp: (n) => `${n}の ぼうぎょアップが切れた。`
   };
+  const ABILITY_LABELS = {
+    venomTouch: "ベノムタッチ",
+    guardianPulse: "ガーディアンパルス"
+  };
 
   let UID_COUNTER = 1;
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -188,10 +194,11 @@
     },
     battleHighlight: {
       active: false,
-      attackers: [],
+      sources: [],
       targets: [],
       effectType: null,
-      statusKind: null
+      statusKind: null,
+      traitKind: null
     },
     log: [],
     temp: { renderCells: [] }
@@ -225,24 +232,26 @@
 
   const clearBattleHighlight = () => {
     gameState.battleHighlight.active = false;
-    gameState.battleHighlight.attackers = [];
+    gameState.battleHighlight.sources = [];
     gameState.battleHighlight.targets = [];
     gameState.battleHighlight.effectType = null;
     gameState.battleHighlight.statusKind = null;
+    gameState.battleHighlight.traitKind = null;
   };
 
-  const setBattleHighlight = ({ attackers = [], targets = [], effectType = null, statusKind = null } = {}) => {
-    const nextAttackers = normalizeUidList(attackers);
+  const setBattleHighlight = ({ sources = [], targets = [], effectType = null, statusKind = null, traitKind = null } = {}) => {
+    const nextSources = normalizeUidList(sources);
     const nextTargets = normalizeUidList(targets);
-    if (!nextAttackers.length && !nextTargets.length) {
+    if (!nextSources.length && !nextTargets.length) {
       clearBattleHighlight();
       return;
     }
     gameState.battleHighlight.active = true;
-    gameState.battleHighlight.attackers = nextAttackers;
+    gameState.battleHighlight.sources = nextSources;
     gameState.battleHighlight.targets = nextTargets;
     gameState.battleHighlight.effectType = effectType;
     gameState.battleHighlight.statusKind = statusKind;
+    gameState.battleHighlight.traitKind = traitKind;
   };
 
   const getEffectiveStat = (unit, key) => {
@@ -449,7 +458,15 @@
         (ability?.onTurnStart || []).forEach((e) => {
           if (e.type !== "applyStatus") return;
           addStatus(unit, e.status, e.duration);
-          turnResult.startStepResults.abilityStatuses.push({ targetId: unit.uid, targetName: unit.name, statusId: e.status, duration: e.duration, sourceName: unit.name });
+          turnResult.startStepResults.abilityStatuses.push({
+            sourceId: unit.uid,
+            sourceName: unit.name,
+            traitKind: unit.abilityId || "ability",
+            targetId: unit.uid,
+            targetName: unit.name,
+            statusId: e.status,
+            duration: e.duration
+          });
         });
       });
     }
@@ -530,7 +547,7 @@
         move.beforeDamage.forEach((effect) => {
           if (effect.type === "applyStatus") {
             addStatus(target, effect.status, effect.duration);
-            targetResult.appliedStatuses.push(effect.status);
+            targetResult.appliedStatuses.push({ statusId: effect.status, duration: effect.duration, sourceType: "move" });
           }
         });
 
@@ -550,7 +567,7 @@
           }
           if (effect.type === "applyStatus") {
             addStatus(target, effect.status, effect.duration);
-            targetResult.appliedStatuses.push(effect.status);
+            targetResult.appliedStatuses.push({ statusId: effect.status, duration: effect.duration, sourceType: "move" });
           }
         });
 
@@ -558,7 +575,14 @@
         (ability?.onAfterDamage || []).forEach((effect) => {
           if (effect.type === "applyStatus" && isAlive(target)) {
             addStatus(target, effect.status, effect.duration);
-            targetResult.appliedStatuses.push(effect.status);
+            targetResult.appliedStatuses.push({
+              statusId: effect.status,
+              duration: effect.duration,
+              sourceType: "trait",
+              sourceId: actor.uid,
+              sourceName: actor.name,
+              traitKind: actor.abilityId || "ability"
+            });
           }
         });
 
@@ -601,9 +625,19 @@
   const buildBattleEventQueue = (turnResult) => {
     const q = [];
     turnResult.startStepResults.abilityStatuses.forEach((s) => {
+      const abilityName = ABILITY_LABELS[s.traitKind] || s.traitKind || "ability";
+      q.push({
+        type: "battleHighlight",
+        sources: [s.sourceId],
+        targets: [s.targetId],
+        effectType: "trait",
+        traitKind: s.traitKind
+      });
+      q.push({ type: "message", text: `${s.sourceName}の ${abilityName}が 発動した！`, loggable: true });
       const text = STATUS_APPLY_TEXT[s.statusId]?.(s.targetName) || `${s.targetName}に ${s.statusId}！`;
       q.push({ type: "message", text, loggable: true });
       q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration });
+      q.push({ type: "clearBattleHighlight" });
     });
 
     turnResult.actionResults.forEach((a) => {
@@ -633,7 +667,7 @@
       const isAoe = a.targets.length > 1;
       q.push({
         type: "battleHighlight",
-        attackers: [a.actorId],
+        sources: [a.actorId],
         targets: targetIds,
         effectType: isAoe ? "aoe" : "attack"
       });
@@ -648,10 +682,24 @@
       });
       if (isAoe && aoeAnimations.length) q.push({ type: "hpAnimationBatch", animations: aoeAnimations });
       a.targets.forEach((t) => {
-        t.appliedStatuses.forEach((statusId) => {
+        t.appliedStatuses.forEach((applied) => {
+          const statusId = applied?.statusId;
+          if (!statusId) return;
+          if (applied.sourceType === "trait") {
+            const abilityName = ABILITY_LABELS[applied.traitKind] || applied.traitKind || "ability";
+            q.push({
+              type: "battleHighlight",
+              sources: [applied.sourceId],
+              targets: [t.targetId],
+              effectType: "trait",
+              traitKind: applied.traitKind
+            });
+            q.push({ type: "message", text: `${applied.sourceName}の ${abilityName}が 発動した！`, loggable: true });
+          }
           const text = STATUS_APPLY_TEXT[statusId]?.(t.targetName) || `${t.targetName}に ${statusId}！`;
           q.push({ type: "message", text, loggable: true });
-          q.push({ type: "statusApply", targetId: t.targetId, statusId });
+          q.push({ type: "statusApply", targetId: t.targetId, statusId, duration: applied.duration });
+          if (applied.sourceType === "trait") q.push({ type: "clearBattleHighlight" });
         });
         if (t.defeated) q.push({ type: "message", text: `${t.targetName}は たおれた！`, loggable: true });
       });
@@ -663,7 +711,7 @@
     turnResult.endStepResults.poisonTicks.forEach((p) => {
       q.push({
         type: "battleHighlight",
-        attackers: [],
+        sources: [],
         targets: [p.targetId],
         effectType: "status",
         statusKind: "poison"
@@ -779,10 +827,11 @@
     }
     if (event.type === "battleHighlight") {
       setBattleHighlight({
-        attackers: event.attackers,
+        sources: event.sources,
         targets: event.targets,
         effectType: event.effectType || null,
-        statusKind: event.statusKind || null
+        statusKind: event.statusKind || null,
+        traitKind: event.traitKind || null
       });
       gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
       return;
@@ -1326,13 +1375,15 @@
     if (replacementCandidate) cell.classList.add("valid-ally", "replacement-target");
     const highlight = gameState.battleHighlight;
     if (isPlaybackBusy() && highlight.active && unit?.uid) {
-      const attackerSet = new Set(highlight.attackers || []);
+      const sourceSet = new Set(highlight.sources || []);
       const targetSet = new Set(highlight.targets || []);
-      const isAttacker = attackerSet.has(unit.uid);
+      const isSource = sourceSet.has(unit.uid);
       const isTarget = targetSet.has(unit.uid);
-      if (isAttacker) cell.classList.add("active-actor");
+      if (isSource) cell.classList.add(highlight.effectType === "trait" ? "source-trait" : "active-actor");
       if (isTarget) {
         if (highlight.effectType === "status" && highlight.statusKind === "poison") cell.classList.add("targeted-status-poison");
+        else if (highlight.effectType === "status") cell.classList.add("targeted-status-default");
+        else if (highlight.effectType === "trait") cell.classList.add("targeted-trait");
         else if (highlight.effectType === "aoe") cell.classList.add("targeted-aoe");
         else cell.classList.add("targeted-single");
       }
@@ -1500,11 +1551,13 @@
     app.innerHTML = "";
     app.style.setProperty("--detail-h", `${CONFIG.MOVE_DETAIL_PANEL_HEIGHT}px`);
     app.style.setProperty("--summary-h", `${CONFIG.SUMMARY_PANEL_HEIGHT}px`);
-    app.style.setProperty("--hl-attacker", CONFIG.HIGHLIGHT_COLORS.attacker);
-    app.style.setProperty("--hl-target-single", CONFIG.HIGHLIGHT_COLORS.targetSingle);
-    app.style.setProperty("--hl-target-aoe", CONFIG.HIGHLIGHT_COLORS.targetAoe);
+    app.style.setProperty("--hl-attacker", CONFIG.HIGHLIGHT_COLORS.attackSource);
+    app.style.setProperty("--hl-target-single", CONFIG.HIGHLIGHT_COLORS.attackTargetSingle);
+    app.style.setProperty("--hl-target-aoe", CONFIG.HIGHLIGHT_COLORS.attackTargetAoe);
     app.style.setProperty("--hl-status-poison", CONFIG.HIGHLIGHT_COLORS.statusPoison);
     app.style.setProperty("--hl-status-default", CONFIG.HIGHLIGHT_COLORS.statusDefault);
+    app.style.setProperty("--hl-trait-source", CONFIG.HIGHLIGHT_COLORS.traitSource);
+    app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
 
     const main = createEl("div", "main");
     const board = createEl("div", "board");

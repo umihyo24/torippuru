@@ -199,6 +199,27 @@ body {
     inset 0 0 24px color-mix(in srgb, var(--hl-status-poison, #b07bff) 34%, transparent);
 }
 
+.cell.targeted-status-default {
+  border-color: var(--hl-status-default, #7d91ff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-status-default, #7d91ff) 60%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--hl-status-default, #7d91ff) 32%, transparent);
+}
+
+.cell.source-trait {
+  border-color: var(--hl-trait-source, #55e9ff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-trait-source, #55e9ff) 62%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--hl-trait-source, #55e9ff) 30%, transparent);
+}
+
+.cell.targeted-trait {
+  border-color: var(--hl-trait-target, #7bd8ff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-trait-target, #7bd8ff) 62%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--hl-trait-target, #7bd8ff) 32%, transparent);
+}
+
 .cell.planned-target {
   outline: 2px dashed rgba(150, 238, 188, 0.8);
   outline-offset: -6px;
