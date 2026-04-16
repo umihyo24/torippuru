@@ -1422,16 +1422,26 @@
   };
 
   const renderBattleTopHeader = () => {
-    const header = createEl("section", "battle-header");
-    header.append(
-      createEl("div", "", `ターン ${gameState.turn}`),
-      createEl("div", "", gameState.phase === PHASE.GAMEOVER ? `勝者: ${gameState.winner || "なし"}` : "3v3 Tactical Battle")
-    );
+    const header = createEl("section", "battle-header content-width");
+    const menuBtn = createEl("button", "header-util-btn", "☰");
+    menuBtn.dataset.action = "toggle-menu";
+    menuBtn.setAttribute("aria-label", "メニュー");
+
+    const turnLabel = gameState.phase === PHASE.GAMEOVER
+      ? `ターン ${gameState.turn} / 勝者: ${gameState.winner || "なし"}`
+      : `ターン ${gameState.turn} / フェーズ: ${gameState.phase}`;
+    const center = createEl("div", "battle-header-center", turnLabel);
+
+    const logBtn = createEl("button", "header-util-btn", "ログ");
+    logBtn.dataset.action = "toggle-log";
+    logBtn.setAttribute("aria-label", "ログ");
+
+    header.append(menuBtn, center, logBtn);
     return header;
   };
 
   const renderBattleMessageBox = () => {
-    const nav = createEl("button", "nav-message");
+    const nav = createEl("button", "nav-message content-width");
     nav.dataset.action = "fast-forward";
     nav.disabled = !isPlaybackBusy();
     nav.appendChild(createEl("div", "nav-message-text", getNavigationMessageText()));
@@ -1456,16 +1466,6 @@
     return log;
   };
 
-  const renderUtilityLane = () => {
-    const lane = createEl("aside", "utility-lane");
-    const menuBtn = createEl("button", "utility-btn", "☰");
-    menuBtn.dataset.action = "toggle-menu";
-    menuBtn.setAttribute("aria-label", "メニュー");
-    const logBtn = createEl("button", "utility-btn", "ログ");
-    logBtn.dataset.action = "toggle-log";
-    lane.append(menuBtn, logBtn);
-    return lane;
-  };
 
   const renderLogModal = () => {
     if (!gameState.ui.isLogOpen) return null;
@@ -1639,7 +1639,7 @@
   };
 
   const renderBattlefield = () => {
-    const board = createEl("section", "battlefield");
+    const board = createEl("section", "battlefield content-width");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
 
     board.append(
@@ -1652,7 +1652,7 @@
   };
 
   const renderCommandArea = () => {
-    const wrap = createEl("div", "command");
+    const wrap = createEl("div", "command content-width");
     if (isPlaybackBusy()) wrap.classList.add("disabled");
     const actor = getCurrentActor();
     if (isKoReplacementPhase()) {
@@ -1742,7 +1742,7 @@
   };
 
   const renderCommandSummaryCards = () => {
-    const plans = createEl("div", "command-summary");
+    const plans = createEl("div", "command-summary content-width");
     for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
       const box = createEl("div", "summary-card");
       const unit = gameState.teams.ally.active[i];
@@ -1786,7 +1786,7 @@
       main.appendChild(renderCommandArea());
       if (!isKoReplacementPhase()) main.appendChild(renderCommandSummaryCards());
     }
-    app.append(renderUtilityLane(), main);
+    app.append(main);
     const logModal = renderLogModal();
     if (logModal) app.appendChild(logModal);
     const menuModal = renderMenuModal();
