@@ -18,7 +18,14 @@
     HP_ANIM_MS: 520,
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
-    TIEBREAKER_TEAM_ORDER: ["ally", "enemy"]
+    TIEBREAKER_TEAM_ORDER: ["ally", "enemy"],
+    HIGHLIGHT_COLORS: {
+      attacker: "#ffe163",
+      targetSingle: "#ff6a6a",
+      targetAoe: "#ff9f4a",
+      statusPoison: "#b07bff",
+      statusDefault: "#7d91ff"
+    }
   };
 
   const TEAM = { ALLY: "ally", ENEMY: "enemy" };
@@ -177,9 +184,14 @@
     },
     displayState: {
       hpAnimations: {},
-      hpDisplay: {},
-      highlightActorId: null,
-      highlightTargetId: null
+      hpDisplay: {}
+    },
+    battleHighlight: {
+      active: false,
+      attackers: [],
+      targets: [],
+      effectType: null,
+      statusKind: null
     },
     log: [],
     temp: { renderCells: [] }
@@ -207,6 +219,30 @@
       }
     }
     return null;
+  };
+
+  const normalizeUidList = (items = []) => items.filter((id) => typeof id === "string" && id.length > 0);
+
+  const clearBattleHighlight = () => {
+    gameState.battleHighlight.active = false;
+    gameState.battleHighlight.attackers = [];
+    gameState.battleHighlight.targets = [];
+    gameState.battleHighlight.effectType = null;
+    gameState.battleHighlight.statusKind = null;
+  };
+
+  const setBattleHighlight = ({ attackers = [], targets = [], effectType = null, statusKind = null } = {}) => {
+    const nextAttackers = normalizeUidList(attackers);
+    const nextTargets = normalizeUidList(targets);
+    if (!nextAttackers.length && !nextTargets.length) {
+      clearBattleHighlight();
+      return;
+    }
+    gameState.battleHighlight.active = true;
+    gameState.battleHighlight.attackers = nextAttackers;
+    gameState.battleHighlight.targets = nextTargets;
+    gameState.battleHighlight.effectType = effectType;
+    gameState.battleHighlight.statusKind = statusKind;
   };
 
   const getEffectiveStat = (unit, key) => {
@@ -593,11 +629,25 @@
         return;
       }
 
-      q.push({ type: "highlightActor", actorId: a.actorId });
+      const targetIds = a.targets.map((t) => t.targetId).filter(Boolean);
+      const isAoe = a.targets.length > 1;
+      q.push({
+        type: "battleHighlight",
+        attackers: [a.actorId],
+        targets: targetIds,
+        effectType: isAoe ? "aoe" : "attack"
+      });
       q.push({ type: "message", text: `${a.actorName}の ${a.moveName}！`, loggable: true });
+      const aoeAnimations = [];
       a.targets.forEach((t) => {
-        q.push({ type: "highlightTarget", targetId: t.targetId });
-        if (t.damage > 0 || t.hpBefore !== t.hpAfter) q.push({ type: "hpAnimation", targetId: t.targetId, fromHp: t.hpBefore, toHp: t.hpAfter, duration: CONFIG.HP_ANIM_MS });
+        if (t.damage > 0 || t.hpBefore !== t.hpAfter) {
+          const anim = { targetId: t.targetId, fromHp: t.hpBefore, toHp: t.hpAfter, duration: CONFIG.HP_ANIM_MS };
+          if (isAoe) aoeAnimations.push(anim);
+          else q.push({ type: "hpAnimation", ...anim });
+        }
+      });
+      if (isAoe && aoeAnimations.length) q.push({ type: "hpAnimationBatch", animations: aoeAnimations });
+      a.targets.forEach((t) => {
         t.appliedStatuses.forEach((statusId) => {
           const text = STATUS_APPLY_TEXT[statusId]?.(t.targetName) || `${t.targetName}に ${statusId}！`;
           q.push({ type: "message", text, loggable: true });
@@ -606,13 +656,22 @@
         if (t.defeated) q.push({ type: "message", text: `${t.targetName}は たおれた！`, loggable: true });
       });
       if (a.selfHeal > 0) q.push({ type: "hpAnimation", targetId: a.actorId, fromHp: a.selfHpBefore, toHp: a.selfHpAfter, duration: CONFIG.HP_ANIM_MS });
+      q.push({ type: "clearBattleHighlight" });
       q.push({ type: "wait", duration: CONFIG.WAIT_SHORT_MS });
     });
 
     turnResult.endStepResults.poisonTicks.forEach((p) => {
+      q.push({
+        type: "battleHighlight",
+        attackers: [],
+        targets: [p.targetId],
+        effectType: "status",
+        statusKind: "poison"
+      });
       q.push({ type: "message", text: `${p.targetName}は どくの ダメージを うけた！`, loggable: true });
       q.push({ type: "hpAnimation", targetId: p.targetId, fromHp: p.hpBefore, toHp: p.hpAfter, duration: CONFIG.HP_ANIM_MS });
       if (p.defeated) q.push({ type: "message", text: `${p.targetName}は たおれた！`, loggable: true });
+      q.push({ type: "clearBattleHighlight" });
     });
 
     turnResult.endStepResults.expiredStatuses.forEach((s) => {
@@ -718,13 +777,13 @@
       gameState.battleFlow.waitUntil = now + (event.duration / gameState.battleFlow.playbackSpeed);
       return;
     }
-    if (event.type === "highlightActor") {
-      gameState.displayState.highlightActorId = event.actorId;
-      gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
-      return;
-    }
-    if (event.type === "highlightTarget") {
-      gameState.displayState.highlightTargetId = event.targetId;
+    if (event.type === "battleHighlight") {
+      setBattleHighlight({
+        attackers: event.attackers,
+        targets: event.targets,
+        effectType: event.effectType || null,
+        statusKind: event.statusKind || null
+      });
       gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
       return;
     }
@@ -732,6 +791,16 @@
       animateHpChange(event.targetId, event.fromHp, event.toHp, event.duration || CONFIG.HP_ANIM_MS);
       const unit = getUnitByUid(event.targetId);
       if (unit) unit.hp = event.toHp;
+      return;
+    }
+    if (event.type === "hpAnimationBatch") {
+      const animations = Array.isArray(event.animations) ? event.animations : [];
+      animations.forEach((anim) => {
+        if (!anim?.targetId) return;
+        animateHpChange(anim.targetId, anim.fromHp, anim.toHp, anim.duration || CONFIG.HP_ANIM_MS);
+        const unit = getUnitByUid(anim.targetId);
+        if (unit) unit.hp = anim.toHp;
+      });
       return;
     }
     if (event.type === "statusApply") {
@@ -754,9 +823,13 @@
       finishCurrentEvent();
       return;
     }
+    if (event.type === "clearBattleHighlight") {
+      clearBattleHighlight();
+      finishCurrentEvent();
+      return;
+    }
     if (event.type === "turnSeparator") {
-      gameState.displayState.highlightActorId = null;
-      gameState.displayState.highlightTargetId = null;
+      clearBattleHighlight();
       finishCurrentEvent();
       return;
     }
@@ -797,7 +870,7 @@
       return;
     }
 
-    if (event.type === "wait" || event.type === "highlightActor" || event.type === "highlightTarget") {
+    if (event.type === "wait" || event.type === "battleHighlight") {
       if (now >= flow.waitUntil) finishCurrentEvent();
       return;
     }
@@ -808,6 +881,18 @@
         finishCurrentEvent();
       }
       return;
+    }
+
+    if (event.type === "hpAnimationBatch") {
+      const animations = Array.isArray(event.animations) ? event.animations : [];
+      const isRunning = animations.some((anim) => !!gameState.displayState.hpAnimations[anim.targetId]);
+      if (!isRunning) {
+        animations.forEach((anim) => {
+          if (!anim?.targetId) return;
+          gameState.displayState.hpDisplay[anim.targetId] = anim.toHp;
+        });
+        finishCurrentEvent();
+      }
     }
   };
 
@@ -1239,9 +1324,18 @@
       && gameState.battleFlow.koReplacement.pendingSlots.includes(x);
     if (candidate) cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
     if (replacementCandidate) cell.classList.add("valid-ally", "replacement-target");
-    if (isPlaybackBusy() && (gameState.displayState.highlightActorId || gameState.displayState.highlightTargetId)) {
-      if (unit?.uid === gameState.displayState.highlightActorId) cell.classList.add("active-actor");
-      if (unit?.uid === gameState.displayState.highlightTargetId) cell.classList.add("targeted");
+    const highlight = gameState.battleHighlight;
+    if (isPlaybackBusy() && highlight.active && unit?.uid) {
+      const attackerSet = new Set(highlight.attackers || []);
+      const targetSet = new Set(highlight.targets || []);
+      const isAttacker = attackerSet.has(unit.uid);
+      const isTarget = targetSet.has(unit.uid);
+      if (isAttacker) cell.classList.add("active-actor");
+      if (isTarget) {
+        if (highlight.effectType === "status" && highlight.statusKind === "poison") cell.classList.add("targeted-status-poison");
+        else if (highlight.effectType === "aoe") cell.classList.add("targeted-aoe");
+        else cell.classList.add("targeted-single");
+      }
     } else if (replacementCandidate && gameState.ui.selectedReplacementReserveIndex !== null) {
       cell.classList.add("targeted");
     } else if (gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
@@ -1406,6 +1500,11 @@
     app.innerHTML = "";
     app.style.setProperty("--detail-h", `${CONFIG.MOVE_DETAIL_PANEL_HEIGHT}px`);
     app.style.setProperty("--summary-h", `${CONFIG.SUMMARY_PANEL_HEIGHT}px`);
+    app.style.setProperty("--hl-attacker", CONFIG.HIGHLIGHT_COLORS.attacker);
+    app.style.setProperty("--hl-target-single", CONFIG.HIGHLIGHT_COLORS.targetSingle);
+    app.style.setProperty("--hl-target-aoe", CONFIG.HIGHLIGHT_COLORS.targetAoe);
+    app.style.setProperty("--hl-status-poison", CONFIG.HIGHLIGHT_COLORS.statusPoison);
+    app.style.setProperty("--hl-status-default", CONFIG.HIGHLIGHT_COLORS.statusDefault);
 
     const main = createEl("div", "main");
     const board = createEl("div", "board");

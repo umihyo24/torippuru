@@ -172,10 +172,31 @@ body {
 }
 
 .cell.active-actor {
-  border-color: #ffe163;
+  border-color: var(--hl-attacker, #ffe163);
   box-shadow:
-    0 0 0 3px rgba(255, 225, 99, 0.4),
-    inset 0 0 22px rgba(255, 224, 113, 0.18);
+    0 0 0 3px color-mix(in srgb, var(--hl-attacker, #ffe163) 60%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--hl-attacker, #ffe163) 30%, transparent);
+}
+
+.cell.targeted-single {
+  border-color: var(--hl-target-single, #ff6a6a);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-target-single, #ff6a6a) 60%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--hl-target-single, #ff6a6a) 30%, transparent);
+}
+
+.cell.targeted-aoe {
+  border-color: var(--hl-target-aoe, #ff9f4a);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-target-aoe, #ff9f4a) 62%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--hl-target-aoe, #ff9f4a) 32%, transparent);
+}
+
+.cell.targeted-status-poison {
+  border-color: var(--hl-status-poison, #b07bff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-status-poison, #b07bff) 62%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--hl-status-poison, #b07bff) 34%, transparent);
 }
 
 .cell.planned-target {
