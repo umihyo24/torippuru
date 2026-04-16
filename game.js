@@ -249,6 +249,49 @@
     unit.switchTargetId = null;
   };
 
+  const replaceActiveUnitFromReserve = ({
+    state,
+    team,
+    slot,
+    incomingUnitId,
+    reserveIndexHint = null,
+    reserveMode = "swap",
+    requireDefeatedOutgoing = false
+  }) => {
+    const teamState = state?.teams?.[team];
+    if (!teamState || !Array.isArray(teamState.active) || !Array.isArray(teamState.reserve)) return null;
+    if (!Number.isInteger(slot) || slot < 0 || slot >= teamState.active.length || !incomingUnitId) return null;
+
+    const outgoing = teamState.active[slot] || null;
+    if (!outgoing) return null;
+    if (requireDefeatedOutgoing && !isDefeated(outgoing)) return null;
+
+    let reserveIndex = -1;
+    if (Number.isInteger(reserveIndexHint) && reserveIndexHint >= 0 && teamState.reserve[reserveIndexHint]?.uid === incomingUnitId) {
+      reserveIndex = reserveIndexHint;
+    } else {
+      reserveIndex = teamState.reserve.findIndex((unit) => unit?.uid === incomingUnitId);
+    }
+    if (reserveIndex < 0) return null;
+
+    const incoming = teamState.reserve[reserveIndex];
+    if (!incoming || !isAlive(incoming)) return null;
+
+    teamState.active[slot] = incoming;
+    incoming.slot = slot;
+    clearSwitchFlags(incoming);
+
+    if (reserveMode === "consume") {
+      teamState.reserve.splice(reserveIndex, 1);
+    } else {
+      teamState.reserve[reserveIndex] = outgoing;
+      outgoing.slot = `r${reserveIndex}`;
+      clearSwitchFlags(outgoing);
+    }
+
+    return { incoming, outgoing, reserveIndex };
+  };
+
   const getDefeatedActiveSlots = (state, team) => state.teams[team].active
     .map((unit, slot) => (isDefeated(unit) ? slot : null))
     .filter((slot) => slot !== null);
@@ -397,17 +440,27 @@
       const outgoing = teamState.active[slot] || null;
       if (!outgoing) return;
       clearSwitchSensitiveStatuses(outgoing);
-      teamState.active[slot] = reserve;
-      reserve.slot = slot;
-      clearSwitchFlags(reserve);
-      teamState.reserve[reserveIndex] = outgoing;
-      outgoing.slot = `r${reserveIndex}`;
-      clearSwitchFlags(outgoing);
+      const replacement = replaceActiveUnitFromReserve({
+        state: sim,
+        team: action.team,
+        slot,
+        incomingUnitId: reserve.uid,
+        reserveIndexHint: reserveIndex,
+        reserveMode: "swap"
+      });
+      if (!replacement) {
+        turnResult.actionResults.push({ type: "skip", reason: "invalidSwitchTarget", actorId: actor.uid, actorName: actor.name });
+        return;
+      }
       const enter = resolveUnitOnEnterEffects({ state: sim, team: action.team, slot, unit: reserve });
       turnResult.actionResults.push({
         type: "switch",
         team: action.team,
+        playerId: action.team,
         slot,
+        slotIndex: slot,
+        incomingUnitId: reserve.uid,
+        reserveIndex,
         reserveIn: { uid: reserve.uid, name: reserve.name, reserveIndex },
         reserveOut: { uid: outgoing.uid, name: outgoing.name },
         enterEffects: enter.messages,
@@ -524,8 +577,15 @@
       }
       if (a.type === "switch") {
         q.push({ type: "message", text: `${a.reserveOut.name}は 交代した！`, loggable: true });
-        // NOTE: Apply switch state before showing the entry message so the board reflects the new unit immediately.
-        q.push({ type: "switchApply", ...a });
+        q.push({
+          type: "switchApply",
+          playerId: a.playerId ?? a.team,
+          team: a.team,
+          slotIndex: a.slotIndex ?? a.slot,
+          slot: a.slot,
+          incomingUnitId: a.incomingUnitId ?? a.reserveIn?.uid,
+          reserveIndex: a.reserveIndex ?? a.reserveIn?.reserveIndex
+        });
         q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
         (a.enterStatusApplies || []).forEach((s) => q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration }));
         a.enterEffects.forEach((line) => q.push({ type: "message", text: line, loggable: true }));
@@ -620,35 +680,28 @@
   };
 
   const applySwitchResult = (event) => {
-    if (!event || event.team === undefined || event.slot === undefined || !event.reserveIn?.uid) return;
-    const teamState = gameState.teams[event.team];
-    if (!teamState || !Array.isArray(teamState.active) || !Array.isArray(teamState.reserve)) return;
-    const hintedReserveIndex = Number.isInteger(event.reserveIn.reserveIndex) ? event.reserveIn.reserveIndex : -1;
-    const reserveIndexByHint = hintedReserveIndex >= 0 && teamState.reserve[hintedReserveIndex]?.uid === event.reserveIn.uid ? hintedReserveIndex : -1;
-    const reserveIndex = reserveIndexByHint >= 0 ? reserveIndexByHint : teamState.reserve.findIndex((unit) => unit?.uid === event.reserveIn.uid);
-    if (reserveIndex < 0) return;
+    const team = event?.playerId ?? event?.team;
+    const slot = event?.slotIndex ?? event?.slot;
+    const incomingUnitId = event?.incomingUnitId ?? event?.reserveIn?.uid;
+    if (!team || !Number.isInteger(slot) || !incomingUnitId) return;
+    const outgoing = gameState.teams[team]?.active?.[slot] || null;
+    if (!outgoing) return;
+    clearSwitchSensitiveStatuses(outgoing);
+    delete gameState.displayState.hpDisplay[outgoing.uid];
+    delete gameState.displayState.hpAnimations[outgoing.uid];
 
-    const reserve = teamState.reserve[reserveIndex];
-    if (!reserve) return;
-    const outgoing = teamState.active[event.slot] || null;
+    const replacement = replaceActiveUnitFromReserve({
+      state: gameState,
+      team,
+      slot,
+      incomingUnitId,
+      reserveIndexHint: event?.reserveIndex ?? event?.reserveIn?.reserveIndex,
+      reserveMode: "swap"
+    });
+    if (!replacement) return;
 
-    if (outgoing) {
-      clearSwitchSensitiveStatuses(outgoing);
-      delete gameState.displayState.hpDisplay[outgoing.uid];
-      delete gameState.displayState.hpAnimations[outgoing.uid];
-    }
-
-    teamState.active[event.slot] = reserve;
-    reserve.slot = event.slot;
-    clearSwitchFlags(reserve);
-    gameState.displayState.hpDisplay[reserve.uid] = reserve.hp;
-    delete gameState.displayState.hpAnimations[reserve.uid];
-
-    teamState.reserve[reserveIndex] = outgoing;
-    if (outgoing) {
-      outgoing.slot = `r${reserveIndex}`;
-      clearSwitchFlags(outgoing);
-    }
+    gameState.displayState.hpDisplay[replacement.incoming.uid] = replacement.incoming.hp;
+    delete gameState.displayState.hpAnimations[replacement.incoming.uid];
   };
 
   const beginEvent = (event, now) => {
@@ -799,18 +852,22 @@
   const applyKoReplacement = ({ team, reserveIndex, slot, withLog = true }) => {
     const teamState = gameState.teams[team];
     const reserve = teamState.reserve[reserveIndex];
-    const current = teamState.active[slot];
-    if (!reserve || !current || !isDefeated(current) || !isAlive(reserve)) return false;
-    teamState.active[slot] = reserve;
-    reserve.slot = slot;
-    clearSwitchFlags(reserve);
-    teamState.reserve.splice(reserveIndex, 1);
-    const enter = resolveUnitOnEnterEffects({ state: gameState, team, slot, unit: reserve });
+    const replacement = replaceActiveUnitFromReserve({
+      state: gameState,
+      team,
+      slot,
+      incomingUnitId: reserve?.uid,
+      reserveIndexHint: reserveIndex,
+      reserveMode: "consume",
+      requireDefeatedOutgoing: true
+    });
+    if (!replacement) return false;
+    const enter = resolveUnitOnEnterEffects({ state: gameState, team, slot, unit: replacement.incoming });
     if (withLog) {
-      appendBattleLogEntry(`[${reserve.name}] entered the battle!`);
+      appendBattleLogEntry(`[${replacement.incoming.name}] entered the battle!`);
       enter.messages.forEach((line) => appendBattleLogEntry(line));
     }
-    return { enteredUnit: reserve, enterMessages: enter.messages };
+    return { enteredUnit: replacement.incoming, enterMessages: enter.messages };
   };
 
   const autoResolveKoReplacementsForTeam = (team) => {
