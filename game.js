@@ -1,139 +1,65 @@
 (() => {
   "use strict";
 
-  // ------------------------------------------------------------
-  // 1) config / constants
-  // ------------------------------------------------------------
   const CONFIG = {
     BOARD_COLS: 3,
     BOARD_ROWS: 2,
-    MAX_LOG_LINES: 120,
-    LOG_VISIBLE_LINES: 8,
+    MAX_LOG_LINES: 160,
     MAX_TURNS: 60,
     POISON_RATIO: 0.1,
     BARRIER_RATIO: 0.5,
     ATK_UP_RATIO: 0.25,
     DEF_UP_RATIO: 0.25,
-    LEVEL: 50,
-    TIEBREAKER_TEAM_ORDER: ["ally", "enemy"],
     MOVE_DETAIL_PANEL_HEIGHT: 72,
-    SUMMARY_PANEL_HEIGHT: 128
+    SUMMARY_PANEL_HEIGHT: 128,
+    MESSAGE_MIN_MS: 480,
+    MESSAGE_AUTO_MS: 1200,
+    WAIT_SHORT_MS: 220,
+    HP_ANIM_MS: 520,
+    HIGHLIGHT_MS: 220,
+    SPEED_BASE: 1,
+    TIEBREAKER_TEAM_ORDER: ["ally", "enemy"]
   };
 
-  const TEAM = {
-    ALLY: "ally",
-    ENEMY: "enemy"
-  };
+  const TEAM = { ALLY: "ally", ENEMY: "enemy" };
+  const PHASE = { START: "start", PLAYING: "playing", GAMEOVER: "gameover" };
 
-  const PHASE = {
-    START: "start",
-    PLAYING: "playing",
-    GAMEOVER: "gameover"
-  };
-
-  // ------------------------------------------------------------
-  // 2) assets
-  // ------------------------------------------------------------
   const ASSETS = {
-    backgrounds: {
-      battle: "/assets/backgrounds/background_battle.jpg"
-    },
-    icons: {
-      attack: "/assets/icons/icon_attack.png",
-      status: "/assets/icons/icon_status.png"
-    },
+    backgrounds: { battle: "./assets/backgrounds/background_battle.jpg" },
+    icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
     portraits: {
-      emberlynx: "/assets/portraits/ally_emberlynx.png",
-      mossblob: "/assets/portraits/ally_mossblob.png",
-      frostfang: "/assets/portraits/ally_frostfang.png",
-      stormimp: "/assets/portraits/ally_stormimp.png",
-      ironboar: "/assets/portraits/ally_ironboar.png",
-      wyvern: "/assets/portraits/enemy_wyvern.png",
-      golem: "/assets/portraits/enemy_golem.png",
-      thunderroc: "/assets/portraits/enemy_thunderroc.png",
-      venomtoad: "/assets/portraits/enemy_venomtoad.png",
-      duskmoth: "/assets/portraits/enemy_duskmoth.png"
+      emberlynx: "./assets/portraits/ally_emberlynx.png",
+      mossblob: "./assets/portraits/ally_mossblob.png",
+      frostfang: "./assets/portraits/ally_frostfang.png",
+      stormimp: "./assets/portraits/ally_stormimp.png",
+      ironboar: "./assets/portraits/ally_ironboar.png",
+      wyvern: "./assets/portraits/enemy_wyvern.png",
+      golem: "./assets/portraits/enemy_golem.png",
+      thunderroc: "./assets/portraits/enemy_thunderroc.png",
+      venomtoad: "./assets/portraits/enemy_venomtoad.png",
+      duskmoth: "./assets/portraits/enemy_duskmoth.png"
     }
   };
 
-  const getAssetPath = (type, key) => {
-    if (!ASSETS[type]) return "";
-    return ASSETS[type][key] || "";
-  };
+  const getAssetPath = (type, key) => (ASSETS[type] && ASSETS[type][key]) || "";
 
-  // ------------------------------------------------------------
-  // 3) game data definitions
-  // ------------------------------------------------------------
   const patterns = {
-    front: [{ x: 0, y: -1 }],
     front3: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 }],
-    adjacentEnemy: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 }],
-    allyLine: [{ x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }],
     self: [{ x: 0, y: 0 }],
     allyAdjacent: [{ x: -1, y: 0 }, { x: 1, y: 0 }],
-    singleAttackReach: [
-      { x: -1, y: -1 },
-      { x: 0, y: -1 },
-      { x: 1, y: -1 },
-      { x: -1, y: 0 },
-      { x: 1, y: 0 }
-    ],
-    all: [
-      { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
-      { x: -1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 0 }
-    ]
+    singleAttackReach: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 0 }, { x: 1, y: 0 }]
   };
 
   const MOVES = {
-    clawStrike: {
-      id: "clawStrike", name: "クロー・ストライク", category: "attack", type: "fire", power: 32,
-      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
-      beforeDamage: [], afterDamage: []
-    },
-    drainBite: {
-      id: "drainBite", name: "ドレインバイト", category: "attack", type: "nature", power: 28,
-      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
-      beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }]
-    },
-    quakeWave: {
-      id: "quakeWave", name: "クエイクウェーブ", category: "attack", type: "earth", power: 24,
-      patternId: "front3", targetRule: "enemy", targetMode: "allPattern",
-      beforeDamage: [], afterDamage: []
-    },
-    frostLance: {
-      id: "frostLance", name: "フロストランス", category: "attack", type: "water", power: 34,
-      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
-      beforeDamage: [], afterDamage: []
-    },
-    toxicSpit: {
-      id: "toxicSpit", name: "トキシックスピット", category: "attack", type: "shadow", power: 18,
-      patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single",
-      beforeDamage: [], afterDamage: []
-    },
-    ironGuard: {
-      id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0,
-      patternId: "self", targetRule: "selfOnly", targetMode: "single",
-      beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }],
-      afterDamage: []
-    },
-    rallyHowl: {
-      id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0,
-      patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single",
-      beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
-      afterDamage: []
-    },
-    shellStance: {
-      id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0,
-      patternId: "self", targetRule: "selfOnly", targetMode: "single",
-      beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }],
-      afterDamage: []
-    },
-    venomBless: {
-      id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0,
-      patternId: "self", targetRule: "selfOnly", targetMode: "single",
-      beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }],
-      afterDamage: []
-    }
+    clawStrike: { id: "clawStrike", name: "クロー・ストライク", category: "attack", type: "fire", power: 32, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    drainBite: { id: "drainBite", name: "ドレインバイト", category: "attack", type: "nature", power: 28, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }] },
+    quakeWave: { id: "quakeWave", name: "クエイクウェーブ", category: "attack", type: "earth", power: 24, patternId: "front3", targetRule: "enemy", targetMode: "allPattern", beforeDamage: [], afterDamage: [] },
+    frostLance: { id: "frostLance", name: "フロストランス", category: "attack", type: "water", power: 34, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    toxicSpit: { id: "toxicSpit", name: "トキシックスピット", category: "attack", type: "shadow", power: 18, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    ironGuard: { id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }], afterDamage: [] },
+    rallyHowl: { id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0, patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
+    shellStance: { id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }], afterDamage: [] },
+    venomBless: { id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] }
   };
 
   const STATUSES = {
@@ -144,14 +70,8 @@
   };
 
   const ABILITIES = {
-    venomTouch: {
-      id: "venomTouch",
-      onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }]
-    },
-    guardianPulse: {
-      id: "guardianPulse",
-      onTurnStart: [{ type: "applyStatus", status: "barrier", duration: 1, target: "self" }]
-    }
+    venomTouch: { id: "venomTouch", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
+    guardianPulse: { id: "guardianPulse", onTurnStart: [{ type: "applyStatus", status: "barrier", duration: 1, target: "self" }] }
   };
 
   const UNIT_LIBRARY = {
@@ -162,15 +82,29 @@
     ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
     wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
-    thunderroc: { id: "thunderroc", name: "サンダーロック", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
-    venomtoad: { id: "venomtoad", name: "ベノムトード", portrait: "venomtoad", hp: 92, atk: 29, def: 27, spd: 20, abilityId: "venomTouch", moves: ["toxicSpit", "drainBite", "ironGuard", "rallyHowl"] },
-    duskmoth: { id: "duskmoth", name: "ダスクモス", portrait: "duskmoth", hp: 74, atk: 32, def: 19, spd: 41, abilityId: null, moves: ["toxicSpit", "frostLance", "venomBless", "shellStance"] }
+    thunderroc: { id: "thunderroc", name: "サンダーロック", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
 
-  // ------------------------------------------------------------
-  // 4) state creation / reset
-  // ------------------------------------------------------------
+  const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ" };
+  const STATUS_APPLY_TEXT = {
+    poison: (n) => `${n}は どくを うけた！`,
+    barrier: (n) => `${n}は バリアに守られた！`,
+    atkUp: (n) => `${n}の こうげきが上がった！`,
+    defUp: (n) => `${n}の ぼうぎょが上がった！`
+  };
+  const STATUS_FADE_TEXT = {
+    poison: (n) => `${n}の どくが消えた。`,
+    barrier: (n) => `${n}の バリアが消えた。`,
+    atkUp: (n) => `${n}の こうげきアップが切れた。`,
+    defUp: (n) => `${n}の ぼうぎょアップが切れた。`
+  };
+
   let UID_COUNTER = 1;
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  const byTeamOrder = (team) => CONFIG.TIEBREAKER_TEAM_ORDER.indexOf(team);
+  const isAlive = (u) => !!u && u.hp > 0;
+  const cloneStatus = (kind, duration) => ({ ...STATUSES[kind], duration: duration ?? STATUSES[kind].duration, tags: [...STATUSES[kind].tags] });
+  const findStatus = (statuses, kind) => statuses.find((s) => s.kind === kind);
 
   const createUnit = (unitId, team, slot) => {
     const base = UNIT_LIBRARY[unitId];
@@ -193,26 +127,13 @@
   };
 
   const createInitialState = () => ({
-    phase: PHASE.START,
+    phase: PHASE.PLAYING,
     turn: 1,
     winner: null,
-    battlefield: {
-      background: getAssetPath("backgrounds", "battle"),
-      grid: { cols: CONFIG.BOARD_COLS, rows: CONFIG.BOARD_ROWS }
-    },
+    battlefield: { background: getAssetPath("backgrounds", "battle") },
     teams: {
-      ally: {
-        key: TEAM.ALLY,
-        active: [createUnit("emberlynx", TEAM.ALLY, 0), createUnit("mossblob", TEAM.ALLY, 1), createUnit("frostfang", TEAM.ALLY, 2)],
-        reserve: [createUnit("stormimp", TEAM.ALLY, "r0"), createUnit("ironboar", TEAM.ALLY, "r1")],
-        statuses: []
-      },
-      enemy: {
-        key: TEAM.ENEMY,
-        active: [createUnit("wyvern", TEAM.ENEMY, 0), createUnit("golem", TEAM.ENEMY, 1), createUnit("thunderroc", TEAM.ENEMY, 2)],
-        reserve: [createUnit("venomtoad", TEAM.ENEMY, "r0"), createUnit("duskmoth", TEAM.ENEMY, "r1")],
-        statuses: []
-      }
+      ally: { active: [createUnit("emberlynx", TEAM.ALLY, 0), createUnit("mossblob", TEAM.ALLY, 1), createUnit("frostfang", TEAM.ALLY, 2)], reserve: [createUnit("stormimp", TEAM.ALLY, "r0"), createUnit("ironboar", TEAM.ALLY, "r1")], statuses: [] },
+      enemy: { active: [createUnit("wyvern", TEAM.ENEMY, 0), createUnit("golem", TEAM.ENEMY, 1), createUnit("thunderroc", TEAM.ENEMY, 2)], reserve: [], statuses: [] }
     },
     globalStatuses: [],
     confirmedCommands: [null, null, null],
@@ -223,63 +144,62 @@
     selectedTargets: [],
     ui: {
       commandMode: "fight",
-      hoveredMoveId: null,
       previewTargets: [],
       selectedReserveIndex: null,
       selectedSwitchDestination: null,
       targetCandidates: [],
-      isResolvingTurn: false
+      fastForwardRequested: false
+    },
+    battleFlow: {
+      mode: "command",
+      eventQueue: [],
+      currentEventIndex: 0,
+      currentMessage: "わざを選んでください。",
+      isEventRunning: false,
+      waitUntil: 0,
+      turnLogEntries: [],
+      playbackSpeed: CONFIG.SPEED_BASE,
+      activeEvent: null,
+      pendingTurnResult: null
+    },
+    displayState: {
+      hpAnimations: {},
+      hpDisplay: {},
+      highlightActorId: null,
+      highlightTargetId: null
     },
     log: [],
-    temp: {
-      renderCells: []
-    }
+    temp: { renderCells: [] }
   });
 
   let gameState = createInitialState();
 
-  // ------------------------------------------------------------
-  // 5) pure utility functions
-  // ------------------------------------------------------------
-  const byTeamOrder = (team) => CONFIG.TIEBREAKER_TEAM_ORDER.indexOf(team);
-  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-  const isAlive = (unit) => !!unit && unit.hp > 0;
-
-  const getTeamState = (team) => gameState.teams[team];
-
+  const getTeamState = (state, team) => state.teams[team];
   const toBoardPos = (team, slot) => ({ x: slot, y: team === TEAM.ENEMY ? 0 : 1 });
   const inBounds = (pos) => pos.x >= 0 && pos.x < CONFIG.BOARD_COLS && pos.y >= 0 && pos.y < CONFIG.BOARD_ROWS;
 
-  const getUnitAt = (pos) => {
+  const getUnitAtFromState = (state, pos) => {
     if (!inBounds(pos)) return null;
     const team = pos.y === 0 ? TEAM.ENEMY : TEAM.ALLY;
-    return gameState.teams[team].active[pos.x] || null;
+    return state.teams[team].active[pos.x] || null;
   };
 
-  const removeExpiredStatuses = (statuses) => statuses.filter((s) => s.duration > 0);
-
-  const cloneStatus = (kind, durationOverride) => {
-    const base = STATUSES[kind];
-    return {
-      kind: base.kind,
-      category: base.category,
-      duration: durationOverride ?? base.duration,
-      tags: [...base.tags]
-    };
+  const getUnitByUid = (uid) => {
+    for (const team of [TEAM.ALLY, TEAM.ENEMY]) {
+      for (const unit of gameState.teams[team].active) {
+        if (unit && unit.uid === uid) return unit;
+      }
+      for (const unit of gameState.teams[team].reserve) {
+        if (unit && unit.uid === uid) return unit;
+      }
+    }
+    return null;
   };
 
-  const addStatusToContainer = (container, status) => {
-    const idx = container.findIndex((s) => s.category === status.category);
-    if (idx >= 0) container[idx] = status;
-    else container.push(status);
-  };
-
-  const getStatusByKind = (unit, kind) => unit.statuses.find((s) => s.kind === kind);
-
-  const getEffectiveStat = (unit, statKey) => {
-    let value = unit[statKey];
-    if (statKey === "atk" && getStatusByKind(unit, "atkUp")) value = Math.floor(value * (1 + CONFIG.ATK_UP_RATIO));
-    if (statKey === "def" && getStatusByKind(unit, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
+  const getEffectiveStat = (unit, key) => {
+    let value = unit[key];
+    if (key === "atk" && findStatus(unit.statuses, "atkUp")) value = Math.floor(value * (1 + CONFIG.ATK_UP_RATIO));
+    if (key === "def" && findStatus(unit.statuses, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
     return value;
   };
 
@@ -287,480 +207,428 @@
     const atk = getEffectiveStat(attacker, "atk") + Math.floor(move.power / 10);
     const def = getEffectiveStat(defender, "def");
     let dmg = Math.max(1, atk - def);
-    if (getStatusByKind(defender, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
+    if (findStatus(defender.statuses, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
     return Math.min(dmg, defender.hp);
   };
 
-  const healUnit = (unit, amount) => {
-    const before = unit.hp;
-    unit.hp = clamp(unit.hp + amount, 0, unit.maxHp);
-    return unit.hp - before;
+  const addStatus = (unit, statusKind, duration) => {
+    const next = cloneStatus(statusKind, duration);
+    const idx = unit.statuses.findIndex((s) => s.category === next.category);
+    if (idx >= 0) unit.statuses[idx] = next;
+    else unit.statuses.push(next);
   };
 
-  const setHp = (unit, hpValue) => {
-    unit.hp = clamp(hpValue, 0, unit.maxHp);
-  };
+  const removeExpired = (arr) => arr.filter((s) => s.duration > 0);
 
-  const LOG_TEAM = {
-    ALLY: "ally",
-    ENEMY: "enemy",
-    NEUTRAL: "neutral"
-  };
-
-  const STATUS_LABELS = {
-    poison: "どく",
-    barrier: "バリア",
-    atkUp: "こうげきアップ",
-    defUp: "ぼうぎょアップ"
-  };
-
-  const STATUS_APPLY_TEXT = {
-    poison: (name) => `${name}は どく状態になった！`,
-    barrier: (name) => `${name}は バリアに守られた！`,
-    atkUp: (name) => `${name}の こうげきが上がった！`,
-    defUp: (name) => `${name}の ぼうぎょが上がった！`
-  };
-
-  const STATUS_FADE_TEXT = {
-    poison: (name) => `${name}の どく状態が治った。`,
-    barrier: (name) => `${name}の バリアが消えた。`,
-    atkUp: (name) => `${name}の こうげきアップが切れた。`,
-    defUp: (name) => `${name}の ぼうぎょアップが切れた。`
-  };
-
-  const asLogTeam = (team) => (team === TEAM.ALLY ? LOG_TEAM.ALLY : team === TEAM.ENEMY ? LOG_TEAM.ENEMY : LOG_TEAM.NEUTRAL);
-
-  const trimLog = () => {
-    if (gameState.log.length > CONFIG.MAX_LOG_LINES) {
-      gameState.log.splice(0, gameState.log.length - CONFIG.MAX_LOG_LINES);
-    }
-  };
-
-  const startActionLog = ({ team, actor, move }) => ({
-    type: "action",
-    team: asLogTeam(team),
-    actor,
-    move,
-    title: `${actor}の ${move}！`,
-    lines: []
-  });
-
-  const appendActionLine = (entry, text) => {
-    if (!entry) return;
-    entry.lines.push(text);
-  };
-
-  const commitLogEntry = (entry) => {
-    if (!entry) return;
-    gameState.log.push(entry);
-    trimLog();
-  };
-
-  const pushSystemLog = (lines, title = "バトルイベント", team = LOG_TEAM.NEUTRAL) => {
-    if (!lines || lines.length === 0) return;
-    commitLogEntry({
-      type: "system",
-      team,
-      title,
-      lines: [...lines]
-    });
-  };
-
-  const createEl = (tag, className, text) => {
-    const el = document.createElement(tag);
-    if (className) el.className = className;
-    if (text !== undefined) el.textContent = text;
-    return el;
-  };
-
-  const createImageWithFallback = ({
-    src,
-    alt,
-    mirror = false,
-    wrapperClass = "portrait-wrap",
-    placeholderLabel = "画像なし",
-    placeholderSubLabel = "NO SIGNAL"
-  }) => {
-    const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
-    const img = document.createElement("img");
-    const placeholder = createEl("div", "img-placeholder");
-    const label = createEl("div", "img-placeholder-label", placeholderLabel);
-    const subLabel = createEl("div", "img-placeholder-sub", placeholderSubLabel);
-    img.alt = alt;
-    img.src = src;
-    img.loading = "lazy";
-    img.onerror = () => {
-      img.style.display = "none";
-      placeholder.style.display = "flex";
-    };
-    placeholder.append(label, subLabel);
-    wrap.append(img, placeholder);
-    return wrap;
-  };
-
-  const applyBoardBackgroundWithFallback = (boardEl, src) => {
-    const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
-    boardEl.style.backgroundImage = gradient;
-    boardEl.style.backgroundSize = "cover";
-    boardEl.style.backgroundPosition = "center";
-    if (!src) return;
-
-    const bg = new Image();
-    bg.onload = () => {
-      boardEl.style.backgroundImage = `${gradient}, url('${src}')`;
-    };
-    bg.onerror = () => {
-      boardEl.style.backgroundImage = gradient;
-    };
-    bg.src = src;
-  };
-
-  const clearTempArrays = () => {
-    gameState.temp.renderCells.length = 0;
-  };
-
-  // ------------------------------------------------------------
-  // 6) battle logic
-  // ------------------------------------------------------------
-  const getValidTargetsForMove = (actor, move) => {
+  const getValidTargetsForMoveInState = (state, actor, move) => {
     const actorPos = toBoardPos(actor.team, actor.slot);
     const orientation = actor.team === TEAM.ALLY ? 1 : -1;
     const offsets = patterns[move.patternId] || [];
-
     return offsets
-      .map((offset) => ({ x: actorPos.x + offset.x, y: actorPos.y + (offset.y * orientation) }))
+      .map((o) => ({ x: actorPos.x + o.x, y: actorPos.y + (o.y * orientation) }))
       .filter(inBounds)
-      .map((pos) => ({ pos, unit: getUnitAt(pos) }))
+      .map((pos) => ({ pos, unit: getUnitAtFromState(state, pos) }))
       .filter(({ unit }) => {
-        if (!unit) return false;
-        if (!isAlive(unit)) return false;
+        if (!unit || !isAlive(unit)) return false;
         if (move.targetRule === "enemy") return unit.team !== actor.team;
-        if (move.targetRule === "ally") return unit.team === actor.team;
-        if (move.targetRule === "self") return unit.uid === actor.uid;
-        if (move.targetRule === "any") return true;
         if (move.targetRule === "selfOnly") return unit.uid === actor.uid;
         if (move.targetRule === "allyOtherSingle") return unit.team === actor.team && unit.uid !== actor.uid;
         if (move.targetRule === "anyOtherSingle") return unit.uid !== actor.uid;
-        return false;
+        return true;
       })
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
   };
 
-  const applyStatusToUnit = (unit, statusKind, duration, actionLog = null) => {
-    const status = cloneStatus(statusKind, duration);
-    addStatusToContainer(unit.statuses, status);
-    const toText = STATUS_APPLY_TEXT[status.kind] || ((name) => `${name} gained ${STATUS_LABELS[status.kind] || status.kind}!`);
-    if (actionLog) appendActionLine(actionLog, toText(unit.name));
-  };
+  const isPlaybackBusy = () => gameState.battleFlow.mode === "playback" || gameState.battleFlow.mode === "resolve";
 
-  const runEffect = ({ actor, target, effect, actionLog }) => {
-    if (effect.type === "applyStatus" && target) {
-      applyStatusToUnit(target, effect.status, effect.duration, actionLog);
-    }
-    if (effect.type === "drain" && target) {
-      healUnit(actor, Math.max(1, Math.floor((effect.lastDamage || 0) * effect.ratio)));
-      if (actionLog) appendActionLine(actionLog, `${actor.name}は 体力を回復した！`);
-    }
-  };
-
-  const triggerAbilityHook = (unit, hookName, context = {}) => {
-    if (!unit || !unit.abilityId) return;
-    const ability = ABILITIES[unit.abilityId];
-    if (!ability || !ability[hookName]) return;
-    const lines = [];
-
-    ability[hookName].forEach((effect) => {
-      if (effect.type === "applyStatus") {
-        const target = effect.target === "self" ? unit : context?.target;
-        if (target && isAlive(target)) {
-          const status = cloneStatus(effect.status, effect.duration);
-          addStatusToContainer(target.statuses, status);
-          const toText = STATUS_APPLY_TEXT[status.kind] || ((name) => `${name} gained ${STATUS_LABELS[status.kind] || status.kind}!`);
-          lines.push(toText(target.name));
-        }
-      }
-    });
-    if (lines.length > 0) {
-      pushSystemLog(lines, `${unit.name}の とくせいが発動！`, asLogTeam(unit.team));
-    }
-  };
-
-  const executeFightAction = (actor, action) => {
-    const move = MOVES[action.moveId];
-    if (!move) return;
-
-    const candidates = getValidTargetsForMove(actor, move);
-    if (candidates.length === 0) return;
-
-    const targets = move.targetMode === "single"
-      ? candidates.filter((c) => c.x === action.targetPos?.x && c.y === action.targetPos?.y)
-      : candidates;
-
-    if (targets.length === 0) return;
-
-    const actionLog = startActionLog({ team: actor.team, actor: actor.name, move: move.name });
-
-    targets.forEach((targetCell) => {
-      const target = getUnitAt({ x: targetCell.x, y: targetCell.y });
-      if (!target || !isAlive(target)) return;
-
-      move.beforeDamage.forEach((effect) => runEffect({ actor, target, effect, actionLog }));
-
-      let dealt = 0;
-      if (move.category === "attack") {
-        dealt = calcDamage(actor, target, move);
-        setHp(target, target.hp - dealt);
-        appendActionLine(actionLog, `${target.name}に 命中！`);
-      }
-
-      move.afterDamage.forEach((effectTemplate) => {
-        const effect = { ...effectTemplate, lastDamage: dealt };
-        runEffect({ actor, target, effect, actionLog });
-      });
-
-      triggerAbilityHook(actor, "onAfterDamage", { target });
-      if (!isAlive(target)) appendActionLine(actionLog, `${target.name}は たおれた！`);
-    });
-    if (actionLog.lines.length === 0) appendActionLine(actionLog, "しかし 何も起こらなかった。");
-    commitLogEntry(actionLog);
-  };
-
-  const executeSwitchAction = (action) => {
-    const teamState = getTeamState(action.team);
-    const reserve = teamState.reserve[action.reserveIndex];
-    const toSlot = action.toSlot;
-
-    if (!reserve || toSlot === null || toSlot === undefined) return;
-
-    const outgoing = teamState.active[toSlot] || null;
-    teamState.active[toSlot] = reserve;
-    reserve.slot = toSlot;
-    teamState.reserve[action.reserveIndex] = outgoing;
-    if (outgoing) outgoing.slot = `r${action.reserveIndex}`;
-    commitLogEntry({
-      type: "action",
-      team: asLogTeam(action.team),
-      actor: reserve.name,
-      move: "交代",
-      title: `${reserve.name}が 繰り出された！`,
-      lines: outgoing ? [`${outgoing.name}は 引っ込んだ。`] : []
-    });
-
-  };
-
-  const executeAction = (action) => {
-    const teamState = getTeamState(action.team);
-    const actor = teamState.active[action.slot];
-    if (!actor || !isAlive(actor)) return;
-
-    if (action.type === "fight") executeFightAction(actor, action);
-    if (action.type === "switch") executeSwitchAction(action);
-  };
-
-  const applyEndTurnEffects = () => {
-    const systemLines = [];
-    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
-      const teamState = getTeamState(team);
-
-      teamState.active.forEach((unit) => {
-        if (!unit || !isAlive(unit)) return;
-
-        if (getStatusByKind(unit, "poison")) {
-          const poisonDmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
-          setHp(unit, unit.hp - poisonDmg);
-          systemLines.push(`${unit.name}は どくのダメージを受けた！`);
-          if (!isAlive(unit)) systemLines.push(`${unit.name}は たおれた！`);
-        }
-
-        unit.statuses.forEach((s) => { s.duration -= 1; });
-        unit.statuses
-          .filter((s) => s.duration <= 0)
-          .forEach((s) => {
-            const toText = STATUS_FADE_TEXT[s.kind] || ((name) => `${name}の ${STATUS_LABELS[s.kind] || s.kind}が消えた。`);
-            systemLines.push(toText(unit.name));
-          });
-        unit.statuses = removeExpiredStatuses(unit.statuses);
-      });
-
-      teamState.statuses.forEach((s) => { s.duration -= 1; });
-      teamState.statuses
-        .filter((s) => s.duration <= 0)
-        .forEach((s) => {
-          systemLines.push(`${team === TEAM.ALLY ? "味方側" : "敵側"}の ${STATUS_LABELS[s.kind] || s.kind}が切れた。`);
-        });
-      teamState.statuses = removeExpiredStatuses(teamState.statuses);
-    });
-
-    gameState.globalStatuses.forEach((s) => { s.duration -= 1; });
-    gameState.globalStatuses
-      .filter((s) => s.duration <= 0)
-      .forEach((s) => {
-        systemLines.push(`${STATUS_LABELS[s.kind] || s.kind}が消えた。`);
-      });
-    gameState.globalStatuses = removeExpiredStatuses(gameState.globalStatuses);
-    pushSystemLog(systemLines, "ターン終了時の効果", LOG_TEAM.NEUTRAL);
-  };
-
-  const checkWinLose = () => {
-    const allyAlive = gameState.teams.ally.active.some(isAlive);
-    const enemyAlive = gameState.teams.enemy.active.some(isAlive);
-
-    if (!allyAlive && !enemyAlive) {
-      gameState.phase = PHASE.GAMEOVER;
-      gameState.winner = "draw";
-    } else if (!enemyAlive) {
-      gameState.phase = PHASE.GAMEOVER;
-      gameState.winner = TEAM.ALLY;
-    } else if (!allyAlive) {
-      gameState.phase = PHASE.GAMEOVER;
-      gameState.winner = TEAM.ENEMY;
-    }
+  const appendBattleLogEntry = (text) => {
+    gameState.battleFlow.turnLogEntries.push(text);
+    gameState.log.push({ title: `ターン ${Math.max(1, gameState.turn - 1)} ログ`, lines: [text] });
+    if (gameState.log.length > CONFIG.MAX_LOG_LINES) gameState.log.splice(0, gameState.log.length - CONFIG.MAX_LOG_LINES);
   };
 
   const resolveTurn = () => {
-    const queue = [];
-
-    Object.values(gameState.plannedActions).forEach((action) => queue.push(action));
-    Object.values(gameState.enemyPlannedActions).forEach((action) => queue.push(action));
-
-    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
-      gameState.teams[team].active.forEach((unit) => triggerAbilityHook(unit, "onTurnStart", {}));
-    });
-
-    queue.sort((a, b) => {
-      const unitA = getTeamState(a.team).active[a.slot];
-      const unitB = getTeamState(b.team).active[b.slot];
-      const spdA = unitA ? unitA.spd : -1;
-      const spdB = unitB ? unitB.spd : -1;
-      if (spdA !== spdB) return spdB - spdA;
+    const sim = JSON.parse(JSON.stringify({ teams: gameState.teams, globalStatuses: gameState.globalStatuses }));
+    const actions = [...Object.values(gameState.plannedActions), ...Object.values(gameState.enemyPlannedActions)];
+    actions.sort((a, b) => {
+      const ua = sim.teams[a.team].active[a.slot];
+      const ub = sim.teams[b.team].active[b.slot];
+      const sa = ua ? ua.spd : -1;
+      const sb = ub ? ub.spd : -1;
+      if (sa !== sb) return sb - sa;
       if (a.team !== b.team) return byTeamOrder(a.team) - byTeamOrder(b.team);
       return a.slot - b.slot;
     });
 
-    queue.forEach(executeAction);
-    applyEndTurnEffects();
-    checkWinLose();
+    const turnResult = {
+      turnNumber: gameState.turn,
+      startStepResults: { abilityStatuses: [] },
+      actionResults: [],
+      endStepResults: { poisonTicks: [], expiredStatuses: [], expiredFieldEffects: [] },
+      nextState: { winner: null }
+    };
 
-    gameState.turn += 1;
-    gameState.plannedActions = {};
-    gameState.confirmedCommands = [null, null, null];
-    gameState.enemyPlannedActions = {};
-
-    gameState.selectedMoveId = null;
-    gameState.selectedTargets = [];
-    gameState.ui.selectedReserveIndex = null;
-    gameState.ui.selectedSwitchDestination = null;
-
-    if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
-      gameState.phase = PHASE.GAMEOVER;
-      gameState.winner = "draw";
+    for (const team of [TEAM.ALLY, TEAM.ENEMY]) {
+      sim.teams[team].active.forEach((unit) => {
+        if (!unit || !isAlive(unit) || !unit.abilityId) return;
+        const ability = ABILITIES[unit.abilityId];
+        (ability?.onTurnStart || []).forEach((e) => {
+          if (e.type !== "applyStatus") return;
+          addStatus(unit, e.status, e.duration);
+          turnResult.startStepResults.abilityStatuses.push({ targetId: unit.uid, targetName: unit.name, statusId: e.status, duration: e.duration, sourceName: unit.name });
+        });
+      });
     }
-  };
 
-  // ------------------------------------------------------------
-  // 7) AI logic (deterministic)
-  // ------------------------------------------------------------
-  const scoreAction = ({ actor, move, target }) => {
-    if (!target) return { score: -1, koValue: 0, damage: 0 };
-    if (move.category !== "attack") return { score: 1, koValue: 0, damage: 0 };
-    const dmg = calcDamage(actor, target, move);
-    const koValue = dmg >= target.hp ? target.maxHp + target.spd : 0;
-    const score = koValue > 0 ? 10000 + koValue : dmg;
-    return { score, koValue, damage: dmg };
-  };
+    actions.forEach((action) => {
+      const actor = sim.teams[action.team].active[action.slot];
+      if (!actor || !isAlive(actor)) {
+        turnResult.actionResults.push({ type: "skip", reason: "actorDown", actorId: actor?.uid, actorName: actor?.name || "不明" });
+        return;
+      }
+      if (action.type === "switch") {
+        const teamState = sim.teams[action.team];
+        const reserve = teamState.reserve[action.reserveIndex];
+        if (!reserve) return;
+        const outgoing = teamState.active[action.toSlot] || null;
+        teamState.active[action.toSlot] = reserve;
+        reserve.slot = action.toSlot;
+        teamState.reserve[action.reserveIndex] = outgoing;
+        if (outgoing) outgoing.slot = `r${action.reserveIndex}`;
+        turnResult.actionResults.push({ type: "switch", team: action.team, reserveIn: { uid: reserve.uid, name: reserve.name, reserveIndex: action.reserveIndex }, slot: action.toSlot, reserveOut: outgoing ? { uid: outgoing.uid, name: outgoing.name } : null });
+        return;
+      }
+      const move = MOVES[action.moveId];
+      if (!move) return;
+      const candidates = getValidTargetsForMoveInState(sim, actor, move);
+      const targets = move.targetMode === "single" ? candidates.filter((c) => c.x === action.targetPos?.x && c.y === action.targetPos?.y) : candidates;
+      const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0 };
 
-  const chooseEnemyAction = (slot) => {
-    const actor = gameState.teams.enemy.active[slot];
-    if (!actor || !isAlive(actor)) return null;
+      targets.forEach((targetCell) => {
+        const target = getUnitAtFromState(sim, { x: targetCell.x, y: targetCell.y });
+        if (!target || !isAlive(target)) return;
+        const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false };
 
-    let best = null;
-
-    actor.moveIds.forEach((moveId) => {
-      const move = MOVES[moveId];
-      const candidates = getValidTargetsForMove(actor, move);
-
-      if (move.targetMode === "single") {
-        candidates.forEach((c) => {
-          const target = getUnitAt({ x: c.x, y: c.y });
-          const s = scoreAction({ actor, move, target });
-          const candidate = {
-            type: "fight", team: TEAM.ENEMY, slot, moveId,
-            targetPos: { x: c.x, y: c.y },
-            score: s.score,
-            koValue: s.koValue,
-            damage: s.damage,
-            isAttack: move.category === "attack"
-          };
-          if (!best || candidate.score > best.score ||
-              (candidate.score === best.score && candidate.koValue > best.koValue) ||
-              (candidate.score === best.score && candidate.damage > best.damage) ||
-              (candidate.score === best.score && candidate.damage === best.damage && moveId < best.moveId)) {
-            best = candidate;
+        move.beforeDamage.forEach((effect) => {
+          if (effect.type === "applyStatus") {
+            addStatus(target, effect.status, effect.duration);
+            targetResult.appliedStatuses.push(effect.status);
           }
         });
-      } else {
-        const totalDamage = candidates
-          .map((c) => getUnitAt({ x: c.x, y: c.y }))
-          .filter(Boolean)
-          .reduce((sum, target) => sum + (move.category === "attack" ? calcDamage(actor, target, move) : 0), 0);
-        const candidate = {
-          type: "fight", team: TEAM.ENEMY, slot, moveId,
-          targetPos: null,
-          score: move.category === "attack" ? totalDamage : 2,
-          koValue: 0,
-          damage: totalDamage,
-          isAttack: move.category === "attack"
-        };
-        if (!best || candidate.score > best.score ||
-            (candidate.score === best.score && moveId < best.moveId)) {
-          best = candidate;
+
+        if (move.category === "attack") {
+          const damage = calcDamage(actor, target, move);
+          target.hp = clamp(target.hp - damage, 0, target.maxHp);
+          targetResult.damage = damage;
+          targetResult.hpAfter = target.hp;
         }
-      }
+
+        move.afterDamage.forEach((effect) => {
+          if (effect.type === "drain" && targetResult.damage > 0) {
+            const heal = Math.max(1, Math.floor(targetResult.damage * effect.ratio));
+            const before = actor.hp;
+            actor.hp = clamp(actor.hp + heal, 0, actor.maxHp);
+            actionResult.selfHeal += actor.hp - before;
+          }
+          if (effect.type === "applyStatus") {
+            addStatus(target, effect.status, effect.duration);
+            targetResult.appliedStatuses.push(effect.status);
+          }
+        });
+
+        const ability = ABILITIES[actor.abilityId];
+        (ability?.onAfterDamage || []).forEach((effect) => {
+          if (effect.type === "applyStatus" && isAlive(target)) {
+            addStatus(target, effect.status, effect.duration);
+            targetResult.appliedStatuses.push(effect.status);
+          }
+        });
+
+        targetResult.defeated = target.hp <= 0;
+        actionResult.targets.push(targetResult);
+      });
+
+      actionResult.selfHpAfter = actor.hp;
+      turnResult.actionResults.push(actionResult);
     });
 
-    if (!best) {
-      return { type: "fight", team: TEAM.ENEMY, slot, moveId: actor.moveIds[0], targetPos: null };
-    }
+    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+      sim.teams[team].active.forEach((unit) => {
+        if (!unit || !isAlive(unit)) return;
+        if (findStatus(unit.statuses, "poison")) {
+          const hpBefore = unit.hp;
+          const dmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
+          unit.hp = clamp(unit.hp - dmg, 0, unit.maxHp);
+          turnResult.endStepResults.poisonTicks.push({ targetId: unit.uid, targetName: unit.name, hpBefore, hpAfter: unit.hp, damage: hpBefore - unit.hp, defeated: unit.hp <= 0 });
+        }
+        unit.statuses.forEach((s) => { s.duration -= 1; });
+        unit.statuses.filter((s) => s.duration <= 0).forEach((s) => turnResult.endStepResults.expiredStatuses.push({ ownerType: "unit", ownerId: unit.uid, ownerName: unit.name, statusId: s.kind }));
+        unit.statuses = removeExpired(unit.statuses);
+      });
 
-    return {
-      type: "fight",
-      team: TEAM.ENEMY,
-      slot,
-      moveId: best.moveId,
-      targetPos: best.targetPos
-    };
+      sim.teams[team].statuses.forEach((s) => { s.duration -= 1; });
+      sim.teams[team].statuses.filter((s) => s.duration <= 0).forEach((s) => turnResult.endStepResults.expiredFieldEffects.push({ ownerType: "team", ownerTeam: team, effectId: s.kind, ownerName: team === TEAM.ALLY ? "味方側" : "敵側" }));
+      sim.teams[team].statuses = removeExpired(sim.teams[team].statuses);
+    });
+
+    sim.globalStatuses.forEach((s) => { s.duration -= 1; });
+    sim.globalStatuses.filter((s) => s.duration <= 0).forEach((s) => turnResult.endStepResults.expiredFieldEffects.push({ ownerType: "global", effectId: s.kind, ownerName: STATUS_LABELS[s.kind] || s.kind }));
+    sim.globalStatuses = removeExpired(sim.globalStatuses);
+
+    const allyAlive = sim.teams.ally.active.some(isAlive);
+    const enemyAlive = sim.teams.enemy.active.some(isAlive);
+    turnResult.nextState.winner = !allyAlive && !enemyAlive ? "draw" : !enemyAlive ? TEAM.ALLY : !allyAlive ? TEAM.ENEMY : null;
+
+    return turnResult;
   };
 
-  const buildEnemyPlans = () => {
-    const plans = {};
-    for (let slot = 0; slot < CONFIG.BOARD_COLS; slot += 1) {
-      const action = chooseEnemyAction(slot);
-      if (action) plans[slot] = action;
-    }
-    return plans;
+  const buildBattleEventQueue = (turnResult) => {
+    const q = [];
+    turnResult.startStepResults.abilityStatuses.forEach((s) => {
+      const text = STATUS_APPLY_TEXT[s.statusId]?.(s.targetName) || `${s.targetName}に ${s.statusId}！`;
+      q.push({ type: "message", text, loggable: true });
+      q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration });
+    });
+
+    turnResult.actionResults.forEach((a) => {
+      if (a.type === "skip") {
+        q.push({ type: "message", text: `${a.actorName}は 行動できない！`, loggable: true });
+        return;
+      }
+      if (a.type === "switch") {
+        q.push({ type: "message", text: `${a.reserveIn.name}が 繰り出された！`, loggable: true });
+        q.push({ type: "switchApply", ...a });
+        if (a.reserveOut) q.push({ type: "message", text: `${a.reserveOut.name}は 引っ込んだ。`, loggable: true });
+        q.push({ type: "wait", duration: CONFIG.WAIT_SHORT_MS });
+        return;
+      }
+
+      q.push({ type: "highlightActor", actorId: a.actorId });
+      q.push({ type: "message", text: `${a.actorName}の ${a.moveName}！`, loggable: true });
+      a.targets.forEach((t) => {
+        q.push({ type: "highlightTarget", targetId: t.targetId });
+        if (t.damage > 0 || t.hpBefore !== t.hpAfter) q.push({ type: "hpAnimation", targetId: t.targetId, fromHp: t.hpBefore, toHp: t.hpAfter, duration: CONFIG.HP_ANIM_MS });
+        t.appliedStatuses.forEach((statusId) => {
+          const text = STATUS_APPLY_TEXT[statusId]?.(t.targetName) || `${t.targetName}に ${statusId}！`;
+          q.push({ type: "message", text, loggable: true });
+          q.push({ type: "statusApply", targetId: t.targetId, statusId });
+        });
+        if (t.defeated) q.push({ type: "message", text: `${t.targetName}は たおれた！`, loggable: true });
+      });
+      if (a.selfHeal > 0) q.push({ type: "hpAnimation", targetId: a.actorId, fromHp: a.selfHpBefore, toHp: a.selfHpAfter, duration: CONFIG.HP_ANIM_MS });
+      q.push({ type: "wait", duration: CONFIG.WAIT_SHORT_MS });
+    });
+
+    turnResult.endStepResults.poisonTicks.forEach((p) => {
+      q.push({ type: "message", text: `${p.targetName}は どくの ダメージを うけた！`, loggable: true });
+      q.push({ type: "hpAnimation", targetId: p.targetId, fromHp: p.hpBefore, toHp: p.hpAfter, duration: CONFIG.HP_ANIM_MS });
+      if (p.defeated) q.push({ type: "message", text: `${p.targetName}は たおれた！`, loggable: true });
+    });
+
+    turnResult.endStepResults.expiredStatuses.forEach((s) => {
+      const text = STATUS_FADE_TEXT[s.statusId]?.(s.ownerName) || `${s.ownerName}の ${s.statusId}が切れた。`;
+      q.push({ type: "message", text, loggable: true });
+      if (s.ownerType === "unit") q.push({ type: "statusRemove", targetId: s.ownerId, statusId: s.statusId });
+    });
+
+    turnResult.endStepResults.expiredFieldEffects.forEach((f) => {
+      q.push({ type: "fieldEffectExpire", effectId: f.effectId, ownerType: f.ownerType, ownerTeam: f.ownerTeam });
+      q.push({ type: "message", text: `${f.ownerName}の ${STATUS_LABELS[f.effectId] || f.effectId}は 消え失せた`, loggable: true });
+    });
+
+    q.push({ type: "turnSeparator" });
+    return q;
   };
 
-  // ------------------------------------------------------------
-  // 8) input / dispatch logic
-  // ------------------------------------------------------------
+  const startBattlePlayback = (eventQueue, turnResult) => {
+    gameState.battleFlow.mode = "playback";
+    gameState.battleFlow.eventQueue = eventQueue;
+    gameState.battleFlow.currentEventIndex = 0;
+    gameState.battleFlow.currentMessage = "";
+    gameState.battleFlow.waitUntil = 0;
+    gameState.battleFlow.isEventRunning = false;
+    gameState.battleFlow.turnLogEntries = [];
+    gameState.battleFlow.pendingTurnResult = turnResult;
+    gameState.battleFlow.activeEvent = null;
+    gameState.ui.fastForwardRequested = false;
+  };
+
+  const finishCurrentEvent = () => {
+    gameState.battleFlow.isEventRunning = false;
+    gameState.battleFlow.activeEvent = null;
+    gameState.battleFlow.currentEventIndex += 1;
+    gameState.ui.fastForwardRequested = false;
+  };
+
+  const animateHpChange = (targetId, fromHp, toHp, duration) => {
+    const unit = getUnitByUid(targetId);
+    if (!unit) return;
+    gameState.displayState.hpAnimations[targetId] = { fromHp, toHp, startMs: performance.now(), durationMs: Math.max(1, duration / gameState.battleFlow.playbackSpeed) };
+    gameState.displayState.hpDisplay[targetId] = fromHp;
+  };
+
+  const applyStatusMarker = (targetId, statusId, duration = null) => {
+    const unit = getUnitByUid(targetId);
+    if (!unit) return;
+    addStatus(unit, statusId, duration ?? STATUSES[statusId]?.duration ?? 1);
+  };
+
+  const expireFieldEffect = (effectId, ownerType, ownerTeam) => {
+    if (ownerType === "global") {
+      gameState.globalStatuses = gameState.globalStatuses.filter((s) => s.kind !== effectId);
+      return;
+    }
+    if (ownerType === "team") {
+      gameState.teams[ownerTeam].statuses = gameState.teams[ownerTeam].statuses.filter((s) => s.kind !== effectId);
+    }
+  };
+
+  const removeStatusMarker = (targetId, statusId) => {
+    const unit = getUnitByUid(targetId);
+    if (!unit) return;
+    unit.statuses = unit.statuses.filter((s) => s.kind !== statusId);
+  };
+
+  const applySwitchResult = (event) => {
+    const teamState = gameState.teams[event.team];
+    const reserve = teamState.reserve[event.reserveIn.reserveIndex];
+    if (!reserve) return;
+    const outgoing = teamState.active[event.slot] || null;
+    teamState.active[event.slot] = reserve;
+    reserve.slot = event.slot;
+    teamState.reserve[event.reserveIn.reserveIndex] = outgoing;
+    if (outgoing) outgoing.slot = `r${event.reserveIn.reserveIndex}`;
+  };
+
+  const beginEvent = (event, now) => {
+    gameState.battleFlow.isEventRunning = true;
+    gameState.battleFlow.activeEvent = event;
+
+    if (event.type === "message") {
+      gameState.battleFlow.currentMessage = event.text;
+      if (event.loggable) appendBattleLogEntry(event.text);
+      gameState.battleFlow.waitUntil = now + (CONFIG.MESSAGE_AUTO_MS / gameState.battleFlow.playbackSpeed);
+      return;
+    }
+    if (event.type === "wait") {
+      gameState.battleFlow.waitUntil = now + (event.duration / gameState.battleFlow.playbackSpeed);
+      return;
+    }
+    if (event.type === "highlightActor") {
+      gameState.displayState.highlightActorId = event.actorId;
+      gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
+      return;
+    }
+    if (event.type === "highlightTarget") {
+      gameState.displayState.highlightTargetId = event.targetId;
+      gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
+      return;
+    }
+    if (event.type === "hpAnimation") {
+      animateHpChange(event.targetId, event.fromHp, event.toHp, event.duration || CONFIG.HP_ANIM_MS);
+      const unit = getUnitByUid(event.targetId);
+      if (unit) unit.hp = event.toHp;
+      return;
+    }
+    if (event.type === "statusApply") {
+      applyStatusMarker(event.targetId, event.statusId, event.duration);
+      finishCurrentEvent();
+      return;
+    }
+    if (event.type === "statusRemove") {
+      removeStatusMarker(event.targetId, event.statusId);
+      finishCurrentEvent();
+      return;
+    }
+    if (event.type === "fieldEffectExpire") {
+      expireFieldEffect(event.effectId, event.ownerType, event.ownerTeam);
+      finishCurrentEvent();
+      return;
+    }
+    if (event.type === "switchApply") {
+      applySwitchResult(event);
+      finishCurrentEvent();
+      return;
+    }
+    if (event.type === "turnSeparator") {
+      gameState.displayState.highlightActorId = null;
+      gameState.displayState.highlightTargetId = null;
+      finishCurrentEvent();
+      return;
+    }
+    finishCurrentEvent();
+  };
+
+  const updateHpAnimations = (now) => {
+    Object.entries(gameState.displayState.hpAnimations).forEach(([uid, anim]) => {
+      const elapsed = now - anim.startMs;
+      const t = clamp(elapsed / anim.durationMs, 0, 1);
+      const v = Math.round(anim.fromHp + (anim.toHp - anim.fromHp) * t);
+      gameState.displayState.hpDisplay[uid] = v;
+      if (t >= 1) delete gameState.displayState.hpAnimations[uid];
+    });
+  };
+
+  const updateBattlePlayback = (now) => {
+    const flow = gameState.battleFlow;
+    const event = flow.eventQueue[flow.currentEventIndex];
+
+    if (!event) {
+      flow.mode = "command";
+      flow.currentMessage = "わざを選んでください。";
+      gameState.turn += 1;
+      gameState.enemyPlannedActions = {};
+      gameState.plannedActions = {};
+      gameState.confirmedCommands = [null, null, null];
+      gameState.selectedMoveId = null;
+      gameState.selectedTargets = [];
+      gameState.ui.selectedReserveIndex = null;
+      gameState.ui.selectedSwitchDestination = null;
+      if (flow.pendingTurnResult?.nextState?.winner) {
+        gameState.phase = PHASE.GAMEOVER;
+        gameState.winner = flow.pendingTurnResult.nextState.winner;
+      } else {
+        initializePlanningTurn();
+      }
+      if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
+        gameState.phase = PHASE.GAMEOVER;
+        gameState.winner = "draw";
+      }
+      return;
+    }
+
+    if (!flow.isEventRunning) beginEvent(event, now);
+
+    if (!flow.isEventRunning) return;
+
+    if (event.type === "message") {
+      const minReady = now >= (flow.waitUntil - ((CONFIG.MESSAGE_AUTO_MS - CONFIG.MESSAGE_MIN_MS) / gameState.battleFlow.playbackSpeed));
+      if ((gameState.ui.fastForwardRequested && minReady) || now >= flow.waitUntil) finishCurrentEvent();
+      return;
+    }
+
+    if (event.type === "wait" || event.type === "highlightActor" || event.type === "highlightTarget") {
+      if (now >= flow.waitUntil) finishCurrentEvent();
+      return;
+    }
+
+    if (event.type === "hpAnimation") {
+      if (!gameState.displayState.hpAnimations[event.targetId]) {
+        gameState.displayState.hpDisplay[event.targetId] = event.toHp;
+        finishCurrentEvent();
+      }
+      return;
+    }
+  };
+
+  const getCurrentPlaybackMessage = () => gameState.battleFlow.currentMessage;
+
   const getCurrentActor = () => gameState.teams.ally.active[gameState.currentActorIndex] || null;
-
   const getSelectedMove = () => MOVES[gameState.selectedMoveId] || null;
 
-  const getConfirmedCommand = (slot) => gameState.confirmedCommands[slot] || null;
-
-  const allLivingAlliesPlanned = () => gameState.teams.ally.active.every((unit, slot) => !isAlive(unit) || !!getConfirmedCommand(slot));
-
-  const findNextLivingAllySlot = (fromSlot = -1) => {
-    for (let slot = fromSlot + 1; slot < CONFIG.BOARD_COLS; slot += 1) {
-      const unit = gameState.teams.ally.active[slot];
-      if (isAlive(unit)) return slot;
-    }
+  const findNextLivingAllySlot = (from = -1) => {
+    for (let i = from + 1; i < CONFIG.BOARD_COLS; i += 1) if (isAlive(gameState.teams.ally.active[i])) return i;
     return null;
-  };
-
-  const setPlanningSlot = (slot) => {
-    gameState.currentActorIndex = slot;
   };
 
   const clearTargetPreview = () => {
@@ -773,58 +641,90 @@
   };
 
   const initializePlanningTurn = () => {
-    const firstLivingSlot = findNextLivingAllySlot(-1);
-    if (firstLivingSlot === null) return;
-    setPlanningSlot(firstLivingSlot);
+    const first = findNextLivingAllySlot(-1);
+    if (first === null) return;
+    gameState.currentActorIndex = first;
     clearTargetPreview();
     gameState.ui.commandMode = "fight";
   };
 
   const advancePlanningSlot = () => {
-    const nextSlot = findNextLivingAllySlot(gameState.currentActorIndex);
-    if (nextSlot === null) return false;
-    setPlanningSlot(nextSlot);
+    const next = findNextLivingAllySlot(gameState.currentActorIndex);
+    if (next === null) return false;
+    gameState.currentActorIndex = next;
     clearTargetPreview();
     return true;
   };
 
-  const queueTurnResolution = () => {
-    if (gameState.phase !== PHASE.PLAYING || gameState.ui.isResolvingTurn || !allLivingAlliesPlanned()) return;
-    gameState.ui.isResolvingTurn = true;
-    clearTargetPreview();
-    render();
+  const scoreAction = ({ actor, move, target }) => {
+    if (!target) return { score: -1, dmg: 0 };
+    if (move.category !== "attack") return { score: 2, dmg: 0 };
+    const dmg = calcDamage(actor, target, move);
+    return { score: dmg >= target.hp ? 999 + dmg : dmg, dmg };
+  };
 
-    window.setTimeout(() => {
-      if (gameState.phase !== PHASE.PLAYING) return;
-      gameState.enemyPlannedActions = buildEnemyPlans();
-      gameState.plannedActions = buildPlannedActionsFromConfirmedCommands();
-      resolveTurn();
-      if (gameState.phase !== PHASE.GAMEOVER) {
-        initializePlanningTurn();
+  const chooseEnemyAction = (slot) => {
+    const actor = gameState.teams.enemy.active[slot];
+    if (!actor || !isAlive(actor)) return null;
+    let best = null;
+    actor.moveIds.forEach((moveId) => {
+      const move = MOVES[moveId];
+      const cands = getValidTargetsForMoveInState(gameState, actor, move);
+      if (move.targetMode === "single") {
+        cands.forEach((c) => {
+          const s = scoreAction({ actor, move, target: getUnitAtFromState(gameState, { x: c.x, y: c.y }) });
+          if (!best || s.score > best.score) best = { moveId, targetPos: { x: c.x, y: c.y }, score: s.score };
+        });
+      } else {
+        const score = cands.reduce((sum, c) => sum + calcDamage(actor, getUnitAtFromState(gameState, { x: c.x, y: c.y }), move), 0);
+        if (!best || score > best.score) best = { moveId, targetPos: null, score };
       }
-      gameState.ui.isResolvingTurn = false;
-      render();
-    }, 280);
+    });
+    return best ? { type: "fight", team: TEAM.ENEMY, slot, moveId: best.moveId, targetPos: best.targetPos } : null;
+  };
+
+  const buildEnemyPlans = () => {
+    const out = {};
+    for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
+      const a = chooseEnemyAction(i);
+      if (a) out[i] = a;
+    }
+    return out;
+  };
+
+  const allLivingAlliesPlanned = () => gameState.teams.ally.active.every((u, i) => !isAlive(u) || !!gameState.confirmedCommands[i]);
+
+  const buildPlannedActionsFromConfirmedCommands = () => {
+    const out = {};
+    gameState.confirmedCommands.forEach((c, i) => { if (c?.action) out[i] = { ...c.action }; });
+    return out;
+  };
+
+  const queueTurnResolution = () => {
+    if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || !allLivingAlliesPlanned()) return;
+    gameState.battleFlow.mode = "resolve";
+    gameState.enemyPlannedActions = buildEnemyPlans();
+    gameState.plannedActions = buildPlannedActionsFromConfirmedCommands();
+    const result = resolveTurn();
+    const queue = buildBattleEventQueue(result);
+    startBattlePlayback(queue, result);
   };
 
   const chooseMode = (mode) => {
-    if (gameState.phase !== PHASE.PLAYING) return;
+    if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy()) return;
     gameState.ui.commandMode = mode;
     clearTargetPreview();
   };
 
   const setFightMove = (moveId) => {
-    if (gameState.phase !== PHASE.PLAYING) return;
-    const slot = gameState.currentActorIndex;
-    const actor = gameState.teams.ally.active[slot];
+    if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy()) return;
+    const actor = getCurrentActor();
     if (!actor || !isAlive(actor)) return;
-
     const move = MOVES[moveId];
-    const candidates = getValidTargetsForMove(actor, move);
+    const cands = getValidTargetsForMoveInState(gameState, actor, move);
     gameState.selectedMoveId = moveId;
-    gameState.selectedTargets = [];
-    gameState.ui.previewTargets = candidates.map((c) => ({ x: c.x, y: c.y }));
-    gameState.ui.targetCandidates = candidates;
+    gameState.ui.previewTargets = cands.map((c) => ({ x: c.x, y: c.y }));
+    gameState.ui.targetCandidates = cands;
   };
 
   const createConfirmedFightCommand = ({ slot, actor, move, targets }) => ({
@@ -833,114 +733,58 @@
     moveId: move.id,
     moveName: move.name,
     targetType: move.targetMode === "single" ? "単体" : "範囲",
-    targetIds: targets.map((t) => t.uid),
     targetNames: targets.map((t) => t.name),
-    action: {
-      type: "fight",
-      team: TEAM.ALLY,
-      slot,
-      moveId: move.id,
-      targetPos: move.targetMode === "single" ? toBoardPos(targets[0].team, targets[0].slot) : null
-    }
+    action: { type: "fight", team: TEAM.ALLY, slot, moveId: move.id, targetPos: move.targetMode === "single" ? toBoardPos(targets[0].team, targets[0].slot) : null }
   });
-
-  const buildPlannedActionsFromConfirmedCommands = () => {
-    const planned = {};
-    gameState.confirmedCommands.forEach((command, slot) => {
-      if (command?.action) planned[slot] = { ...command.action };
-    });
-    return planned;
-  };
 
   const confirmCurrentFightAction = ({ slot, move, targetPos }) => {
     const actor = gameState.teams.ally.active[slot];
     if (!actor) return;
-    const validTargets = move.targetMode === "single"
-      ? [getUnitAt(targetPos)].filter(Boolean)
-      : gameState.ui.targetCandidates.map((c) => getUnitAt({ x: c.x, y: c.y })).filter(Boolean);
-    if (validTargets.length === 0) return;
+    const targets = move.targetMode === "single"
+      ? [getUnitAtFromState(gameState, targetPos)].filter(Boolean)
+      : gameState.ui.targetCandidates.map((c) => getUnitAtFromState(gameState, { x: c.x, y: c.y })).filter(Boolean);
+    if (!targets.length) return;
 
-    gameState.confirmedCommands[slot] = createConfirmedFightCommand({
-      slot,
-      actor,
-      move,
-      targets: validTargets
-    });
-    gameState.selectedTargets = validTargets.map((u) => ({ uid: u.uid }));
-
-    if (!advancePlanningSlot()) {
-      queueTurnResolution();
-    }
+    gameState.confirmedCommands[slot] = createConfirmedFightCommand({ slot, actor, move, targets });
+    if (!advancePlanningSlot()) queueTurnResolution();
   };
 
   const chooseFightTarget = (x, y) => {
-    if (gameState.phase !== PHASE.PLAYING) return;
-    const slot = gameState.currentActorIndex;
+    if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy()) return;
     const move = getSelectedMove();
     if (!move) return;
-    const match = gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y);
-    if (!match) return;
-
-    if (move.targetMode === "allPattern") {
-      confirmCurrentFightAction({ slot, move, targetPos: null });
-      return;
-    }
-    confirmCurrentFightAction({ slot, move, targetPos: { x, y } });
+    if (!gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y)) return;
+    confirmCurrentFightAction({ slot: gameState.currentActorIndex, move, targetPos: move.targetMode === "single" ? { x, y } : null });
   };
 
   const chooseReserve = (reserveIndex) => {
-    const reserve = gameState.teams.ally.reserve[reserveIndex];
-    if (!reserve) return;
+    if (isPlaybackBusy()) return;
+    if (!gameState.teams.ally.reserve[reserveIndex]) return;
     gameState.ui.selectedReserveIndex = reserveIndex;
   };
 
   const chooseSwitchDestination = (toSlot) => {
-    if (gameState.phase !== PHASE.PLAYING) return;
-    gameState.ui.selectedSwitchDestination = toSlot;
-    const slot = gameState.currentActorIndex;
-    const actor = gameState.teams.ally.active[slot];
-    if (!actor || !isAlive(actor)) return;
-    if (gameState.ui.selectedReserveIndex === null) return;
-
+    if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy()) return;
+    const actor = getCurrentActor();
+    if (!actor || !isAlive(actor) || gameState.ui.selectedReserveIndex === null) return;
     const reserve = gameState.teams.ally.reserve[gameState.ui.selectedReserveIndex];
-    gameState.confirmedCommands[slot] = {
+    gameState.confirmedCommands[gameState.currentActorIndex] = {
       actorId: actor.uid,
       actorName: actor.name,
       moveId: "switch",
       moveName: "こうたい",
       targetType: "交代",
-      targetIds: reserve ? [reserve.uid] : [],
       targetNames: reserve ? [reserve.name] : [],
-      action: {
-        type: "switch",
-        team: TEAM.ALLY,
-        slot,
-        reserveIndex: gameState.ui.selectedReserveIndex,
-        toSlot
-      }
+      action: { type: "switch", team: TEAM.ALLY, slot: gameState.currentActorIndex, reserveIndex: gameState.ui.selectedReserveIndex, toSlot }
     };
-    if (!advancePlanningSlot()) {
-      queueTurnResolution();
-    }
+    if (!advancePlanningSlot()) queueTurnResolution();
   };
 
-  const canCancelSelection = () => {
-    if (gameState.ui.commandMode !== "fight") return false;
-    if (gameState.selectedTargets.length > 0) return true;
-    return !!gameState.selectedMoveId;
-  };
-
+  const canCancelSelection = () => gameState.ui.commandMode === "fight" && (!!gameState.selectedMoveId || gameState.selectedTargets.length > 0);
   const canUndoPreviousCommand = () => gameState.confirmedCommands.some(Boolean);
 
   const cancelCurrentSelection = () => {
-    if (!canCancelSelection()) return;
-    if (gameState.selectedTargets.length > 0) {
-      gameState.selectedTargets = [];
-      gameState.selectedMoveId = null;
-      gameState.ui.previewTargets = [];
-      gameState.ui.targetCandidates = [];
-      return;
-    }
+    if (!canCancelSelection() || isPlaybackBusy()) return;
     gameState.selectedMoveId = null;
     gameState.selectedTargets = [];
     gameState.ui.previewTargets = [];
@@ -948,32 +792,24 @@
   };
 
   const undoLastConfirmedCommand = () => {
-    if (!canUndoPreviousCommand()) return;
-    for (let slot = CONFIG.BOARD_COLS - 1; slot >= 0; slot -= 1) {
-      if (gameState.confirmedCommands[slot]) {
-        gameState.confirmedCommands[slot] = null;
-        setPlanningSlot(slot);
-        clearTargetPreview();
-        gameState.ui.commandMode = "fight";
-        return;
-      }
+    if (!canUndoPreviousCommand() || isPlaybackBusy()) return;
+    for (let i = CONFIG.BOARD_COLS - 1; i >= 0; i -= 1) {
+      if (!gameState.confirmedCommands[i]) continue;
+      gameState.confirmedCommands[i] = null;
+      gameState.currentActorIndex = i;
+      clearTargetPreview();
+      gameState.ui.commandMode = "fight";
+      return;
     }
-  };
-
-  const startBattle = () => {
-    gameState.phase = PHASE.PLAYING;
-    initializePlanningTurn();
   };
 
   const resetBattle = () => {
     gameState = createInitialState();
-    gameState.phase = PHASE.PLAYING;
     initializePlanningTurn();
   };
 
   const dispatch = (action) => {
     switch (action.type) {
-      case "START": startBattle(); break;
       case "RESET": resetBattle(); break;
       case "MODE": chooseMode(action.mode); break;
       case "MOVE": setFightMove(action.moveId); break;
@@ -982,372 +818,183 @@
       case "DEST": chooseSwitchDestination(action.toSlot); break;
       case "CANCEL": cancelCurrentSelection(); break;
       case "UNDO": undoLastConfirmedCommand(); break;
+      case "FAST_FORWARD": if (isPlaybackBusy()) gameState.ui.fastForwardRequested = true; break;
       default: break;
     }
     render();
   };
 
-  // ------------------------------------------------------------
-  // 9) rendering
-  // ------------------------------------------------------------
-  const moveTypeClass = (move) => `type-${move.type}`;
-  const MOVE_CATEGORY_LABEL = { attack: "こうげき", status: "へんか" };
-  const TYPE_LABEL = {
-    fire: "ほのお",
-    water: "みず",
-    earth: "だいち",
-    nature: "しぜん",
-    light: "ひかり",
-    shadow: "かげ"
+  const createEl = (tag, className, text) => {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text !== undefined) el.textContent = text;
+    return el;
   };
 
-  const formatEnemyHpPercent = (unit) => `${Math.round((unit.hp / unit.maxHp) * 100)}%`;
-  const formatAllyHp = (unit) => `${unit.hp} / ${unit.maxHp}`;
-  const formatHpByTeam = (unit) => unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit) : formatAllyHp(unit);
-  const statusText = (status) => `${STATUS_LABELS[status.kind] || status.kind}（${status.duration}ターン）`;
-  const toJaMoveName = (move) => move.name;
-  const MOVE_TARGET_DESCRIPTION = {
-    front: "単体 / 前方",
-    adjacentEnemy: "単体 / 前方",
-    front3: "前列3体",
-    allyLine: "前列3体",
-    self: "単体 / 自分",
-    allyAdjacent: "単体 / 隣接味方",
-    singleAttackReach: "単体 / 前列+隣接",
-    all: "全体"
+  const createImageWithFallback = ({ src, alt, mirror = false, wrapperClass = "portrait-wrap", placeholderLabel = "画像なし", placeholderSubLabel = "NO SIGNAL" }) => {
+    const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
+    const img = document.createElement("img");
+    img.alt = alt;
+    img.src = src;
+    img.loading = "lazy";
+    const placeholder = createEl("div", "img-placeholder");
+    placeholder.append(createEl("div", "img-placeholder-label", placeholderLabel), createEl("div", "img-placeholder-sub", placeholderSubLabel));
+    img.onerror = () => { img.style.display = "none"; placeholder.style.display = "flex"; };
+    wrap.append(img, placeholder);
+    return wrap;
   };
 
-  const getMoveTargetDescription = (move) => MOVE_TARGET_DESCRIPTION[move.patternId] || "単体";
-  const isTargetPreviewActive = () => (
-    gameState.ui.commandMode === "fight" &&
-    !!gameState.selectedMoveId &&
-    gameState.ui.previewTargets.length > 0
-  );
-
-  const formatTargetSummary = (command) => {
-    if (!command || !command.targetNames || command.targetNames.length === 0) return "未選択";
-    return `${command.targetType}: ${command.targetNames.join("、")}`;
+  const applyBoardBackgroundWithFallback = (boardEl, src) => {
+    const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
+    boardEl.style.backgroundImage = gradient;
+    if (!src) return;
+    const bg = new Image();
+    bg.onload = () => { boardEl.style.backgroundImage = `${gradient}, url('${src}')`; };
+    bg.onerror = () => { boardEl.style.backgroundImage = gradient; };
+    bg.src = src;
   };
 
-  const renderStatusChips = (statuses) => {
-    const frag = document.createDocumentFragment();
-    statuses.forEach((s) => {
-      const chip = createEl("span", "status-chip", statusText(s));
-      frag.appendChild(chip);
+  const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
+
+  const formatEnemyHpPercent = (unit, hp) => `${Math.round((hp / unit.maxHp) * 100)}%`;
+  const formatAllyHp = (unit, hp) => `${hp} / ${unit.maxHp}`;
+
+  const getDisplayHp = (unit) => gameState.displayState.hpDisplay[unit.uid] ?? unit.hp;
+  const statusText = (s) => `${STATUS_LABELS[s.kind] || s.kind}（${s.duration}T）`;
+
+  const getNavigationMessageText = () => {
+    if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
+    if (isPlaybackBusy()) return getCurrentPlaybackMessage() || "戦闘演出中…";
+    if (gameState.ui.commandMode === "switch") return gameState.ui.selectedReserveIndex === null ? "交代する控えを選んでください。" : "入れ替える味方スロットを選んでください。";
+    if (!getSelectedMove()) return "わざを選んでください。";
+    return getSelectedMove().targetMode === "single" ? "ハイライトされたマスから対象を選んでください。" : "このわざはハイライト対象全員に当たります。";
+  };
+
+  const renderBattleMessageBox = () => {
+    const nav = createEl("button", "nav-message");
+    nav.dataset.action = "fast-forward";
+    nav.disabled = !isPlaybackBusy();
+    nav.appendChild(createEl("div", "nav-message-text", getNavigationMessageText()));
+    return nav;
+  };
+
+  const renderBattleLogPanel = () => {
+    const log = createEl("div", "log");
+    gameState.log.forEach((entry) => {
+      const card = createEl("article", "log-entry neutral");
+      card.appendChild(createEl("div", "log-title", entry.title));
+      const body = createEl("div", "log-lines");
+      (entry.lines || []).forEach((line) => body.appendChild(createEl("div", "log-line", line)));
+      card.appendChild(body);
+      log.appendChild(card);
     });
-    return frag;
-  };
-
-  const getFieldStatusBuckets = () => {
-    const weather = [];
-    const field = [];
-    gameState.globalStatuses.forEach((status) => {
-      if (status.category === "weather" || status.tags?.includes("weather")) weather.push(status);
-      else field.push(status);
-    });
-    return { weather, field };
-  };
-
-  const createStatusList = (items) => {
-    const list = createEl("div", "field-list");
-    if (!items || items.length === 0) {
-      list.appendChild(createEl("div", "field-empty", "なし"));
-      return list;
-    }
-    items.forEach((status) => {
-      list.appendChild(createEl("div", "field-item", statusText(status)));
-    });
-    return list;
-  };
-
-  const renderFieldStatusPanel = () => {
-    const panel = createEl("div", "field-panel");
-    panel.appendChild(createEl("div", "field-title", "フィールド状態"));
-
-    const buckets = getFieldStatusBuckets();
-
-    const weatherRow = createEl("div", "field-row");
-    weatherRow.appendChild(createEl("div", "field-row-title", "天候"));
-    weatherRow.appendChild(createStatusList(buckets.weather));
-    panel.appendChild(weatherRow);
-
-    const fieldRow = createEl("div", "field-row");
-    fieldRow.appendChild(createEl("div", "field-row-title", "フィールド効果"));
-    fieldRow.appendChild(createStatusList(buckets.field));
-    panel.appendChild(fieldRow);
-
-    const allyRow = createEl("div", "field-row");
-    allyRow.appendChild(createEl("div", "field-row-title", "味方"));
-    allyRow.appendChild(createStatusList(gameState.teams.ally.statuses));
-    panel.appendChild(allyRow);
-
-    const enemyRow = createEl("div", "field-row");
-    enemyRow.appendChild(createEl("div", "field-row-title", "敵"));
-    enemyRow.appendChild(createStatusList(gameState.teams.enemy.statuses));
-    panel.appendChild(enemyRow);
-
-    return panel;
-  };
-
-  const renderLogEntry = (entry) => {
-    const teamClass = entry.team || LOG_TEAM.NEUTRAL;
-    const card = createEl("article", `log-entry ${teamClass}`);
-    card.appendChild(createEl("div", "log-title", entry.title));
-    const body = createEl("div", "log-lines");
-    (entry.lines || []).forEach((line) => {
-      body.appendChild(createEl("div", "log-line", line));
-    });
-    if (!entry.lines || entry.lines.length === 0) {
-      body.appendChild(createEl("div", "log-line", "—"));
-    }
-    card.appendChild(body);
-    return card;
-  };
-
-  const renderMoveBadge = (move) => {
-    const iconKey = move.category === "attack" ? "attack" : "status";
-    const iconWrap = createImageWithFallback({
-      src: getAssetPath("icons", iconKey),
-      alt: `${move.category} icon`,
-      wrapperClass: "move-icon-asset",
-      placeholderLabel: move.category === "attack" ? "ATK" : "STS",
-      placeholderSubLabel: "ICON"
-    });
-    const badge = createEl("span", "move-icon-badge");
-    badge.appendChild(iconWrap);
-    badge.title = MOVE_CATEGORY_LABEL[move.category] || move.category;
-    return badge;
+    return log;
   };
 
   const renderMiniBattleUnit = (unit, mirror = false) => {
-    const miniWrap = createImageWithFallback({
-      src: getAssetPath("portraits", unit.portrait),
-      alt: unit.name,
-      mirror
-    });
-    miniWrap.classList.add("mini-portrait");
-    return miniWrap;
-  };
-
-  const renderReserveCard = (unit, idx) => {
-    const btn = createEl("button", `reserve-card${gameState.ui.selectedReserveIndex === idx ? " active" : ""}`);
-    btn.dataset.action = "pick-reserve";
-    btn.dataset.reserveIndex = String(idx);
-    if (!unit) {
-      btn.disabled = true;
-      btn.textContent = "空き";
-      return btn;
-    }
-    btn.appendChild(renderMiniBattleUnit(unit, true));
-    const info = createEl("div");
-    info.appendChild(createEl("div", "name", unit.name));
-    info.appendChild(createEl("div", "stats", `HP ${formatAllyHp(unit)}`));
-    btn.appendChild(info);
-    return btn;
-  };
-
-  const renderBattleHud = () => {
-    const hud = createEl("div", "battle-hud");
-    const enemyAlive = gameState.teams.enemy.active.filter(isAlive).length;
-    const allyAlive = gameState.teams.ally.active.filter(isAlive).length;
-
-    const infoRow = createEl("div", "hud-row");
-    infoRow.appendChild(createEl("div", "hud-title", `敵 ${enemyAlive}/3 生存`));
-    infoRow.appendChild(createEl("div", "hud-title", `味方 ${allyAlive}/3 生存`));
-    hud.appendChild(infoRow);
-
-    const selectors = createEl("div", "ally-selectors");
-    gameState.teams.ally.active.forEach((unit, slot) => {
-      const plan = getConfirmedCommand(slot);
-      const isCurrent = slot === gameState.currentActorIndex && gameState.phase === PHASE.PLAYING;
-      const selectorState = !isAlive(unit)
-        ? " dead"
-        : isCurrent
-          ? " current"
-          : plan
-            ? " completed"
-            : " pending";
-      const btn = createEl(
-        "button",
-        `ally-selector${selectorState}`
-      );
-      btn.disabled = true;
-
-      btn.appendChild(createEl("div", "name", `${slot + 1}. ${unit.name}`));
-      btn.appendChild(createEl("div", "stats", `HP ${formatAllyHp(unit)}`));
-      if (plan?.action?.type === "fight") btn.appendChild(createEl("div", "stats", `予定: ${plan.moveName}`));
-      else if (plan?.action?.type === "switch") btn.appendChild(createEl("div", "stats", "予定: こうたい"));
-      else btn.appendChild(createEl("div", "stats", "予定: 未選択"));
-      selectors.appendChild(btn);
-    });
-
-    hud.appendChild(selectors);
-    return hud;
+    const mini = createImageWithFallback({ src: getAssetPath("portraits", unit.portrait), alt: unit.name, mirror });
+    mini.classList.add("mini-portrait");
+    return mini;
   };
 
   const renderBoardCell = (x, y) => {
     const cell = createEl("div", "cell");
-    const unit = getUnitAt({ x, y });
-    const currentSlot = gameState.currentActorIndex;
-    const activeActorPos = toBoardPos(TEAM.ALLY, currentSlot);
-    const isCandidate = gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
-    const targetPreviewActive = isTargetPreviewActive();
-
-    if (activeActorPos.x === x && activeActorPos.y === y && gameState.phase === PHASE.PLAYING) {
+    const unit = getUnitAtFromState(gameState, { x, y });
+    const candidate = gameState.ui.previewTargets.some((c) => c.x === x && c.y === y);
+    if (candidate) cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
+    if (isPlaybackBusy() && (gameState.displayState.highlightActorId || gameState.displayState.highlightTargetId)) {
+      if (unit?.uid === gameState.displayState.highlightActorId) cell.classList.add("active-actor");
+      if (unit?.uid === gameState.displayState.highlightTargetId) cell.classList.add("targeted");
+    } else if (gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
       cell.classList.add("active-actor");
-    }
-
-    if (isCandidate) {
-      cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
-    }
-    if (targetPreviewActive && !isCandidate) {
-      cell.classList.add("dimmed");
-    }
-    const hasPlannedTarget = gameState.confirmedCommands.some(
-      (command) => command?.action?.type === "fight" &&
-        command.action.targetPos &&
-        command.action.targetPos.x === x &&
-        command.action.targetPos.y === y
-    );
-    if (hasPlannedTarget) {
-      cell.classList.add("planned-target");
     }
 
     cell.dataset.action = "target-cell";
     cell.dataset.x = String(x);
     cell.dataset.y = String(y);
 
-    if (unit) {
-      const mirror = unit.team === TEAM.ALLY;
-      cell.appendChild(renderMiniBattleUnit(unit, mirror));
-      const main = createEl("div", "cell-unit-main");
-      main.appendChild(createEl("div", "cell-name", unit.name));
-      main.appendChild(createEl("div", "cell-hp", `HP ${formatHpByTeam(unit)}`));
-      const statLine = createEl("div", "mini", unit.statuses.map((s) => `${s.kind}(${s.duration})`).join(" ") || "状態なし");
-      main.appendChild(statLine);
-      cell.appendChild(main);
-    } else {
+    if (!unit) {
       cell.classList.add("empty");
-      cell.appendChild(createEl("div", "mini", "—"));
-      cell.appendChild(createEl("div", "mini", "待機マス"));
+      cell.append(createEl("div", "mini", "—"), createEl("div", "mini", "待機マス"));
+      return cell;
     }
 
-    gameState.temp.renderCells.push(cell);
+    cell.appendChild(renderMiniBattleUnit(unit, unit.team === TEAM.ALLY));
+    const main = createEl("div", "cell-unit-main");
+    const hp = getDisplayHp(unit);
+    const hpPct = Math.round((hp / unit.maxHp) * 100);
+    main.appendChild(createEl("div", "cell-name", unit.name));
+    main.appendChild(createEl("div", "cell-hp", `HP ${unit.team === TEAM.ENEMY ? formatEnemyHpPercent(unit, hp) : formatAllyHp(unit, hp)}`));
+    const bar = createEl("div", "hp-bar");
+    const fill = createEl("div", "hp-bar-fill");
+    fill.style.width = `${hpPct}%`;
+    bar.appendChild(fill);
+    main.appendChild(bar);
+    main.appendChild(createEl("div", "mini", unit.statuses.map(statusText).join(" ") || "状態なし"));
+    cell.appendChild(main);
     return cell;
-  };
-
-  const getNavigationMessageText = () => {
-    if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
-    if (gameState.ui.isResolvingTurn) return "行動を解決中です…";
-
-    if (gameState.ui.commandMode === "switch") {
-      if (gameState.ui.selectedReserveIndex === null) {
-        return "交代する控えを選んでください。";
-      }
-      if (gameState.ui.selectedSwitchDestination === null) {
-        return "入れ替える味方スロットを選んでください。";
-      }
-      return "交代を選択しました。次の行動を選んでください。";
-    }
-
-    if (gameState.ui.commandMode === "fight") {
-      const selectedMove = getSelectedMove();
-      if (!selectedMove) return "わざを選んでください。";
-      if (selectedMove.targetMode === "single") {
-        return "ハイライトされたマスから対象を選んでください。";
-      }
-      return "このわざはハイライトされた対象すべてに当たります。";
-    }
-
-    return "わざを選んでください。";
-  };
-
-  const renderNavigationMessage = () => {
-    const nav = createEl("div", "nav-message");
-    nav.appendChild(createEl("div", "nav-message-text", getNavigationMessageText()));
-    return nav;
-  };
-
-  const renderMoveDetailPanel = () => {
-    const panel = createEl("div", "move-detail-panel");
-    const selectedMove = getSelectedMove();
-    if (!selectedMove) {
-      panel.appendChild(createEl("div", "move-detail-placeholder", "技を選ぶとここに対象と効果が表示されます"));
-      return panel;
-    }
-    panel.appendChild(createEl("div", "move-detail-line", `選択した技: ${selectedMove.name}`));
-    panel.appendChild(createEl("div", "move-detail-line", `対象: ${getMoveTargetDescription(selectedMove)}`));
-    const previewNames = gameState.ui.targetCandidates
-      .map((c) => getUnitAt({ x: c.x, y: c.y }))
-      .filter(Boolean)
-      .map((unit) => unit.name);
-    if (previewNames.length > 0) {
-      panel.appendChild(createEl("div", "move-detail-line", `${selectedMove.targetMode === "single" ? "単体" : "範囲"}: ${previewNames.join("、")}`));
-    }
-    return panel;
   };
 
   const renderCommandArea = () => {
     const wrap = createEl("div", "command");
+    if (isPlaybackBusy()) wrap.classList.add("disabled");
     const actor = getCurrentActor();
-
-    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}（スロット${gameState.currentActorIndex + 1}）`));
+    wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}`));
 
     const actions = createEl("div", "actions");
-    const fightBtn = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
-    fightBtn.dataset.action = "mode-fight";
-    const switchBtn = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "こうたい");
-    switchBtn.dataset.action = "mode-switch";
-    actions.append(fightBtn, switchBtn);
-      wrap.appendChild(actions);
+    const fight = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
+    fight.dataset.action = "mode-fight";
+    fight.disabled = isPlaybackBusy();
+    const sw = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "こうたい");
+    sw.dataset.action = "mode-switch";
+    sw.disabled = isPlaybackBusy();
+    actions.append(fight, sw);
+    wrap.appendChild(actions);
+
     const controls = createEl("div", "actions");
-    const cancelBtn = createEl("button", "action-btn", "キャンセル");
-    cancelBtn.dataset.action = "cancel-selection";
-    cancelBtn.disabled = !canCancelSelection();
-    const undoBtn = createEl("button", "action-btn", "前の選択に戻る");
-    undoBtn.dataset.action = "undo-command";
-    undoBtn.disabled = !canUndoPreviousCommand();
-    controls.append(cancelBtn, undoBtn);
+    const cancel = createEl("button", "action-btn", "キャンセル");
+    cancel.dataset.action = "cancel-selection";
+    cancel.disabled = !canCancelSelection() || isPlaybackBusy();
+    const undo = createEl("button", "action-btn", "前の選択に戻る");
+    undo.dataset.action = "undo-command";
+    undo.disabled = !canUndoPreviousCommand() || isPlaybackBusy();
+    controls.append(cancel, undo);
     wrap.appendChild(controls);
 
-    if (gameState.ui.commandMode === "fight") {
-      const movesWrap = createEl("div", "moves");
+    if (gameState.ui.commandMode === "fight" && actor) {
+      const moves = createEl("div", "moves");
       actor.moveIds.forEach((moveId) => {
         const move = MOVES[moveId];
-        const btn = createEl("button", `move ${move.category} ${moveTypeClass(move)}`);
-        const info = createEl("div");
-        info.appendChild(createEl("div", "move-name", toJaMoveName(move)));
-        info.appendChild(createEl("div", "move-meta", `${MOVE_CATEGORY_LABEL[move.category]} / ${TYPE_LABEL[move.type] || move.type}`));
-        btn.appendChild(renderMoveBadge(move));
-        btn.appendChild(info);
+        const btn = createEl("button", `move ${move.category} type-${move.type}${gameState.selectedMoveId === moveId ? " active" : ""}`);
         btn.dataset.action = "pick-move";
         btn.dataset.moveId = moveId;
-        if (gameState.selectedMoveId === moveId) {
-          btn.classList.add("active");
-        }
-        movesWrap.appendChild(btn);
+        btn.disabled = isPlaybackBusy();
+        btn.appendChild(createEl("div", "move-name", move.name));
+        moves.appendChild(btn);
       });
-      wrap.appendChild(movesWrap);
-      wrap.appendChild(renderMoveDetailPanel());
+      wrap.appendChild(moves);
     }
 
     if (gameState.ui.commandMode === "switch") {
       const switches = createEl("div", "switches");
-      gameState.teams.ally.reserve.forEach((unit, idx) => {
-        switches.appendChild(renderReserveCard(unit, idx));
+      gameState.teams.ally.reserve.forEach((u, idx) => {
+        const btn = createEl("button", `reserve-card${gameState.ui.selectedReserveIndex === idx ? " active" : ""}`);
+        btn.dataset.action = "pick-reserve";
+        btn.dataset.reserveIndex = String(idx);
+        btn.disabled = !u || isPlaybackBusy();
+        btn.appendChild(createEl("div", "name", u ? u.name : "空き"));
+        switches.appendChild(btn);
       });
-      wrap.appendChild(createEl("div", "section-title", "1) こうたい先（控え）を選択"));
       wrap.appendChild(switches);
 
       const dests = createEl("div", "destinations");
       for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
-        const unit = gameState.teams.ally.active[i];
-        const btn = createEl("button", `dest-btn${gameState.ui.selectedSwitchDestination === i ? " active" : ""}`, `スロット${i + 1} ← ${unit ? unit.name : "空き"}`);
+        const btn = createEl("button", `dest-btn`, `スロット${i + 1}`);
         btn.dataset.action = "pick-destination";
         btn.dataset.toSlot = String(i);
+        btn.disabled = isPlaybackBusy();
         dests.appendChild(btn);
       }
-      wrap.appendChild(createEl("div", "section-title", "2) 入れ替える味方スロットを選択"));
       wrap.appendChild(dests);
     }
 
@@ -1359,11 +1006,10 @@
     for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
       const box = createEl("div", "summary-card");
       const unit = gameState.teams.ally.active[i];
-      const command = getConfirmedCommand(i);
-      box.appendChild(createEl("div", "summary-title", `${i + 1}. ${unit ? unit.name : `味方${i + 1}`}`));
-      box.appendChild(createEl("div", "summary-line", `技: ${command?.moveName || "未選択"}`));
-      box.appendChild(createEl("div", "summary-line", `対象モード: ${command?.targetType || "未選択"}`));
-      box.appendChild(createEl("div", "summary-line", formatTargetSummary(command)));
+      const cmd = gameState.confirmedCommands[i];
+      box.appendChild(createEl("div", "summary-title", `${i + 1}. ${unit ? unit.name : "-"}`));
+      box.appendChild(createEl("div", "summary-line", `技: ${cmd?.moveName || "未選択"}`));
+      box.appendChild(createEl("div", "summary-line", `対象: ${cmd?.targetNames?.join("、") || "未選択"}`));
       plans.appendChild(box);
     }
     return plans;
@@ -1372,28 +1018,13 @@
   const renderSidebar = () => {
     const side = createEl("div", "sidebar");
     side.appendChild(createEl("div", "stats", `ターン ${gameState.turn} | フェーズ: ${gameState.phase}`));
-
     const footer = createEl("div", "footer");
-    if (gameState.phase === PHASE.START) {
-      const start = createEl("button", "", "バトル開始");
-      start.dataset.action = "start";
-      footer.appendChild(start);
-    }
-    if (gameState.phase === PHASE.GAMEOVER) {
-      const reset = createEl("button", "", "もう一度");
-      reset.dataset.action = "reset";
-      footer.appendChild(reset);
-      footer.appendChild(createEl("div", "stats", `勝者: ${gameState.winner}`));
-    }
+    const reset = createEl("button", "", "リセット");
+    reset.dataset.action = "reset";
+    footer.appendChild(reset);
+    if (gameState.phase === PHASE.GAMEOVER) footer.appendChild(createEl("div", "stats", `勝者: ${gameState.winner}`));
     side.appendChild(footer);
-
-    const log = createEl("div", "log");
-    gameState.log.forEach((entry) => {
-      log.appendChild(renderLogEntry(entry));
-    });
-    side.appendChild(log);
-    side.appendChild(renderFieldStatusPanel());
-
+    side.appendChild(renderBattleLogPanel());
     return side;
   };
 
@@ -1405,48 +1036,56 @@
     app.style.setProperty("--summary-h", `${CONFIG.SUMMARY_PANEL_HEIGHT}px`);
 
     const main = createEl("div", "main");
-
     const board = createEl("div", "board");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
-
-    for (let y = 0; y < CONFIG.BOARD_ROWS; y += 1) {
-      for (let x = 0; x < CONFIG.BOARD_COLS; x += 1) {
-        board.appendChild(renderBoardCell(x, y));
-      }
-    }
+    for (let y = 0; y < CONFIG.BOARD_ROWS; y += 1) for (let x = 0; x < CONFIG.BOARD_COLS; x += 1) board.appendChild(renderBoardCell(x, y));
     main.appendChild(board);
-    main.appendChild(renderNavigationMessage());
-
+    main.appendChild(renderBattleMessageBox());
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
       main.appendChild(renderCommandSummaryCards());
     }
-
-    app.appendChild(main);
-    app.appendChild(renderSidebar());
+    app.append(main, renderSidebar());
   };
 
-  // ------------------------------------------------------------
-  // 10) boot / init
-  // ------------------------------------------------------------
+  const update = (now) => {
+    const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
+    const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
+    if (!hasHpAnimations && !hasPlayback) return;
+    updateHpAnimations(now);
+    if (hasPlayback) updateBattlePlayback(now);
+    render();
+  };
+
+  const loop = (now) => {
+    update(now);
+    requestAnimationFrame(loop);
+  };
+
   document.addEventListener("click", (event) => {
     const target = event.target.closest("[data-action]");
     if (!target) return;
-
-    const action = target.dataset.action;
-    if (action === "start") dispatch({ type: "START" });
-    if (action === "reset") dispatch({ type: "RESET" });
-    if (action === "mode-fight") dispatch({ type: "MODE", mode: "fight" });
-    if (action === "mode-switch") dispatch({ type: "MODE", mode: "switch" });
-    if (action === "pick-move") dispatch({ type: "MOVE", moveId: target.dataset.moveId });
-    if (action === "target-cell") dispatch({ type: "TARGET", x: Number(target.dataset.x), y: Number(target.dataset.y) });
-    if (action === "pick-reserve") dispatch({ type: "RESERVE", reserveIndex: Number(target.dataset.reserveIndex) });
-    if (action === "pick-destination") dispatch({ type: "DEST", toSlot: Number(target.dataset.toSlot) });
-    if (action === "cancel-selection") dispatch({ type: "CANCEL" });
-    if (action === "undo-command") dispatch({ type: "UNDO" });
+    const a = target.dataset.action;
+    if (a === "reset") dispatch({ type: "RESET" });
+    if (a === "mode-fight") dispatch({ type: "MODE", mode: "fight" });
+    if (a === "mode-switch") dispatch({ type: "MODE", mode: "switch" });
+    if (a === "pick-move") dispatch({ type: "MOVE", moveId: target.dataset.moveId });
+    if (a === "target-cell") dispatch({ type: "TARGET", x: Number(target.dataset.x), y: Number(target.dataset.y) });
+    if (a === "pick-reserve") dispatch({ type: "RESERVE", reserveIndex: Number(target.dataset.reserveIndex) });
+    if (a === "pick-destination") dispatch({ type: "DEST", toSlot: Number(target.dataset.toSlot) });
+    if (a === "cancel-selection") dispatch({ type: "CANCEL" });
+    if (a === "undo-command") dispatch({ type: "UNDO" });
+    if (a === "fast-forward") dispatch({ type: "FAST_FORWARD" });
   });
 
-  gameState.phase = PHASE.PLAYING;
+  document.addEventListener("keydown", (event) => {
+    if ((event.key === "Enter" || event.key === " ") && isPlaybackBusy()) {
+      event.preventDefault();
+      dispatch({ type: "FAST_FORWARD" });
+    }
+  });
+
   initializePlanningTurn();
   render();
+  requestAnimationFrame(loop);
 })();
