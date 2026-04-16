@@ -25,6 +25,7 @@
       attackTargetAoe: "#ff9f4a",
       statusPoison: "#b07bff",
       statusDefault: "#7d91ff",
+      statusRemove: "#8ff5ff",
       traitSource: "#55e9ff",
       traitTarget: "#7bd8ff"
     }
@@ -198,7 +199,8 @@
       targets: [],
       effectType: null,
       statusKind: null,
-      traitKind: null
+      traitKind: null,
+      removeKind: null
     },
     log: [],
     temp: { renderCells: [] }
@@ -237,9 +239,10 @@
     gameState.battleHighlight.effectType = null;
     gameState.battleHighlight.statusKind = null;
     gameState.battleHighlight.traitKind = null;
+    gameState.battleHighlight.removeKind = null;
   };
 
-  const setBattleHighlight = ({ sources = [], targets = [], effectType = null, statusKind = null, traitKind = null } = {}) => {
+  const setBattleHighlight = ({ sources = [], targets = [], effectType = null, statusKind = null, traitKind = null, removeKind = null } = {}) => {
     const nextSources = normalizeUidList(sources);
     const nextTargets = normalizeUidList(targets);
     if (!nextSources.length && !nextTargets.length) {
@@ -252,6 +255,7 @@
     gameState.battleHighlight.effectType = effectType;
     gameState.battleHighlight.statusKind = statusKind;
     gameState.battleHighlight.traitKind = traitKind;
+    gameState.battleHighlight.removeKind = removeKind;
   };
 
   const getEffectiveStat = (unit, key) => {
@@ -724,8 +728,20 @@
 
     turnResult.endStepResults.expiredStatuses.forEach((s) => {
       const text = STATUS_FADE_TEXT[s.statusId]?.(s.ownerName) || `${s.ownerName}の ${s.statusId}が切れた。`;
+      if (s.ownerType === "unit") {
+        q.push({
+          type: "battleHighlight",
+          sources: [],
+          targets: [s.ownerId],
+          effectType: "statusRemove",
+          removeKind: s.statusId
+        });
+      }
       q.push({ type: "message", text, loggable: true });
-      if (s.ownerType === "unit") q.push({ type: "statusRemove", targetId: s.ownerId, statusId: s.statusId });
+      if (s.ownerType === "unit") {
+        q.push({ type: "statusRemove", targetId: s.ownerId, statusId: s.statusId });
+        q.push({ type: "clearBattleHighlight" });
+      }
     });
 
     turnResult.endStepResults.expiredFieldEffects.forEach((f) => {
@@ -831,7 +847,8 @@
         targets: event.targets,
         effectType: event.effectType || null,
         statusKind: event.statusKind || null,
-        traitKind: event.traitKind || null
+        traitKind: event.traitKind || null,
+        removeKind: event.removeKind || null
       });
       gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
       return;
@@ -1374,7 +1391,7 @@
     if (candidate) cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
     if (replacementCandidate) cell.classList.add("valid-ally", "replacement-target");
     const highlight = gameState.battleHighlight;
-    if (isPlaybackBusy() && highlight.active && unit?.uid) {
+    if (isPlaybackBusy() && highlight.active === true && unit?.uid) {
       const sourceSet = new Set(highlight.sources || []);
       const targetSet = new Set(highlight.targets || []);
       const isSource = sourceSet.has(unit.uid);
@@ -1383,13 +1400,14 @@
       if (isTarget) {
         if (highlight.effectType === "status" && highlight.statusKind === "poison") cell.classList.add("targeted-status-poison");
         else if (highlight.effectType === "status") cell.classList.add("targeted-status-default");
+        else if (highlight.effectType === "statusRemove") cell.classList.add("targeted-status-remove");
         else if (highlight.effectType === "trait") cell.classList.add("targeted-trait");
         else if (highlight.effectType === "aoe") cell.classList.add("targeted-aoe");
         else cell.classList.add("targeted-single");
       }
     } else if (replacementCandidate && gameState.ui.selectedReplacementReserveIndex !== null) {
       cell.classList.add("targeted");
-    } else if (gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
+    } else if (!isPlaybackBusy() && gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
       cell.classList.add("active-actor");
     }
 
@@ -1556,6 +1574,7 @@
     app.style.setProperty("--hl-target-aoe", CONFIG.HIGHLIGHT_COLORS.attackTargetAoe);
     app.style.setProperty("--hl-status-poison", CONFIG.HIGHLIGHT_COLORS.statusPoison);
     app.style.setProperty("--hl-status-default", CONFIG.HIGHLIGHT_COLORS.statusDefault);
+    app.style.setProperty("--hl-status-remove", CONFIG.HIGHLIGHT_COLORS.statusRemove);
     app.style.setProperty("--hl-trait-source", CONFIG.HIGHLIGHT_COLORS.traitSource);
     app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
 

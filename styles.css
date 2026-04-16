@@ -206,6 +206,13 @@ body {
     inset 0 0 24px color-mix(in srgb, var(--hl-status-default, #7d91ff) 32%, transparent);
 }
 
+.cell.targeted-status-remove {
+  border-color: var(--hl-status-remove, #8ff5ff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hl-status-remove, #8ff5ff) 62%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--hl-status-remove, #8ff5ff) 34%, transparent);
+}
+
 .cell.source-trait {
   border-color: var(--hl-trait-source, #55e9ff);
   box-shadow:
