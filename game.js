@@ -1315,12 +1315,33 @@
   const createImageWithFallback = ({ src, alt, mirror = false, wrapperClass = "portrait-wrap", placeholderLabel = "画像なし", placeholderSubLabel = "NO SIGNAL" }) => {
     const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
     const img = document.createElement("img");
-    img.alt = alt;
-    img.src = src;
-    img.loading = "lazy";
     const placeholder = createEl("div", "img-placeholder");
+    const setLoadedState = () => {
+      img.style.display = "block";
+      placeholder.style.display = "none";
+    };
+    const setFallbackState = () => {
+      img.style.display = "none";
+      placeholder.style.display = "flex";
+    };
+    img.alt = alt || "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.draggable = false;
+    img.onerror = () => setFallbackState();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) setLoadedState();
+      else setFallbackState();
+    };
     placeholder.append(createEl("div", "img-placeholder-label", placeholderLabel), createEl("div", "img-placeholder-sub", placeholderSubLabel));
-    img.onerror = () => { img.style.display = "none"; placeholder.style.display = "flex"; };
+    setFallbackState();
+    if (typeof src === "string" && src.length > 0) {
+      img.src = src;
+      if (img.complete) {
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) setLoadedState();
+        else setFallbackState();
+      }
+    }
     wrap.append(img, placeholder);
     return wrap;
   };
