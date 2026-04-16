@@ -51,7 +51,14 @@
     }
   };
 
-  const getAssetPath = (type, key) => (ASSETS[type] && ASSETS[type][key]) || "";
+  const getAssetPath = (type, key) => {
+    const table = ASSETS?.[type];
+    if (!table || typeof table !== "object") return "";
+    const normalizedKey = typeof key === "string" ? key.trim() : "";
+    if (!normalizedKey) return "";
+    const mapped = table[normalizedKey];
+    return typeof mapped === "string" ? mapped : "";
+  };
 
   const patterns = {
     front3: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 }],
@@ -1316,16 +1323,17 @@
     const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
     const img = document.createElement("img");
     const placeholder = createEl("div", "img-placeholder");
+    const normalizedSrc = typeof src === "string" ? src.trim() : "";
     const setLoadedState = () => {
-      img.style.display = "block";
-      placeholder.style.display = "none";
+      wrap.classList.add("is-loaded");
+      wrap.classList.remove("is-fallback");
     };
     const setFallbackState = () => {
-      img.style.display = "none";
-      placeholder.style.display = "flex";
+      wrap.classList.add("is-fallback");
+      wrap.classList.remove("is-loaded");
     };
     img.alt = alt || "";
-    img.loading = "lazy";
+    img.loading = "eager";
     img.decoding = "async";
     img.draggable = false;
     img.onerror = () => setFallbackState();
@@ -1335,8 +1343,8 @@
     };
     placeholder.append(createEl("div", "img-placeholder-label", placeholderLabel), createEl("div", "img-placeholder-sub", placeholderSubLabel));
     setFallbackState();
-    if (typeof src === "string" && src.length > 0) {
-      img.src = src;
+    if (normalizedSrc) {
+      img.src = normalizedSrc;
       if (img.complete) {
         if (img.naturalWidth > 0 && img.naturalHeight > 0) setLoadedState();
         else setFallbackState();
