@@ -11,7 +11,6 @@
     ATK_UP_RATIO: 0.25,
     DEF_UP_RATIO: 0.25,
     MOVE_DETAIL_PANEL_HEIGHT: 72,
-    SUMMARY_PANEL_HEIGHT: 96,
     MESSAGE_MIN_MS: 480,
     MESSAGE_AUTO_MS: 1200,
     WAIT_SHORT_MS: 220,
@@ -24,6 +23,7 @@
         offsetXPx: 0
       },
       SECTIONS: {
+        battleHeader: { widthAdjustPx: 0, offsetXPx: 0 },
         battlefield: { widthAdjustPx: 0, offsetXPx: 0 },
         messageRow: { widthAdjustPx: 0, offsetXPx: 0 },
         commandArea: { widthAdjustPx: 0, offsetXPx: 0 }
@@ -1453,7 +1453,8 @@
   };
 
   const renderBattleTopHeader = () => {
-    const header = createEl("section", "battle-header content-width");
+    const header = createEl("section", "battle-header shared-content-width");
+    applySharedContentRect(header, "battleHeader");
     const menuBtn = createEl("button", "header-util-btn", "☰");
     menuBtn.dataset.action = "toggle-menu";
     menuBtn.setAttribute("aria-label", "メニュー");
@@ -1775,32 +1776,11 @@
     return wrap;
   };
 
-  const renderCommandSummaryCards = () => {
-    const plans = createEl("div", "command-summary content-width");
-    for (let i = 0; i < CONFIG.BOARD_COLS; i += 1) {
-      const box = createEl("div", "summary-card");
-      const unit = gameState.teams.ally.active[i];
-      const cmd = gameState.confirmedCommands[i];
-      box.appendChild(createEl("div", "summary-title", `${i + 1}. ${unit ? unit.name : "-"}`));
-      if (cmd?.action?.type === "switch") {
-        box.appendChild(createEl("div", "summary-line", cmd.moveName));
-        box.appendChild(createEl("div", "summary-line", "対象: 自身スロット"));
-      } else {
-        box.appendChild(createEl("div", "summary-line", `技: ${cmd?.moveName || "未選択"}`));
-        box.appendChild(createEl("div", "summary-line", `対象: ${cmd?.targetNames?.join("、") || "未選択"}`));
-      }
-      plans.appendChild(box);
-    }
-    return plans;
-  };
-
-
   const render = () => {
     clearTempArrays();
     const app = document.getElementById("app");
     app.innerHTML = "";
     app.style.setProperty("--detail-h", `${CONFIG.MOVE_DETAIL_PANEL_HEIGHT}px`);
-    app.style.setProperty("--summary-h", `${CONFIG.SUMMARY_PANEL_HEIGHT}px`);
     app.style.setProperty("--hl-attacker", CONFIG.HIGHLIGHT_COLORS.attackSource);
     app.style.setProperty("--hl-target-single", CONFIG.HIGHLIGHT_COLORS.attackTargetSingle);
     app.style.setProperty("--hl-target-aoe", CONFIG.HIGHLIGHT_COLORS.attackTargetAoe);
@@ -1818,7 +1798,6 @@
     main.appendChild(battleStage);
     if (gameState.phase !== PHASE.GAMEOVER) {
       main.appendChild(renderCommandArea());
-      if (!isKoReplacementPhase()) main.appendChild(renderCommandSummaryCards());
     }
     app.append(main);
     const logModal = renderLogModal();
