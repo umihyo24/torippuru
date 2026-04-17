@@ -30,6 +30,8 @@ body {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
   position: relative;
   --content-max-width: 920px;
+  --shared-content-max-width: var(--content-max-width);
+  --shared-content-offset-x: 0px;
 }
 
 .main {
@@ -43,6 +45,12 @@ body {
 .content-width {
   width: min(100%, var(--content-max-width));
   margin-inline: auto;
+}
+
+.shared-content-width {
+  width: min(100%, var(--section-max-width-px, var(--shared-content-max-width)));
+  margin-inline: auto;
+  transform: translateX(var(--section-offset-x-px, var(--shared-content-offset-x)));
 }
 
 .battle-stage {

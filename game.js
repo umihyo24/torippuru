@@ -18,6 +18,17 @@
     HP_ANIM_MS: 520,
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
+    UI_LAYOUT: {
+      SHARED_CONTENT_COLUMN: {
+        maxWidthPx: 920,
+        offsetXPx: 0
+      },
+      SECTIONS: {
+        battlefield: { widthAdjustPx: 0, offsetXPx: 0 },
+        messageRow: { widthAdjustPx: 0, offsetXPx: 0 },
+        commandArea: { widthAdjustPx: 0, offsetXPx: 0 }
+      }
+    },
     TIEBREAKER_TEAM_ORDER: ["ally", "enemy"],
     HIGHLIGHT_COLORS: {
       attackSource: "#ffe163",
@@ -1349,6 +1360,26 @@
     return el;
   };
 
+  const getSharedContentRect = (sectionKey) => {
+    const base = CONFIG.UI_LAYOUT?.SHARED_CONTENT_COLUMN || {};
+    const section = CONFIG.UI_LAYOUT?.SECTIONS?.[sectionKey] || {};
+    const baseMaxWidth = Number(base.maxWidthPx) || 0;
+    const baseOffsetX = Number(base.offsetXPx) || 0;
+    const widthAdjust = Number(section.widthAdjustPx) || 0;
+    const sectionOffsetX = Number(section.offsetXPx) || 0;
+    return {
+      maxWidthPx: Math.max(0, baseMaxWidth + widthAdjust),
+      offsetXPx: baseOffsetX + sectionOffsetX
+    };
+  };
+
+  const applySharedContentRect = (el, sectionKey) => {
+    if (!el) return;
+    const rect = getSharedContentRect(sectionKey);
+    el.style.setProperty("--section-max-width-px", `${rect.maxWidthPx}px`);
+    el.style.setProperty("--section-offset-x-px", `${rect.offsetXPx}px`);
+  };
+
   const createImageWithFallback = ({ src, alt, mirror = false, wrapperClass = "portrait-wrap", placeholderLabel = "画像なし", placeholderSubLabel = "NO SIGNAL" }) => {
     const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
     const img = document.createElement("img");
@@ -1441,7 +1472,8 @@
   };
 
   const renderBattleMessageBox = () => {
-    const nav = createEl("button", "nav-message content-width");
+    const nav = createEl("button", "nav-message shared-content-width");
+    applySharedContentRect(nav, "messageRow");
     nav.dataset.action = "fast-forward";
     nav.disabled = !isPlaybackBusy();
     nav.appendChild(createEl("div", "nav-message-text", getNavigationMessageText()));
@@ -1639,7 +1671,8 @@
   };
 
   const renderBattlefield = () => {
-    const board = createEl("section", "battlefield content-width");
+    const board = createEl("section", "battlefield shared-content-width");
+    applySharedContentRect(board, "battlefield");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
 
     board.append(
@@ -1652,7 +1685,8 @@
   };
 
   const renderCommandArea = () => {
-    const wrap = createEl("div", "command content-width");
+    const wrap = createEl("div", "command shared-content-width");
+    applySharedContentRect(wrap, "commandArea");
     if (isPlaybackBusy()) wrap.classList.add("disabled");
     const actor = getCurrentActor();
     if (isKoReplacementPhase()) {
