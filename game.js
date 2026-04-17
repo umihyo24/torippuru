@@ -49,17 +49,17 @@
     backgrounds: { battle: "./assets/backgrounds/background_battle.jpg" },
     icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
     portraits: {
-      emberlynx: "./assets/portraits/ally_emberlynx.png",
-      hittokage: "./assets/portraits/ally_hittokage.png",
-      mossblob: "./assets/portraits/ally_mossblob.png",
-      frostfang: "./assets/portraits/ally_frostfang.png",
-      stormimp: "./assets/portraits/ally_stormimp.png",
-      ironboar: "./assets/portraits/ally_ironboar.png",
-      wyvern: "./assets/portraits/enemy_wyvern.png",
-      golem: "./assets/portraits/enemy_golem.png",
-      thunderroc: "./assets/portraits/enemy_thunderroc.png",
-      venomtoad: "./assets/portraits/enemy_venomtoad.png",
-      duskmoth: "./assets/portraits/enemy_duskmoth.png"
+      emberlynx: "./assets/portraits/emberlynx.png",
+      hittokage: "./assets/portraits/hittokage.png",
+      mossblob: "./assets/portraits/mossblob.png",
+      frostfang: "./assets/portraits/frostfang.png",
+      stormimp: "./assets/portraits/stormimp.png",
+      ironboar: "./assets/portraits/ironboar.png",
+      wyvern: "./assets/portraits/wyvern.png",
+      golem: "./assets/portraits/golem.png",
+      shinju: "./assets/portraits/shinju.png",
+      venomtoad: "./assets/portraits/venomtoad.png",
+      duskmoth: "./assets/portraits/duskmoth.png"
     }
   };
 
@@ -117,7 +117,7 @@
     ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
     wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
-    thunderroc: { id: "thunderroc", name: "サンダーロック", portrait: "thunderroc", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
+    shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
 
   const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ" };
@@ -153,8 +153,6 @@
       unitId: base.id,
       name: base.name,
       portrait: base.portrait,
-      allyPortrait: base.allyPortrait || null,
-      enemyPortrait: base.enemyPortrait || null,
       team,
       slot,
       hp: base.hp,
@@ -177,7 +175,7 @@
     battlefield: { background: getAssetPath("backgrounds", "battle") },
     teams: {
       ally: { active: [createUnit("emberlynx", TEAM.ALLY, 0), createUnit("hittokage", TEAM.ALLY, 1), createUnit("frostfang", TEAM.ALLY, 2)], reserve: [createUnit("stormimp", TEAM.ALLY, "r0"), createUnit("ironboar", TEAM.ALLY, "r1")], statuses: [], tileEffects: [[], [], []] },
-      enemy: { active: [createUnit("wyvern", TEAM.ENEMY, 0), createUnit("golem", TEAM.ENEMY, 1), createUnit("thunderroc", TEAM.ENEMY, 2)], reserve: [], statuses: [], tileEffects: [[], [], []] }
+      enemy: { active: [createUnit("wyvern", TEAM.ENEMY, 0), createUnit("golem", TEAM.ENEMY, 1), createUnit("shinju", TEAM.ENEMY, 2)], reserve: [], statuses: [], tileEffects: [[], [], []] }
     },
     globalStatuses: [],
     confirmedCommands: [null, null, null],
@@ -1545,8 +1543,7 @@
 
   const getUnitPortraitPath = (unit) => {
     if (!unit) return "";
-    const sideSpecificKey = unit.team === TEAM.ALLY ? unit.allyPortrait : unit.enemyPortrait;
-    return getAssetPath("portraits", sideSpecificKey || unit.portrait);
+    return getAssetPath("portraits", unit.portrait);
   };
 
   const renderBattleSprite = (unit) => {
