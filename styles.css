@@ -36,15 +36,10 @@ body {
 
 .main {
   display: grid;
-  grid-template-rows: auto 1fr auto auto var(--summary-h, 96px);
+  grid-template-rows: auto 1fr auto auto;
   gap: 8px;
   padding: 10px;
   background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
-}
-
-.content-width {
-  width: min(100%, var(--content-max-width));
-  margin-inline: auto;
 }
 
 .shared-content-width {
@@ -617,42 +612,6 @@ button:disabled {
 .type-light { background: #82723a; }
 .type-shadow { background: #4b3f63; }
 .icon { margin-right: 4px; }
-
-.command-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  font-size: 12px;
-  height: var(--summary-h, 128px);
-  min-height: var(--summary-h, 128px);
-  max-height: var(--summary-h, 128px);
-}
-
-.summary-card {
-  border: 1px solid #5f739d;
-  border-radius: 6px;
-  padding: 6px;
-  background: rgba(24, 31, 50, 0.8);
-  min-height: 0;
-  overflow: hidden;
-  display: grid;
-  align-content: start;
-  gap: 4px;
-}
-
-.summary-title {
-  font-weight: 700;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-
-.summary-line {
-  color: #deebff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .log {
   border: 1px solid rgba(122, 144, 194, 0.55);
