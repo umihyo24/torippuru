@@ -180,6 +180,7 @@
   };
 
   let UID_COUNTER = 1;
+  const backgroundLoadState = new Map();
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const byTeamOrder = (team) => CONFIG.TIEBREAKER_TEAM_ORDER.indexOf(team);
   const isAlive = (u) => !!u && u.hp > 0;
@@ -1623,17 +1624,20 @@
     if (!boardEl) return;
     const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
     const normalizedSrc = typeof src === "string" ? src.trim() : "";
-    const previousSrc = boardEl.dataset.bgSrc || "";
-    if (previousSrc === normalizedSrc) return;
-    boardEl.dataset.bgSrc = normalizedSrc;
     boardEl.style.backgroundImage = gradient;
     if (!normalizedSrc) return;
+    const cachedStatus = backgroundLoadState.get(normalizedSrc);
+    if (cachedStatus === "loaded") {
+      boardEl.style.backgroundImage = `${gradient}, url('${normalizedSrc}')`;
+      return;
+    }
+    if (cachedStatus === "loading" || cachedStatus === "error") return;
+    backgroundLoadState.set(normalizedSrc, "loading");
     const bg = new Image();
     bg.onload = () => {
-      if (boardEl.dataset.bgSrc !== normalizedSrc) return;
-      boardEl.style.backgroundImage = `${gradient}, url('${normalizedSrc}')`;
+      backgroundLoadState.set(normalizedSrc, "loaded");
     };
-    bg.onerror = () => { boardEl.style.backgroundImage = gradient; };
+    bg.onerror = () => { backgroundLoadState.set(normalizedSrc, "error"); };
     bg.src = normalizedSrc;
   };
 
