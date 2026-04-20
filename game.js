@@ -237,9 +237,10 @@
     ui: {
       commandMode: "fight",
       previewTargets: [],
-      selectedReserveIndex: null,
-      selectedReplacementReserveIndex: null,
-      selectedSwitchDestination: null,
+      hoverSlot: null,
+      switchSelection: null,
+      pendingKoSlot: null,
+      selectedAction: null,
       targetCandidates: [],
       fastForwardRequested: false,
       isLogOpen: false,
@@ -561,12 +562,24 @@
 
     const turnResult = {
       turnNumber: gameState.turn,
-      startStepResults: { abilityStatuses: [], statBoosts: [] },
+      switchStepResults: [],
+      turnStartStepResults: { abilityStatuses: [], statBoosts: [] },
       actionResults: [],
       endStepResults: { poisonTicks: [], expiredStatuses: [], expiredFieldEffects: [] },
       nextState: { winner: null }
     };
     const switchInsThisTurn = [];
+    const getCurrentFieldMonsters = () => {
+      const out = [];
+      [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+        const activeList = sim?.teams?.[team]?.active;
+        if (!Array.isArray(activeList)) return;
+        activeList.forEach((unit) => {
+          if (unit && isAlive(unit)) out.push(unit);
+        });
+      });
+      return out;
+    };
 
     const processForcedSwitchIfNeeded = () => {
       switchInsThisTurn.forEach((entry) => {
@@ -587,40 +600,38 @@
     };
 
     const processTurnStartPassives = () => {
-      for (const team of [TEAM.ALLY, TEAM.ENEMY]) {
-        sim.teams[team].active.forEach((unit) => {
-          if (!unit || !isAlive(unit) || !unit.abilityId) return;
-          const ability = ABILITIES[unit.abilityId];
-          (ability?.onTurnStart || []).forEach((e) => {
-            if (e.type === "applyStatus") {
-              addStatus(unit, e.status, e.duration);
-              turnResult.startStepResults.abilityStatuses.push({
-                sourceId: unit.uid,
-                sourceName: unit.name,
-                traitKind: unit.abilityId || "ability",
-                targetId: unit.uid,
-                targetName: unit.name,
-                statusId: e.status,
-                duration: e.duration
-              });
-              return;
-            }
-            if (e.type === "addAtkStage") {
-              const amount = Math.max(0, Number(e.amount) || 0);
-              if (!amount) return;
-              unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, 0, CONFIG.CRIT_STAGE_MAX);
-              turnResult.startStepResults.statBoosts.push({
-                sourceId: unit.uid,
-                sourceName: unit.name,
-                traitKind: unit.abilityId || "ability",
-                targetId: unit.uid,
-                targetName: unit.name,
-                amount
-              });
-            }
-          });
+      getCurrentFieldMonsters().forEach((unit) => {
+        if (!unit?.abilityId) return;
+        const ability = ABILITIES[unit.abilityId];
+        (ability?.onTurnStart || []).forEach((e) => {
+          if (e.type === "applyStatus") {
+            addStatus(unit, e.status, e.duration);
+            turnResult.turnStartStepResults.abilityStatuses.push({
+              sourceId: unit.uid,
+              sourceName: unit.name,
+              traitKind: unit.abilityId || "ability",
+              targetId: unit.uid,
+              targetName: unit.name,
+              statusId: e.status,
+              duration: e.duration
+            });
+            return;
+          }
+          if (e.type === "addAtkStage") {
+            const amount = Math.max(0, Number(e.amount) || 0);
+            if (!amount) return;
+            unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, 0, CONFIG.CRIT_STAGE_MAX);
+            turnResult.turnStartStepResults.statBoosts.push({
+              sourceId: unit.uid,
+              sourceName: unit.name,
+              traitKind: unit.abilityId || "ability",
+              targetId: unit.uid,
+              targetName: unit.name,
+              amount
+            });
+          }
         });
-      }
+      });
     };
 
     const runSwitchAction = (action) => {
@@ -671,7 +682,7 @@
         enterStatusApplies: []
       };
       switchInsThisTurn.push(actionResult);
-      turnResult.actionResults.push(actionResult);
+      turnResult.switchStepResults.push(actionResult);
     };
 
     switchActions.forEach(runSwitchAction);
@@ -799,7 +810,30 @@
 
   const buildBattleEventQueue = (turnResult) => {
     const q = [];
-    turnResult.startStepResults.abilityStatuses.forEach((s) => {
+    turnResult.switchStepResults.forEach((a) => {
+      q.push({ type: "message", text: "交代処理", loggable: true });
+      q.push({ type: "message", text: `${a.reserveOut.name}は 交代した！`, loggable: true });
+      q.push({
+        type: "switchApply",
+        playerId: a.playerId ?? a.team,
+        team: a.team,
+        slotIndex: a.slotIndex ?? a.slot,
+        slot: a.slot,
+        incomingUnitId: a.incomingUnitId ?? a.reserveIn?.uid,
+        reserveIndex: a.reserveIndex ?? a.reserveIn?.reserveIndex
+      });
+      q.push({ type: "message", text: "交代完了", loggable: true });
+      q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
+      q.push({ type: "message", text: "交代後特性発動", loggable: true });
+      (a.enterStatusApplies || []).forEach((s) => q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration }));
+      (a.enterEffects || []).forEach((line) => q.push({ type: "message", text: line, loggable: true }));
+      q.push({ type: "wait", duration: CONFIG.WAIT_SHORT_MS });
+    });
+    const hasTurnStartPassives = (turnResult.turnStartStepResults.abilityStatuses.length > 0 || turnResult.turnStartStepResults.statBoosts.length > 0);
+    if (hasTurnStartPassives) {
+      q.push({ type: "message", text: "場のモンスターの特性発動", loggable: true });
+    }
+    turnResult.turnStartStepResults.abilityStatuses.forEach((s) => {
       const abilityName = ABILITY_LABELS[s.traitKind] || s.traitKind || "ability";
       q.push({
         type: "battleHighlight",
@@ -814,7 +848,7 @@
       q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration });
       q.push({ type: "clearBattleHighlight" });
     });
-    turnResult.startStepResults.statBoosts.forEach((boost) => {
+    turnResult.turnStartStepResults.statBoosts.forEach((boost) => {
       const abilityName = ABILITY_LABELS[boost.traitKind] || boost.traitKind || "ability";
       q.push({
         type: "battleHighlight",
@@ -833,24 +867,6 @@
         q.push({ type: "message", text: `${a.actorName}は 行動できない！`, loggable: true });
         return;
       }
-      if (a.type === "switch") {
-        q.push({ type: "message", text: `${a.reserveOut.name}は 交代した！`, loggable: true });
-        q.push({
-          type: "switchApply",
-          playerId: a.playerId ?? a.team,
-          team: a.team,
-          slotIndex: a.slotIndex ?? a.slot,
-          slot: a.slot,
-          incomingUnitId: a.incomingUnitId ?? a.reserveIn?.uid,
-          reserveIndex: a.reserveIndex ?? a.reserveIn?.reserveIndex
-        });
-        q.push({ type: "message", text: `${a.reserveIn.name}が 場に出た！`, loggable: true });
-        (a.enterStatusApplies || []).forEach((s) => q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration }));
-        a.enterEffects.forEach((line) => q.push({ type: "message", text: line, loggable: true }));
-        q.push({ type: "wait", duration: CONFIG.WAIT_SHORT_MS });
-        return;
-      }
-
       const targetIds = a.targets.map((t) => t.targetId).filter(Boolean);
       const isAoe = a.targets.length > 1;
       q.push({
@@ -1163,6 +1179,11 @@
 
   const getCurrentActor = () => gameState.teams.ally.active[gameState.currentActorIndex] || null;
   const getSelectedMove = () => MOVES[gameState.selectedMoveId] || null;
+  const clearSwitchUiState = () => {
+    gameState.ui.hoverSlot = null;
+    gameState.ui.switchSelection = null;
+    gameState.ui.pendingKoSlot = null;
+  };
 
   const findNextLivingAllySlot = (from = -1) => {
     for (let i = from + 1; i < CONFIG.BOARD_COLS; i += 1) if (isAlive(gameState.teams.ally.active[i])) return i;
@@ -1174,9 +1195,8 @@
     gameState.selectedTargets = [];
     gameState.ui.previewTargets = [];
     gameState.ui.targetCandidates = [];
-    gameState.ui.selectedReserveIndex = null;
-    gameState.ui.selectedReplacementReserveIndex = null;
-    gameState.ui.selectedSwitchDestination = null;
+    clearSwitchUiState();
+    gameState.ui.selectedAction = null;
   };
 
   const isKoReplacementPhase = () => gameState.battleFlow.mode === "replacement";
@@ -1192,7 +1212,7 @@
     gameState.battleFlow.koReplacement.activeTeam = team;
     gameState.battleFlow.koReplacement.pendingSlots = getPendingKoReplacementSlots(team);
     gameState.battleFlow.currentMessage = "Choose a reserve monster to replace a defeated ally.";
-    gameState.ui.selectedReplacementReserveIndex = null;
+    clearSwitchUiState();
     gameState.ui.commandMode = "fight";
     appendBattleLogEntry(`— ${team === TEAM.ALLY ? "Ally" : "Enemy"} KO Replacement —`);
   };
@@ -1212,8 +1232,11 @@
     if (!replacement) return false;
     const enter = resolveUnitOnEnterEffects({ state: gameState, team, slot, unit: replacement.incoming });
     if (withLog) {
-      appendBattleLogEntry(`[${replacement.incoming.name}] entered the battle!`);
+      appendBattleLogEntry("交代処理");
+      appendBattleLogEntry("交代完了");
+      appendBattleLogEntry("交代後特性発動");
       enter.messages.forEach((line) => appendBattleLogEntry(line));
+      appendBattleLogEntry("場のモンスターの特性発動");
     }
     return { enteredUnit: replacement.incoming, enterMessages: enter.messages };
   };
@@ -1339,6 +1362,7 @@
     if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || isKoReplacementPhase()) return;
     gameState.ui.commandMode = mode;
     clearTargetPreview();
+    gameState.ui.selectedAction = mode;
   };
 
   const setFightMove = (moveId) => {
@@ -1348,6 +1372,7 @@
     const move = MOVES[moveId];
     const cands = getValidTargetsForMoveInState(gameState, actor, move);
     gameState.selectedMoveId = moveId;
+    gameState.ui.selectedAction = "fight";
     gameState.ui.previewTargets = cands.map((c) => ({ x: c.x, y: c.y }));
     gameState.ui.targetCandidates = cands;
   };
@@ -1379,13 +1404,15 @@
     if (isKoReplacementPhase()) {
       const pending = gameState.battleFlow.koReplacement.pendingSlots;
       if (gameState.battleFlow.koReplacement.activeTeam !== TEAM.ALLY) return;
-      if (y !== 1 || !pending.includes(x) || gameState.ui.selectedReplacementReserveIndex === null) return;
-      const reserveIndex = gameState.ui.selectedReplacementReserveIndex;
+      gameState.ui.pendingKoSlot = y === 1 ? x : null;
+      const selectedReserveIndex = gameState.ui.switchSelection?.mode === "koReplacement" ? gameState.ui.switchSelection.reserveIndex : null;
+      if (y !== 1 || !pending.includes(x) || selectedReserveIndex === null) return;
+      const reserveIndex = selectedReserveIndex;
       const reserve = gameState.teams.ally.reserve[reserveIndex];
       if (!reserve || !isAlive(reserve)) return;
       const result = applyKoReplacement({ team: TEAM.ALLY, reserveIndex, slot: x, withLog: true });
       if (!result) return;
-      gameState.ui.selectedReplacementReserveIndex = null;
+      clearSwitchUiState();
       gameState.battleFlow.koReplacement.pendingSlots = getPendingKoReplacementSlots(TEAM.ALLY);
       if (!gameState.battleFlow.koReplacement.pendingSlots.length) {
         const winner = getWinnerFromRemainingUnits(gameState);
@@ -1396,6 +1423,7 @@
         }
         gameState.battleFlow.mode = "command";
         gameState.battleFlow.currentMessage = "わざを選んでください。";
+        clearSwitchUiState();
         initializePlanningTurn();
       }
       return;
@@ -1411,7 +1439,7 @@
     if (isKoReplacementPhase()) {
       const reserve = gameState.teams.ally.reserve[reserveIndex];
       if (!reserve || !isAlive(reserve)) return;
-      gameState.ui.selectedReplacementReserveIndex = reserveIndex;
+      gameState.ui.switchSelection = { mode: "koReplacement", reserveIndex };
       return;
     }
     const reserve = gameState.teams.ally.reserve[reserveIndex];
@@ -1426,16 +1454,17 @@
       .map((a) => a.actorId);
     const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
     if (!candidates.some((c) => c.index === reserveIndex && c.unit?.uid === reserve.uid)) return;
-    gameState.ui.selectedReserveIndex = reserveIndex;
+    gameState.ui.switchSelection = { mode: "commandSwitch", reserveIndex };
   };
 
   const confirmCurrentSwitchAction = () => {
     if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || isKoReplacementPhase()) return;
     const actor = getCurrentActor();
-    if (!actor || !isAlive(actor) || gameState.ui.selectedReserveIndex === null) return;
+    const selectedReserveIndex = gameState.ui.switchSelection?.mode === "commandSwitch" ? gameState.ui.switchSelection.reserveIndex : null;
+    if (!actor || !isAlive(actor) || selectedReserveIndex === null) return;
     const state = getStatusState(actor);
     if (!state.canSwitch) return;
-    const reserve = gameState.teams.ally.reserve[gameState.ui.selectedReserveIndex];
+    const reserve = gameState.teams.ally.reserve[selectedReserveIndex];
     if (!reserve) return;
     const alreadyPickedTargetIds = gameState.confirmedCommands
       .map((c) => c?.action)
@@ -1446,7 +1475,7 @@
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
     const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
-    if (!candidates.some((c) => c.index === gameState.ui.selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
+    if (!candidates.some((c) => c.index === selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
     gameState.confirmedCommands[gameState.currentActorIndex] = {
       actorId: actor.uid,
       actorName: actor.name,
@@ -1618,7 +1647,7 @@
     if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
     if (isPlaybackBusy()) return getCurrentPlaybackMessage() || "戦闘演出中…";
     if (isKoReplacementPhase()) return "Choose a reserve monster to replace a defeated ally.";
-    if (gameState.ui.commandMode === "switch") return gameState.ui.selectedReserveIndex === null ? "交代する控えを選んでください。" : "選択中の交代先で確定してください。";
+    if (gameState.ui.commandMode === "switch") return gameState.ui.switchSelection?.mode === "commandSwitch" ? "選択中の交代先で確定してください。" : "交代する控えを選んでください。";
     if (!getSelectedMove()) return "わざを選んでください。";
     return getSelectedMove().targetMode === "single" ? "ハイライトされたマスから対象を選んでください。" : "このわざはハイライト対象全員に当たります。";
   };
@@ -1741,6 +1770,7 @@
       && gameState.battleFlow.koReplacement.activeTeam === TEAM.ALLY
       && y === 1
       && gameState.battleFlow.koReplacement.pendingSlots.includes(x);
+    const selectedKoReplacement = gameState.ui.switchSelection?.mode === "koReplacement" ? gameState.ui.switchSelection : null;
     if (candidate) cell.classList.add(y === 0 ? "valid-enemy" : "valid-ally");
     if (replacementCandidate) cell.classList.add("valid-ally", "replacement-target");
 
@@ -1759,7 +1789,7 @@
         else if (highlight.effectType === "aoe") cell.classList.add("targeted-aoe");
         else cell.classList.add("targeted-single");
       }
-    } else if (replacementCandidate && gameState.ui.selectedReplacementReserveIndex !== null) {
+    } else if (replacementCandidate && selectedKoReplacement && gameState.ui.pendingKoSlot === x) {
       cell.classList.add("targeted");
     } else if (!isPlaybackBusy() && gameState.phase === PHASE.PLAYING && y === 1 && x === gameState.currentActorIndex) {
       cell.classList.add("active-actor");
@@ -1870,7 +1900,8 @@
       wrap.appendChild(createEl("div", "mini", "Choose a reserve monster to replace a defeated ally."));
       const switches = createEl("div", "switches");
       gameState.teams.ally.reserve.forEach((u, idx) => {
-        const btn = createEl("button", `reserve-card${gameState.ui.selectedReplacementReserveIndex === idx ? " active" : ""}`);
+        const isActive = gameState.ui.switchSelection?.mode === "koReplacement" && gameState.ui.switchSelection.reserveIndex === idx;
+        const btn = createEl("button", `reserve-card${isActive ? " active" : ""}`);
         btn.dataset.action = "pick-reserve";
         btn.dataset.reserveIndex = String(idx);
         btn.disabled = !u || !isAlive(u);
@@ -1931,7 +1962,8 @@
       const allowedCandidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
       const allowedIndexSet = new Set(allowedCandidates.map((entry) => entry.index));
       gameState.teams.ally.reserve.forEach((u, idx) => {
-        const btn = createEl("button", `reserve-card${gameState.ui.selectedReserveIndex === idx ? " active" : ""}`);
+        const isActive = gameState.ui.switchSelection?.mode === "commandSwitch" && gameState.ui.switchSelection.reserveIndex === idx;
+        const btn = createEl("button", `reserve-card${isActive ? " active" : ""}`);
         btn.dataset.action = "pick-reserve";
         btn.dataset.reserveIndex = String(idx);
         const blocked = !u || !allowedIndexSet.has(idx);
@@ -1945,7 +1977,7 @@
       const btn = createEl("button", "dest-btn", "交代を確定");
       btn.dataset.action = "pick-destination";
       btn.dataset.toSlot = String(gameState.currentActorIndex);
-      btn.disabled = isPlaybackBusy() || gameState.ui.selectedReserveIndex === null || !actorStatusState.canSwitch;
+      btn.disabled = isPlaybackBusy() || gameState.ui.switchSelection?.mode !== "commandSwitch" || !actorStatusState.canSwitch;
       dests.appendChild(btn);
       wrap.appendChild(dests);
     }
@@ -1989,11 +2021,11 @@
     if (!hasHpAnimations && !hasPlayback) return;
     updateHpAnimations(now);
     if (hasPlayback) updateBattlePlayback(now);
-    render();
   };
 
   const loop = (now) => {
     update(now);
+    render();
     requestAnimationFrame(loop);
   };
 
@@ -2021,6 +2053,18 @@
       event.preventDefault();
       dispatch({ type: "FAST_FORWARD" });
     }
+  });
+
+  document.addEventListener("mousemove", (event) => {
+    if (!isKoReplacementPhase()) return;
+    const target = event.target?.closest?.("[data-action='target-cell']");
+    const x = Number(target?.dataset?.x);
+    const y = Number(target?.dataset?.y);
+    const nextHover = Number.isInteger(x) && y === 1 ? x : null;
+    if (gameState.ui.hoverSlot === nextHover) return;
+    gameState.ui.hoverSlot = nextHover;
+    gameState.ui.pendingKoSlot = nextHover;
+    render();
   });
 
   initializePlanningTurn();
