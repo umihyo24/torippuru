@@ -54,7 +54,7 @@
   const PHASE = { START: "start", PLAYING: "playing", GAMEOVER: "gameover" };
 
   const ASSETS = {
-    backgrounds: { battle: "./assets/backgrounds/background_battle.jpg" },
+    backgrounds: { battle: "./assets/backgrounds/background_battle.png" },
     icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
     portraits: {
       emberlynx: "./assets/portraits/emberlynx.png",
@@ -1620,13 +1620,21 @@
   };
 
   const applyBoardBackgroundWithFallback = (boardEl, src) => {
+    if (!boardEl) return;
     const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
+    const normalizedSrc = typeof src === "string" ? src.trim() : "";
+    const previousSrc = boardEl.dataset.bgSrc || "";
+    if (previousSrc === normalizedSrc) return;
+    boardEl.dataset.bgSrc = normalizedSrc;
     boardEl.style.backgroundImage = gradient;
-    if (!src) return;
+    if (!normalizedSrc) return;
     const bg = new Image();
-    bg.onload = () => { boardEl.style.backgroundImage = `${gradient}, url('${src}')`; };
+    bg.onload = () => {
+      if (boardEl.dataset.bgSrc !== normalizedSrc) return;
+      boardEl.style.backgroundImage = `${gradient}, url('${normalizedSrc}')`;
+    };
     bg.onerror = () => { boardEl.style.backgroundImage = gradient; };
-    bg.src = src;
+    bg.src = normalizedSrc;
   };
 
   const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
