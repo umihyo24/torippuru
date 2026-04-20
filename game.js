@@ -10,6 +10,7 @@
     BARRIER_RATIO: 0.5,
     ATK_UP_RATIO: 0.25,
     DEF_UP_RATIO: 0.25,
+    CRIT_MULTIPLIER: 1.5,
     MOVE_DETAIL_PANEL_HEIGHT: 72,
     MESSAGE_MIN_MS: 480,
     MESSAGE_AUTO_MS: 1200,
@@ -88,7 +89,8 @@
     ironGuard: { id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }], afterDamage: [] },
     rallyHowl: { id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0, patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
     shellStance: { id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }], afterDamage: [] },
-    venomBless: { id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] }
+    venomBless: { id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
+    focusMind: { id: "focusMind", name: "フォーカス", category: "status", type: "light", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "focus" }], afterDamage: [] }
   };
 
   const STATUSES = {
@@ -96,6 +98,7 @@
     barrier: { kind: "barrier", category: "barrier", duration: 2, tags: ["barrier"] },
     atkUp: { kind: "atkUp", category: "buffAtk", duration: 2, tags: ["buff", "atk"] },
     defUp: { kind: "defUp", category: "buffDef", duration: 2, tags: ["buff", "def"] },
+    focus: { kind: "focus", category: "buffFocus", duration: CONFIG.MAX_TURNS, tags: ["buff", "crit"] },
     bind: { kind: "bind", category: "debuffBind", duration: 2, tags: ["debuff", "bind"] }
   };
 
@@ -113,25 +116,27 @@
     hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 94, atk: 34, def: 26, spd: 27, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
     frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
-    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "venomBless", "ironGuard"] },
+    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "ironGuard"] },
     ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
     wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
     shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
 
-  const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ" };
+  const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ", focus: "しゅうちゅう" };
   const STATUS_APPLY_TEXT = {
     poison: (n) => `${n}は どくを うけた！`,
     barrier: (n) => `${n}は バリアに守られた！`,
     atkUp: (n) => `${n}の こうげきが上がった！`,
-    defUp: (n) => `${n}の ぼうぎょが上がった！`
+    defUp: (n) => `${n}の ぼうぎょが上がった！`,
+    focus: (n) => `${n}は しゅうちゅうしている！`
   };
   const STATUS_FADE_TEXT = {
     poison: (n) => `${n}の どくが消えた。`,
     barrier: (n) => `${n}の バリアが消えた。`,
     atkUp: (n) => `${n}の こうげきアップが切れた。`,
-    defUp: (n) => `${n}の ぼうぎょアップが切れた。`
+    defUp: (n) => `${n}の ぼうぎょアップが切れた。`,
+    focus: (n) => `${n}の しゅうちゅうが切れた。`
   };
   const ABILITY_LABELS = {
     venomTouch: "ベノムタッチ",
@@ -280,18 +285,26 @@
     gameState.battleHighlight.removeKind = removeKind;
   };
 
-  const getEffectiveStat = (unit, key) => {
+  const getEffectiveStat = (unit, key, options = {}) => {
+    const { ignoreDefUp = false } = options;
     let value = unit[key];
     if (key === "atk" && findStatus(unit.statuses, "atkUp")) value = Math.floor(value * (1 + CONFIG.ATK_UP_RATIO));
-    if (key === "def" && findStatus(unit.statuses, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
+    if (key === "def" && !ignoreDefUp && findStatus(unit.statuses, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
     return value;
   };
 
-  const calcDamage = (attacker, defender, move) => {
+  const isCriticalHit = (attacker, move) => {
+    if (!attacker || !move || move.category !== "attack") return false;
+    return !!move.alwaysCrit || !!findStatus(attacker.statuses, "focus");
+  };
+
+  const calcDamage = (attacker, defender, move, options = {}) => {
+    const { isCritical = false } = options;
     const atk = getEffectiveStat(attacker, "atk") + Math.floor(move.power / 10);
-    const def = getEffectiveStat(defender, "def");
+    const def = getEffectiveStat(defender, "def", { ignoreDefUp: isCritical });
     let dmg = Math.max(1, atk - def);
-    if (findStatus(defender.statuses, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
+    if (!isCritical && findStatus(defender.statuses, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
+    if (isCritical) dmg = Math.max(1, Math.floor(dmg * CONFIG.CRIT_MULTIPLIER));
     return Math.min(dmg, defender.hp);
   };
 
@@ -564,14 +577,15 @@
       const targets = move.targetMode === "single"
         ? (action.targetPos ? [{ x: action.targetPos.x, y: action.targetPos.y }] : [])
         : patternPositions;
-      const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0 };
+      const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0, isCritical: false };
+      const isCritical = isCriticalHit(actor, move);
 
       targets.forEach((targetPos) => {
         if (!inBounds(targetPos)) return;
         if (!patternPositions.some((p) => p.x === targetPos.x && p.y === targetPos.y)) return;
         const target = getUnitAtFromState(sim, targetPos);
         if (!isRuleMatchAtPosition(actor, move, target)) return;
-        const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false };
+        const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false, isCritical: false };
 
         move.beforeDamage.forEach((effect) => {
           if (effect.type === "applyStatus") {
@@ -581,10 +595,12 @@
         });
 
         if (move.category === "attack") {
-          const damage = calcDamage(actor, target, move);
+          const damage = calcDamage(actor, target, move, { isCritical });
           target.hp = clamp(target.hp - damage, 0, target.maxHp);
           targetResult.damage = damage;
           targetResult.hpAfter = target.hp;
+          targetResult.isCritical = isCritical;
+          actionResult.isCritical = isCritical;
         }
 
         move.afterDamage.forEach((effect) => {
@@ -701,6 +717,7 @@
         effectType: isAoe ? "aoe" : "attack"
       });
       q.push({ type: "message", text: `${a.actorName}の ${a.moveName}！`, loggable: true });
+      if (a.isCritical) q.push({ type: "message", text: "きゅうしょに あたった！", loggable: true });
       const aoeAnimations = [];
       a.targets.forEach((t) => {
         if (t.damage > 0 || t.hpBefore !== t.hpAfter) {
@@ -1111,7 +1128,7 @@
   const scoreAction = ({ actor, move, target }) => {
     if (!target) return { score: -1, dmg: 0 };
     if (move.category !== "attack") return { score: 2, dmg: 0 };
-    const dmg = calcDamage(actor, target, move);
+    const dmg = calcDamage(actor, target, move, { isCritical: isCriticalHit(actor, move) });
     return { score: dmg >= target.hp ? 999 + dmg : dmg, dmg };
   };
 
@@ -1128,7 +1145,7 @@
           if (!best || s.score > best.score) best = { moveId, targetPos: { x: c.x, y: c.y }, score: s.score };
         });
       } else {
-        const score = cands.reduce((sum, c) => sum + calcDamage(actor, getUnitAtFromState(gameState, { x: c.x, y: c.y }), move), 0);
+        const score = cands.reduce((sum, c) => sum + calcDamage(actor, getUnitAtFromState(gameState, { x: c.x, y: c.y }), move, { isCritical: isCriticalHit(actor, move) }), 0);
         if (!best || score > best.score) best = { moveId, targetPos: null, score };
       }
     });
