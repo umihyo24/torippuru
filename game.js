@@ -4,13 +4,20 @@
   const CONFIG = {
     BOARD_COLS: 3,
     BOARD_ROWS: 2,
+    PARTY_ACTIVE_COUNT: 3,
+    PARTY_TOTAL_COUNT: 6,
+    PARTY_RESERVE_COUNT: 3,
     MAX_LOG_LINES: 160,
     MAX_TURNS: 60,
     POISON_RATIO: 0.1,
     BARRIER_RATIO: 0.5,
     ATK_UP_RATIO: 0.25,
     DEF_UP_RATIO: 0.25,
+    TURN_START_ATK_STAGE_RATIO: 0.08,
     CRIT_MULTIPLIER: 1.5,
+    CRIT_BASE_RATE: 0.08,
+    CRIT_STAGE_RATE: 0.18,
+    CRIT_STAGE_MAX: 3,
     MOVE_DETAIL_PANEL_HEIGHT: 72,
     MESSAGE_MIN_MS: 480,
     MESSAGE_AUTO_MS: 1200,
@@ -90,7 +97,31 @@
     rallyHowl: { id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0, patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
     shellStance: { id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }], afterDamage: [] },
     venomBless: { id: "venomBless", name: "ベノムブレス", category: "status", type: "shadow", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
-    focusMind: { id: "focusMind", name: "フォーカス", category: "status", type: "light", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "focus" }], afterDamage: [] }
+    focusMind: {
+      id: "focusMind",
+      name: "精神集中",
+      category: "status",
+      type: "light",
+      power: 0,
+      patternId: "self",
+      targetRule: "selfOnly",
+      targetMode: "single",
+      beforeDamage: [{ type: "modifyCritStage", stages: 1, duration: 2, target: "self" }],
+      afterDamage: []
+    },
+    precisionStrike: {
+      id: "precisionStrike",
+      name: "クリティカルテスト",
+      category: "attack",
+      type: "light",
+      power: 26,
+      patternId: "singleAttackReach",
+      targetRule: "anyOtherSingle",
+      targetMode: "single",
+      guaranteedCrit: true,
+      beforeDamage: [],
+      afterDamage: []
+    }
   };
 
   const STATUSES = {
@@ -98,49 +129,50 @@
     barrier: { kind: "barrier", category: "barrier", duration: 2, tags: ["barrier"] },
     atkUp: { kind: "atkUp", category: "buffAtk", duration: 2, tags: ["buff", "atk"] },
     defUp: { kind: "defUp", category: "buffDef", duration: 2, tags: ["buff", "def"] },
-    focus: { kind: "focus", category: "buffFocus", duration: CONFIG.MAX_TURNS, tags: ["buff", "crit"] },
     bind: { kind: "bind", category: "debuffBind", duration: 2, tags: ["debuff", "bind"] }
   };
 
   const ABILITIES = {
     venomTouch: { id: "venomTouch", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
-    guardianPulse: {
-      id: "guardianPulse",
-      onTurnStart: [{ type: "applyStatus", status: "barrier", duration: 1, target: "self" }],
-      onEnter: [{ type: "applyStatus", status: "barrier", duration: 1, target: "self" }]
-    }
+    battleRhythm: { id: "battleRhythm", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
+    openingSurge: { id: "openingSurge", onSwitchIn: [{ type: "addAtkStage", amount: 2, target: "self" }] }
   };
 
   const UNIT_LIBRARY = {
     emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 94, atk: 34, def: 26, spd: 27, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "guardianPulse", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
-    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "clawStrike", "rallyHowl", "shellStance"] },
-    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "ironGuard"] },
-    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "guardianPulse", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
+    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "precisionStrike", "rallyHowl", "shellStance"] },
+    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
+    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
     wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "guardianPulse", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
+    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
     shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
+  const INITIAL_PARTY = {
+    ally: ["emberlynx", "hittokage", "frostfang", "stormimp", "ironboar", "mossblob"],
+    enemy: ["wyvern", "golem", "shinju"]
+  };
 
-  const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ", focus: "しゅうちゅう" };
+  const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ", critFocus: "精神集中" };
   const STATUS_APPLY_TEXT = {
     poison: (n) => `${n}は どくを うけた！`,
     barrier: (n) => `${n}は バリアに守られた！`,
     atkUp: (n) => `${n}の こうげきが上がった！`,
     defUp: (n) => `${n}の ぼうぎょが上がった！`,
-    focus: (n) => `${n}は しゅうちゅうしている！`
+    critFocus: (n) => `${n}は 精神集中した！`,
   };
   const STATUS_FADE_TEXT = {
     poison: (n) => `${n}の どくが消えた。`,
     barrier: (n) => `${n}の バリアが消えた。`,
     atkUp: (n) => `${n}の こうげきアップが切れた。`,
     defUp: (n) => `${n}の ぼうぎょアップが切れた。`,
-    focus: (n) => `${n}の しゅうちゅうが切れた。`
+    critFocus: (n) => `${n}の 精神集中が切れた。`,
   };
   const ABILITY_LABELS = {
     venomTouch: "ベノムタッチ",
-    guardianPulse: "ガーディアンパルス"
+    battleRhythm: "バトルリズム",
+    openingSurge: "オープニングサージ"
   };
 
   let UID_COUNTER = 1;
@@ -168,6 +200,7 @@
       abilityId: base.abilityId,
       moveIds: [...base.moves],
       statuses: [],
+      buffs: { atkStage: 0, critStage: 0, critStageDuration: 0 },
       isSwitching: false,
       switchTargetId: null
     };
@@ -179,11 +212,23 @@
     winner: null,
     battlefield: { background: getAssetPath("backgrounds", "battle") },
     teams: {
-      ally: { active: [createUnit("emberlynx", TEAM.ALLY, 0), createUnit("hittokage", TEAM.ALLY, 1), createUnit("frostfang", TEAM.ALLY, 2)], reserve: [createUnit("stormimp", TEAM.ALLY, "r0"), createUnit("ironboar", TEAM.ALLY, "r1")], statuses: [], tileEffects: [[], [], []] },
-      enemy: { active: [createUnit("wyvern", TEAM.ENEMY, 0), createUnit("golem", TEAM.ENEMY, 1), createUnit("shinju", TEAM.ENEMY, 2)], reserve: [], statuses: [], tileEffects: [[], [], []] }
+      ally: {
+        active: INITIAL_PARTY.ally.slice(0, CONFIG.PARTY_ACTIVE_COUNT).map((unitId, slot) => createUnit(unitId, TEAM.ALLY, slot)),
+        reserve: INITIAL_PARTY.ally
+          .slice(CONFIG.PARTY_ACTIVE_COUNT, CONFIG.PARTY_ACTIVE_COUNT + CONFIG.PARTY_RESERVE_COUNT)
+          .map((unitId, idx) => createUnit(unitId, TEAM.ALLY, `r${idx}`)),
+        statuses: [],
+        tileEffects: [[], [], []]
+      },
+      enemy: {
+        active: INITIAL_PARTY.enemy.slice(0, CONFIG.BOARD_COLS).map((unitId, slot) => createUnit(unitId, TEAM.ENEMY, slot)),
+        reserve: [],
+        statuses: [],
+        tileEffects: [[], [], []]
+      }
     },
     globalStatuses: [],
-    confirmedCommands: [null, null, null],
+    confirmedCommands: Array.from({ length: CONFIG.BOARD_COLS }, () => null),
     plannedActions: {},
     enemyPlannedActions: {},
     currentActorIndex: 0,
@@ -289,13 +334,20 @@
     const { ignoreDefUp = false } = options;
     let value = unit[key];
     if (key === "atk" && findStatus(unit.statuses, "atkUp")) value = Math.floor(value * (1 + CONFIG.ATK_UP_RATIO));
+    if (key === "atk" && Number.isFinite(unit?.buffs?.atkStage) && unit.buffs.atkStage > 0) {
+      value = Math.floor(value * (1 + (CONFIG.TURN_START_ATK_STAGE_RATIO * unit.buffs.atkStage)));
+    }
     if (key === "def" && !ignoreDefUp && findStatus(unit.statuses, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
     return value;
   };
 
   const isCriticalHit = (attacker, move) => {
     if (!attacker || !move || move.category !== "attack") return false;
-    return !!move.alwaysCrit || !!findStatus(attacker.statuses, "focus");
+    if (move.guaranteedCrit || move.alwaysCrit) return true;
+    const critStage = clamp(Number(attacker?.buffs?.critStage) || 0, 0, CONFIG.CRIT_STAGE_MAX);
+    const bonus = Number(move.critRateBonus) || 0;
+    const chance = clamp(CONFIG.CRIT_BASE_RATE + (critStage * CONFIG.CRIT_STAGE_RATE) + bonus, 0, 1);
+    return Math.random() < chance;
   };
 
   const calcDamage = (attacker, defender, move, options = {}) => {
@@ -331,6 +383,15 @@
     if (!unit) return;
     unit.isSwitching = false;
     unit.switchTargetId = null;
+  };
+
+  const getAvailableSwitchCandidates = (state, team, excludingUids = []) => {
+    const blocked = new Set(Array.isArray(excludingUids) ? excludingUids.filter(Boolean) : []);
+    const reserve = state?.teams?.[team]?.reserve;
+    if (!Array.isArray(reserve)) return [];
+    return reserve
+      .map((unit, index) => ({ unit, index }))
+      .filter(({ unit }) => !!unit && isAlive(unit) && !blocked.has(unit.uid));
   };
 
   const replaceActiveUnitFromReserve = ({
@@ -412,12 +473,25 @@
         statusApplies.push({ targetId: unit.uid, statusId: effect.status, duration });
       });
     };
+    const applyStatEffects = (effects = [], sourceLabel = null, announceAbility = false) => {
+      if (!effects.length) return;
+      if (announceAbility && sourceLabel) messages.push(`${unit.name}の ${sourceLabel}が 発動した！`);
+      effects.forEach((effect) => {
+        if (effect.type === "addAtkStage") {
+          const amount = Math.max(0, Number(effect.amount) || 0);
+          if (amount <= 0) return;
+          unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, 0, CONFIG.CRIT_STAGE_MAX);
+          messages.push(`${unit.name}の こうげき体勢が高まった！`);
+        }
+      });
+    };
 
     state.globalStatuses.forEach((status) => applyEffects(status.onEnter, STATUS_LABELS[status.kind] || status.kind));
     state.teams[team].statuses.forEach((status) => applyEffects(status.onEnter, STATUS_LABELS[status.kind] || status.kind));
     (state.teams[team].tileEffects?.[slot] || []).forEach((tileEffect) => applyEffects(tileEffect.onEnter, tileEffect.name || tileEffect.kind || "tile effect"));
     const ability = ABILITIES[unit.abilityId];
-    applyEffects(ability?.onEnter, ability?.id || "ability", true);
+    applyEffects(ability?.onSwitchIn, ABILITY_LABELS[ability?.id] || ability?.id || "ability", true);
+    applyStatEffects(ability?.onSwitchIn, ABILITY_LABELS[ability?.id] || ability?.id || "ability", false);
 
     return { messages, statusApplies };
   };
@@ -487,31 +561,67 @@
 
     const turnResult = {
       turnNumber: gameState.turn,
-      startStepResults: { abilityStatuses: [] },
+      startStepResults: { abilityStatuses: [], statBoosts: [] },
       actionResults: [],
       endStepResults: { poisonTicks: [], expiredStatuses: [], expiredFieldEffects: [] },
       nextState: { winner: null }
     };
+    const switchInsThisTurn = [];
 
-    for (const team of [TEAM.ALLY, TEAM.ENEMY]) {
-      sim.teams[team].active.forEach((unit) => {
-        if (!unit || !isAlive(unit) || !unit.abilityId) return;
-        const ability = ABILITIES[unit.abilityId];
-        (ability?.onTurnStart || []).forEach((e) => {
-          if (e.type !== "applyStatus") return;
-          addStatus(unit, e.status, e.duration);
-          turnResult.startStepResults.abilityStatuses.push({
-            sourceId: unit.uid,
-            sourceName: unit.name,
-            traitKind: unit.abilityId || "ability",
-            targetId: unit.uid,
-            targetName: unit.name,
-            statusId: e.status,
-            duration: e.duration
+    const processForcedSwitchIfNeeded = () => {
+      switchInsThisTurn.forEach((entry) => {
+        const unit = sim?.teams?.[entry.team]?.active?.[entry.slot];
+        if (!unit || !isAlive(unit)) return;
+        clearSwitchFlags(unit);
+      });
+    };
+
+    const processSwitchInEffects = () => {
+      switchInsThisTurn.forEach((entry) => {
+        const unit = sim?.teams?.[entry.team]?.active?.[entry.slot];
+        if (!unit || !isAlive(unit) || unit.uid !== entry.incomingUnitId) return;
+        const enter = resolveUnitOnEnterEffects({ state: sim, team: entry.team, slot: entry.slot, unit });
+        entry.enterEffects = enter.messages;
+        entry.enterStatusApplies = enter.statusApplies;
+      });
+    };
+
+    const processTurnStartPassives = () => {
+      for (const team of [TEAM.ALLY, TEAM.ENEMY]) {
+        sim.teams[team].active.forEach((unit) => {
+          if (!unit || !isAlive(unit) || !unit.abilityId) return;
+          const ability = ABILITIES[unit.abilityId];
+          (ability?.onTurnStart || []).forEach((e) => {
+            if (e.type === "applyStatus") {
+              addStatus(unit, e.status, e.duration);
+              turnResult.startStepResults.abilityStatuses.push({
+                sourceId: unit.uid,
+                sourceName: unit.name,
+                traitKind: unit.abilityId || "ability",
+                targetId: unit.uid,
+                targetName: unit.name,
+                statusId: e.status,
+                duration: e.duration
+              });
+              return;
+            }
+            if (e.type === "addAtkStage") {
+              const amount = Math.max(0, Number(e.amount) || 0);
+              if (!amount) return;
+              unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, 0, CONFIG.CRIT_STAGE_MAX);
+              turnResult.startStepResults.statBoosts.push({
+                sourceId: unit.uid,
+                sourceName: unit.name,
+                traitKind: unit.abilityId || "ability",
+                targetId: unit.uid,
+                targetName: unit.name,
+                amount
+              });
+            }
           });
         });
-      });
-    }
+      }
+    };
 
     const runSwitchAction = (action) => {
       const actor = sim.teams[action.team].active[action.slot];
@@ -547,8 +657,7 @@
         turnResult.actionResults.push({ type: "skip", reason: "invalidSwitchTarget", actorId: actor.uid, actorName: actor.name });
         return;
       }
-      const enter = resolveUnitOnEnterEffects({ state: sim, team: action.team, slot, unit: reserve });
-      turnResult.actionResults.push({
+      const actionResult = {
         type: "switch",
         team: action.team,
         playerId: action.team,
@@ -558,12 +667,17 @@
         reserveIndex,
         reserveIn: { uid: reserve.uid, name: reserve.name, reserveIndex },
         reserveOut: { uid: outgoing.uid, name: outgoing.name },
-        enterEffects: enter.messages,
-        enterStatusApplies: enter.statusApplies
-      });
+        enterEffects: [],
+        enterStatusApplies: []
+      };
+      switchInsThisTurn.push(actionResult);
+      turnResult.actionResults.push(actionResult);
     };
 
     switchActions.forEach(runSwitchAction);
+    processForcedSwitchIfNeeded();
+    processSwitchInEffects();
+    processTurnStartPassives();
 
     otherActions.forEach((action) => {
       const actor = sim.teams[action.team].active[action.slot];
@@ -591,6 +705,15 @@
           if (effect.type === "applyStatus") {
             addStatus(target, effect.status, effect.duration);
             targetResult.appliedStatuses.push({ statusId: effect.status, duration: effect.duration, sourceType: "move" });
+          }
+          if (effect.type === "modifyCritStage") {
+            const effectTarget = effect.target === "self" ? actor : target;
+            if (!effectTarget?.buffs) return;
+            const stages = Math.max(0, Number(effect.stages) || 0);
+            const duration = Math.max(0, Number(effect.duration) || 0);
+            effectTarget.buffs.critStage = clamp((Number(effectTarget.buffs.critStage) || 0) + stages, 0, CONFIG.CRIT_STAGE_MAX);
+            effectTarget.buffs.critStageDuration = Math.max(Number(effectTarget.buffs.critStageDuration) || 0, duration);
+            targetResult.appliedStatuses.push({ statusId: "critFocus", duration, sourceType: "move", targetId: effectTarget.uid, targetName: effectTarget.name });
           }
         });
 
@@ -651,6 +774,13 @@
         unit.statuses.forEach((s) => { s.duration -= 1; });
         unit.statuses.filter((s) => s.duration <= 0).forEach((s) => turnResult.endStepResults.expiredStatuses.push({ ownerType: "unit", ownerId: unit.uid, ownerName: unit.name, statusId: s.kind }));
         unit.statuses = removeExpired(unit.statuses);
+        if ((Number(unit?.buffs?.critStageDuration) || 0) > 0) {
+          unit.buffs.critStageDuration -= 1;
+          if (unit.buffs.critStageDuration <= 0 && (Number(unit.buffs.critStage) || 0) > 0) {
+            unit.buffs.critStage = 0;
+            turnResult.endStepResults.expiredStatuses.push({ ownerType: "unit", ownerId: unit.uid, ownerName: unit.name, statusId: "critFocus" });
+          }
+        }
       });
 
       sim.teams[team].statuses.forEach((s) => { s.duration -= 1; });
@@ -682,6 +812,19 @@
       const text = STATUS_APPLY_TEXT[s.statusId]?.(s.targetName) || `${s.targetName}に ${s.statusId}！`;
       q.push({ type: "message", text, loggable: true });
       q.push({ type: "statusApply", targetId: s.targetId, statusId: s.statusId, duration: s.duration });
+      q.push({ type: "clearBattleHighlight" });
+    });
+    turnResult.startStepResults.statBoosts.forEach((boost) => {
+      const abilityName = ABILITY_LABELS[boost.traitKind] || boost.traitKind || "ability";
+      q.push({
+        type: "battleHighlight",
+        sources: [boost.sourceId],
+        targets: [boost.targetId],
+        effectType: "trait",
+        traitKind: boost.traitKind
+      });
+      q.push({ type: "message", text: `${boost.sourceName}の ${abilityName}が 発動した！`, loggable: true });
+      q.push({ type: "message", text: `${boost.targetName}の こうげき体勢が高まった！`, loggable: true });
       q.push({ type: "clearBattleHighlight" });
     });
 
@@ -731,20 +874,22 @@
         t.appliedStatuses.forEach((applied) => {
           const statusId = applied?.statusId;
           if (!statusId) return;
+          const appliedTargetId = applied?.targetId || t.targetId;
+          const appliedTargetName = applied?.targetName || t.targetName;
           if (applied.sourceType === "trait") {
             const abilityName = ABILITY_LABELS[applied.traitKind] || applied.traitKind || "ability";
             q.push({
               type: "battleHighlight",
               sources: [applied.sourceId],
-              targets: [t.targetId],
+              targets: [appliedTargetId],
               effectType: "trait",
               traitKind: applied.traitKind
             });
             q.push({ type: "message", text: `${applied.sourceName}の ${abilityName}が 発動した！`, loggable: true });
           }
-          const text = STATUS_APPLY_TEXT[statusId]?.(t.targetName) || `${t.targetName}に ${statusId}！`;
+          const text = STATUS_APPLY_TEXT[statusId]?.(appliedTargetName) || `${appliedTargetName}に ${statusId}！`;
           q.push({ type: "message", text, loggable: true });
-          q.push({ type: "statusApply", targetId: t.targetId, statusId, duration: applied.duration });
+          q.push({ type: "statusApply", targetId: appliedTargetId, statusId, duration: applied.duration });
           if (applied.sourceType === "trait") q.push({ type: "clearBattleHighlight" });
         });
         if (t.defeated) q.push({ type: "message", text: `${t.targetName}は たおれた！`, loggable: true });
@@ -825,6 +970,11 @@
   const applyStatusMarker = (targetId, statusId, duration = null) => {
     const unit = getUnitByUid(targetId);
     if (!unit) return;
+    if (statusId === "critFocus") {
+      unit.buffs.critStage = clamp((Number(unit?.buffs?.critStage) || 0) + 1, 0, CONFIG.CRIT_STAGE_MAX);
+      unit.buffs.critStageDuration = Math.max(Number(unit?.buffs?.critStageDuration) || 0, duration ?? 1);
+      return;
+    }
     addStatus(unit, statusId, duration ?? STATUSES[statusId]?.duration ?? 1);
   };
 
@@ -841,6 +991,11 @@
   const removeStatusMarker = (targetId, statusId) => {
     const unit = getUnitByUid(targetId);
     if (!unit) return;
+    if (statusId === "critFocus") {
+      unit.buffs.critStage = 0;
+      unit.buffs.critStageDuration = 0;
+      return;
+    }
     unit.statuses = unit.statuses.filter((s) => s.kind !== statusId);
   };
 
@@ -1089,7 +1244,7 @@
     gameState.turn += 1;
     gameState.enemyPlannedActions = {};
     gameState.plannedActions = {};
-    gameState.confirmedCommands = [null, null, null];
+    gameState.confirmedCommands = Array.from({ length: CONFIG.BOARD_COLS }, () => null);
     clearTargetPreview();
     autoResolveKoReplacementsForTeam(TEAM.ENEMY);
     if (getPendingKoReplacementSlots(TEAM.ALLY).length) {
@@ -1269,8 +1424,8 @@
       .map((c) => c?.action)
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
-    if (alreadyPickedTargetIds.includes(reserve.uid)) return;
-    if (switchingActorIds.includes(reserve.uid)) return;
+    const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
+    if (!candidates.some((c) => c.index === reserveIndex && c.unit?.uid === reserve.uid)) return;
     gameState.ui.selectedReserveIndex = reserveIndex;
   };
 
@@ -1290,7 +1445,8 @@
       .map((c) => c?.action)
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
-    if (alreadyPickedTargetIds.includes(reserve.uid) || switchingActorIds.includes(reserve.uid)) return;
+    const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
+    if (!candidates.some((c) => c.index === gameState.ui.selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
     gameState.confirmedCommands[gameState.currentActorIndex] = {
       actorId: actor.uid,
       actorName: actor.name,
@@ -1630,6 +1786,11 @@
       icon.title = statusText(status);
       wrap.appendChild(icon);
     });
+    if ((Number(unit?.buffs?.critStageDuration) || 0) > 0) {
+      const critIcon = createEl("span", "status-icon", STATUS_LABELS.critFocus);
+      critIcon.title = `精神集中（${unit.buffs.critStageDuration}T）`;
+      wrap.appendChild(critIcon);
+    }
     if (wrap.childElementCount === 0) wrap.appendChild(createEl("span", "status-empty", "-"));
     return wrap;
   };
@@ -1767,11 +1928,13 @@
         .map((c) => c?.action)
         .filter((a) => a?.type === "switch")
         .map((a) => a.actorId);
+      const allowedCandidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
+      const allowedIndexSet = new Set(allowedCandidates.map((entry) => entry.index));
       gameState.teams.ally.reserve.forEach((u, idx) => {
         const btn = createEl("button", `reserve-card${gameState.ui.selectedReserveIndex === idx ? " active" : ""}`);
         btn.dataset.action = "pick-reserve";
         btn.dataset.reserveIndex = String(idx);
-        const blocked = !u || alreadyPickedTargetIds.includes(u.uid) || switchingActorIds.includes(u.uid);
+        const blocked = !u || !allowedIndexSet.has(idx);
         btn.disabled = blocked || isPlaybackBusy();
         btn.appendChild(createEl("div", "name", u ? u.name : "空き"));
         switches.appendChild(btn);
