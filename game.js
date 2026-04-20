@@ -1935,7 +1935,7 @@
     const fight = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
     fight.dataset.action = "mode-fight";
     fight.disabled = isPlaybackBusy();
-    const sw = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "こうたい");
+    const sw = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "なかま");
     sw.dataset.action = "mode-switch";
     const actorStatusState = actor ? getStatusState(actor) : { canSwitch: false, statuses: [] };
     sw.disabled = isPlaybackBusy() || !actorStatusState.canSwitch;
@@ -1990,7 +1990,7 @@
       wrap.appendChild(switches);
 
       const dests = createEl("div", "destinations");
-      const btn = createEl("button", "dest-btn", "交代を確定");
+      const btn = createEl("button", "dest-btn", "こうたい");
       btn.dataset.action = "pick-destination";
       btn.dataset.toSlot = String(gameState.currentActorIndex);
       btn.disabled = isPlaybackBusy() || gameState.ui.switchSelection?.mode !== "commandSwitch" || !actorStatusState.canSwitch;
