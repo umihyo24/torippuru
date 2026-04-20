@@ -2037,11 +2037,11 @@
     if (!hasHpAnimations && !hasPlayback) return;
     updateHpAnimations(now);
     if (hasPlayback) updateBattlePlayback(now);
+    render();    
   };
 
   const loop = (now) => {
     update(now);
-    render();
     requestAnimationFrame(loop);
   };
 
