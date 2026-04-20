@@ -54,13 +54,15 @@
   const PHASE = { START: "start", PLAYING: "playing", GAMEOVER: "gameover" };
 
   const ASSETS = {
-    backgrounds: { battle: "./assets/backgrounds/background_battle.jpg" },
+    backgrounds: { battle: "./assets/backgrounds/background_battle.png" },
     icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
     portraits: {
       emberlynx: "./assets/portraits/emberlynx.png",
       hittokage: "./assets/portraits/hittokage.png",
+      maguma: "./assets/portraits/maguma.png",
       mossblob: "./assets/portraits/mossblob.png",
       frostfang: "./assets/portraits/frostfang.png",
+      sandko: "./assets/portraits/sandko.png",
       stormimp: "./assets/portraits/stormimp.png",
       ironboar: "./assets/portraits/ironboar.png",
       wyvern: "./assets/portraits/wyvern.png",
@@ -141,8 +143,10 @@
   const UNIT_LIBRARY = {
     emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
     hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 94, atk: 34, def: 26, spd: 27, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 114, atk: 42, def: 33, spd: 18, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
     mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
     frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "precisionStrike", "rallyHowl", "shellStance"] },
+    sandko: { id: "sandko", name: "サンドコ", portrait: "sandko", hp: 92, atk: 30, def: 24, spd: 40, abilityId: "battleRhythm", moves: ["frostLance", "precisionStrike", "focusMind", "shellStance"] },
     stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
     ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
     wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
@@ -150,7 +154,7 @@
     shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
   const INITIAL_PARTY = {
-    ally: ["emberlynx", "hittokage", "frostfang", "stormimp", "ironboar", "mossblob"],
+    ally: ["maguma", "sandko", "frostfang", "emberlynx", "hittokage", "stormimp"],
     enemy: ["wyvern", "golem", "shinju"]
   };
 
@@ -1616,13 +1620,21 @@
   };
 
   const applyBoardBackgroundWithFallback = (boardEl, src) => {
+    if (!boardEl) return;
     const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
+    const normalizedSrc = typeof src === "string" ? src.trim() : "";
+    const previousSrc = boardEl.dataset.bgSrc || "";
+    if (previousSrc === normalizedSrc) return;
+    boardEl.dataset.bgSrc = normalizedSrc;
     boardEl.style.backgroundImage = gradient;
-    if (!src) return;
+    if (!normalizedSrc) return;
     const bg = new Image();
-    bg.onload = () => { boardEl.style.backgroundImage = `${gradient}, url('${src}')`; };
+    bg.onload = () => {
+      if (boardEl.dataset.bgSrc !== normalizedSrc) return;
+      boardEl.style.backgroundImage = `${gradient}, url('${normalizedSrc}')`;
+    };
     bg.onerror = () => { boardEl.style.backgroundImage = gradient; };
-    bg.src = src;
+    bg.src = normalizedSrc;
   };
 
   const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
