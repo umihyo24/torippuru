@@ -47,14 +47,20 @@
       FORMATION_LIST_SPACING_Y: 8,
       FORMATION_SLOT_X: 20,
       FORMATION_SLOT_Y: 110,
-      FORMATION_SLOT_WIDTH: 520,
+      FORMATION_SLOT_WIDTH: 176,
       FORMATION_SLOT_HEIGHT: 74,
       FORMATION_SLOT_SPACING_Y: 10,
-      MONSTER_LIST_X: 560,
-      MONSTER_LIST_Y: 110,
-      MONSTER_LIST_WIDTH: 520,
+      FORMATION_SLOT_SPACING_X: 12,
+      MONSTER_LIST_X: 20,
+      MONSTER_LIST_Y: 250,
+      MONSTER_LIST_WIDTH: 740,
       MONSTER_LIST_ITEM_HEIGHT: 52,
       MONSTER_LIST_SPACING_Y: 8,
+      BUTTON_X: 20,
+      BUTTON_Y: 780,
+      BUTTON_WIDTH: 140,
+      BUTTON_HEIGHT: 42,
+      BUTTON_GAP: 12,
       FRONT_SLOT_COLOR: "rgba(74, 113, 166, 0.28)",
       RESERVE_SLOT_COLOR: "rgba(89, 122, 96, 0.26)"
     },
@@ -84,7 +90,7 @@
   };
 
   const TEAM = { ALLY: "ally", ENEMY: "enemy" };
-  const PHASE = { HOME: "home", FORMATION: "formation", FORMATION_EDIT: "formation_edit", PLAYING: "playing", GAMEOVER: "gameover" };
+  const PHASE = { HOME: "home", FORMATION: "formation", FORMATION_EDIT: "formation_edit", BATTLE_PREPARE: "battle_prepare", PLAYING: "playing", GAMEOVER: "gameover" };
   const HOME_MENU_ITEMS = ["Battle", "Formation", "Story", "Gacha", "Settings"];
 
   const ASSETS = {
@@ -240,6 +246,13 @@
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
   };
 
+  const getSelectableIndex = (value, max) => {
+    if (!Number.isFinite(value)) return -1;
+    const idx = Math.trunc(value);
+    if (idx < 0) return -1;
+    return clamp(idx, 0, Math.max(0, max));
+  };
+
   const getSafeHomeIndex = (value) => {
     const max = Math.max(0, HOME_MENU_ITEMS.length - 1);
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
@@ -328,6 +341,7 @@
       formations: seedFormations,
       availableMonsters: seedAvailableMonsters,
       currentEditIndex: null,
+      battlePrepareIndex: -1,
       input: {
         mouseX: 0,
         mouseY: 0,
@@ -372,17 +386,19 @@
     selectedMoveId: null,
     selectedTargets: [],
       ui: {
-        homeIndex: 0,
-        formationIndex: 0,
+        homeIndex: -1,
+        formationIndex: -1,
+        battlePrepareIndex: -1,
         hoveredHomeIndex: -1,
         hoveredFormationIndex: -1,
+        hoveredBattlePrepareIndex: -1,
         formationEdit: {
-          selectedSlotIndex: 0,
-          selectedMonsterIndex: 0,
+          selectedSlotIndex: -1,
+          selectedMonsterIndex: -1,
           hoveredSlotIndex: -1,
           hoveredMonsterIndex: -1,
           mode: "slot",
-          draft: []
+          draft: null
         },
       command: "fight",
       partyIndex: 0,
@@ -454,15 +470,16 @@
   };
 
   const getHomeInfo = (index, state) => {
-    const safeIndex = getSafeHomeIndex(index);
+    const safeIndex = getSelectableIndex(index, HOME_MENU_ITEMS.length - 1);
+    if (safeIndex < 0) {
+      return { title: "HOME", description: "メニューを選択してください。" };
+    }
     const menu = HOME_MENU_ITEMS[safeIndex] || "";
     if (menu === "Battle") {
-      const previewIndex = getSafeFormationSlot(state?.ui?.formationIndex);
-      const preview = formatFormationPreview(getFormationAt(state, previewIndex));
       return {
         title: "Battle",
-        description: "保存された編成でバトルを開始します。",
-        extra: { lines: preview, label: `Current Formation: Slot ${previewIndex + 1}` }
+        description: "編成を選択してバトルを開始します。",
+        extra: { lines: ["戦闘前に編成選択画面へ移動します。"] }
       };
     }
     if (menu === "Formation") {
@@ -481,17 +498,19 @@
   };
 
   const ensureUiSafety = () => {
-    gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
-    gameState.ui.formationIndex = getSafeFormationSlot(gameState.ui.formationIndex);
+    gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, HOME_MENU_ITEMS.length - 1);
+    gameState.ui.formationIndex = getSelectableIndex(gameState.ui.formationIndex, FORMATION_SLOT_COUNT - 1);
+    gameState.ui.battlePrepareIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.hoveredHomeIndex = Number.isInteger(gameState.ui.hoveredHomeIndex) ? gameState.ui.hoveredHomeIndex : -1;
     gameState.ui.hoveredFormationIndex = Number.isInteger(gameState.ui.hoveredFormationIndex) ? gameState.ui.hoveredFormationIndex : -1;
+    gameState.ui.hoveredBattlePrepareIndex = Number.isInteger(gameState.ui.hoveredBattlePrepareIndex) ? gameState.ui.hoveredBattlePrepareIndex : -1;
     const edit = gameState.ui.formationEdit;
-    edit.selectedSlotIndex = getSafeEditPartyIndex(edit.selectedSlotIndex);
-    edit.selectedMonsterIndex = getSafeEditMonsterIndex(gameState, edit.selectedMonsterIndex);
+    edit.selectedSlotIndex = getSelectableIndex(edit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
+    edit.selectedMonsterIndex = getSelectableIndex(edit.selectedMonsterIndex, gameState.availableMonsters.length - 1);
     edit.hoveredSlotIndex = Number.isInteger(edit.hoveredSlotIndex) ? edit.hoveredSlotIndex : -1;
     edit.hoveredMonsterIndex = Number.isInteger(edit.hoveredMonsterIndex) ? edit.hoveredMonsterIndex : -1;
     edit.mode = edit.mode === "monster" ? "monster" : "slot";
-    if (!Array.isArray(edit.draft)) edit.draft = [];
+    if (!Array.isArray(edit.draft)) edit.draft = createEmptyFormation();
     edit.draft = cloneFormation(edit.draft);
   };
 
@@ -500,17 +519,38 @@
     ensureUiSafety();
   };
 
+  const enterHome = () => {
+    gameState.ui.homeIndex = -1;
+    gameState.ui.hoveredHomeIndex = -1;
+    gameState.ui.formationIndex = -1;
+    gameState.ui.battlePrepareIndex = -1;
+    setPhase(PHASE.HOME);
+  };
+
+  const enterFormation = () => {
+    gameState.ui.formationIndex = -1;
+    gameState.ui.hoveredFormationIndex = -1;
+    setPhase(PHASE.FORMATION);
+  };
+
   const enterFormationEdit = (index) => {
     const safeIndex = getSafeFormationSlot(index);
     const source = getFormationAt(gameState, safeIndex) || createEmptyFormation();
     gameState.currentEditIndex = safeIndex;
-    gameState.ui.formationEdit.selectedSlotIndex = 0;
-    gameState.ui.formationEdit.selectedMonsterIndex = 0;
+    gameState.ui.formationEdit.selectedSlotIndex = -1;
+    gameState.ui.formationEdit.selectedMonsterIndex = -1;
     gameState.ui.formationEdit.hoveredSlotIndex = -1;
     gameState.ui.formationEdit.hoveredMonsterIndex = -1;
     gameState.ui.formationEdit.mode = "slot";
     gameState.ui.formationEdit.draft = cloneFormation(source);
     setPhase(PHASE.FORMATION_EDIT);
+  };
+
+  const enterBattlePrepare = () => {
+    gameState.battlePrepareIndex = -1;
+    gameState.ui.battlePrepareIndex = -1;
+    gameState.ui.hoveredBattlePrepareIndex = -1;
+    setPhase(PHASE.BATTLE_PREPARE);
   };
 
   const saveFormationEdit = () => {
@@ -519,26 +559,31 @@
     const isEmpty = draft.every((unitId) => !unitId);
     gameState.formations[index] = isEmpty ? null : draft;
     gameState.currentEditIndex = null;
-    setPhase(PHASE.FORMATION);
+    enterFormation();
   };
 
   const cancelFormationEdit = () => {
-    gameState.ui.formationEdit.draft = [];
+    gameState.ui.formationEdit.draft = createEmptyFormation();
     gameState.currentEditIndex = null;
-    setPhase(PHASE.FORMATION);
+    enterFormation();
   };
 
   const handleHomeSelection = (index) => {
+    if (!Number.isFinite(index) || index < 0) return;
     gameState.ui.homeIndex = getSafeHomeIndex(index);
     const selected = HOME_MENU_ITEMS[gameState.ui.homeIndex];
     if (selected === "Battle") {
-      startBattleFromFormation(gameState.ui.formationIndex);
+      enterBattlePrepare();
       return;
     }
-    if (selected === "Formation") setPhase(PHASE.FORMATION);
+    if (selected === "Formation") {
+      enterFormation();
+      return;
+    }
   };
 
   const handleFormationSelection = (index, shouldEnterEdit = false) => {
+    if (!Number.isFinite(index) || index < 0) return;
     gameState.ui.formationIndex = getSafeFormationSlot(index);
     if (shouldEnterEdit) enterFormationEdit(gameState.ui.formationIndex);
   };
@@ -548,19 +593,33 @@
     gameState.ui.formationEdit.mode = "slot";
   };
 
+  const findMonsterSlotInDraft = (draft, monsterId) => cloneFormation(draft).findIndex((unitId) => unitId === monsterId);
+
+  const assignOrSwapMonsterInDraft = (draft, targetSlotIndex, monsterId) => {
+    const out = cloneFormation(draft);
+    const safeTarget = getSelectableIndex(targetSlotIndex, FORMATION_MEMBER_COUNT - 1);
+    if (safeTarget < 0 || !UNIT_LIBRARY[monsterId]) return out;
+    const existingSlotIndex = findMonsterSlotInDraft(out, monsterId);
+    if (existingSlotIndex === -1) {
+      out[safeTarget] = monsterId;
+      return out;
+    }
+    if (existingSlotIndex === safeTarget) return out;
+    const previousTarget = out[safeTarget] || null;
+    out[safeTarget] = monsterId;
+    out[existingSlotIndex] = previousTarget;
+    return out;
+  };
+
   const assignMonsterToSelectedSlot = (monsterIndex) => {
-    const draft = cloneFormation(gameState.ui.formationEdit.draft);
+    const slotIndex = getSelectableIndex(gameState.ui.formationEdit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
+    if (slotIndex < 0) return;
     const boxIndex = getSafeEditMonsterIndex(gameState, monsterIndex);
     const unitId = gameState.availableMonsters[boxIndex] || null;
-    const slotIndex = getSafeEditPartyIndex(gameState.ui.formationEdit.selectedSlotIndex);
     if (!unitId) return;
-    for (let i = 0; i < draft.length; i += 1) {
-      if (i !== slotIndex && draft[i] === unitId) draft[i] = null;
-    }
-    draft[slotIndex] = unitId;
     gameState.ui.formationEdit.selectedMonsterIndex = boxIndex;
     gameState.ui.formationEdit.mode = "monster";
-    gameState.ui.formationEdit.draft = draft;
+    gameState.ui.formationEdit.draft = assignOrSwapMonsterInDraft(gameState.ui.formationEdit.draft, slotIndex, unitId);
   };
 
   const getTeamState = (state, team) => state.teams[team];
@@ -1910,6 +1969,7 @@
   };
 
   const startBattleFromFormation = (formationIndex) => {
+    if (!Array.isArray(getFormationAt(gameState, formationIndex))) return;
     const safeIndex = getSafeFormationSlot(formationIndex);
     const playerParty = createBattlePartyFromFormation(safeIndex);
     const nextState = createInitialState({
@@ -2457,9 +2517,11 @@
 
   const getHoveredFormationSlotIndex = (x, y) => {
     for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
+      const row = i < CONFIG.PARTY_ACTIVE_COUNT ? 0 : 1;
+      const col = i % CONFIG.PARTY_ACTIVE_COUNT;
       const rect = {
-        x: CONFIG.UI.FORMATION_SLOT_X,
-        y: CONFIG.UI.FORMATION_SLOT_Y + (i * (CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_SPACING_Y)),
+        x: CONFIG.UI.FORMATION_SLOT_X + (col * (CONFIG.UI.FORMATION_SLOT_WIDTH + CONFIG.UI.FORMATION_SLOT_SPACING_X)),
+        y: CONFIG.UI.FORMATION_SLOT_Y + (row * (CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_SPACING_Y)),
         width: CONFIG.UI.FORMATION_SLOT_WIDTH,
         height: CONFIG.UI.FORMATION_SLOT_HEIGHT
       };
@@ -2467,6 +2529,8 @@
     }
     return -1;
   };
+
+  const getHoveredBattlePrepareIndex = (x, y) => getHoveredFormationIndex(x, y);
 
   const getHoveredMonsterIndex = (x, y) => {
     const count = Array.isArray(gameState.availableMonsters) ? gameState.availableMonsters.length : 0;
@@ -2496,7 +2560,7 @@
 
     const menu = createEl("div", "home-menu");
     HOME_MENU_ITEMS.forEach((label, index) => {
-      const isSelected = index === getSafeHomeIndex(gameState.ui.homeIndex);
+      const isSelected = index === gameState.ui.homeIndex;
       const isHovered = index === gameState.ui.hoveredHomeIndex;
       const item = createEl("button", `home-menu-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, label);
       item.dataset.action = "home-select";
@@ -2527,7 +2591,7 @@
     for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
       const formation = getFormationAt(gameState, i);
       const lines = formatFormationPreview(formation).join(" / ");
-      const isSelected = i === getSafeFormationSlot(gameState.ui.formationIndex);
+      const isSelected = i === gameState.ui.formationIndex;
       const isHovered = i === gameState.ui.hoveredFormationIndex;
       const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
       item.dataset.action = "formation-select";
@@ -2536,8 +2600,25 @@
       list.appendChild(item);
     }
     wrap.appendChild(list);
-    wrap.appendChild(createEl("div", "formation-help", "↑↓:選択  Enter:編集  Esc:HOME"));
+    const buttons = createEl("div", "screen-button-row");
+    const home = createEl("button", "screen-nav-btn", "Back HOME");
+    home.dataset.action = "go-home";
+    buttons.appendChild(home);
+    wrap.append(buttons, createEl("div", "formation-help", "Click slot to edit / Esc:HOME"));
     return wrap;
+  };
+
+  const getFormationEditButtons = () => {
+    const y = CONFIG.UI.BUTTON_Y;
+    const w = CONFIG.UI.BUTTON_WIDTH;
+    const h = CONFIG.UI.BUTTON_HEIGHT;
+    const gap = CONFIG.UI.BUTTON_GAP;
+    const x = CONFIG.UI.BUTTON_X;
+    return {
+      save: { x, y, width: w, height: h },
+      cancel: { x: x + (w + gap), y, width: w, height: h },
+      back: { x: x + ((w + gap) * 2), y, width: w, height: h }
+    };
   };
 
   const renderFormationEditScreen = () => {
@@ -2550,6 +2631,7 @@
     wrap.style.setProperty("--formation-slot-width", `${CONFIG.UI.FORMATION_SLOT_WIDTH}px`);
     wrap.style.setProperty("--formation-slot-height", `${CONFIG.UI.FORMATION_SLOT_HEIGHT}px`);
     wrap.style.setProperty("--formation-slot-spacing-y", `${CONFIG.UI.FORMATION_SLOT_SPACING_Y}px`);
+    wrap.style.setProperty("--formation-slot-spacing-x", `${CONFIG.UI.FORMATION_SLOT_SPACING_X}px`);
     wrap.style.setProperty("--monster-list-x", `${CONFIG.UI.MONSTER_LIST_X}px`);
     wrap.style.setProperty("--monster-list-y", `${CONFIG.UI.MONSTER_LIST_Y}px`);
     wrap.style.setProperty("--monster-list-width", `${CONFIG.UI.MONSTER_LIST_WIDTH}px`);
@@ -2559,7 +2641,8 @@
     wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
     const body = createEl("div", "formation-edit-body");
     const party = createEl("div", "formation-edit-party");
-    party.appendChild(createEl("div", "formation-pane-title", "Formation (Front 1-3 / Reserve 4-6)"));
+    party.appendChild(createEl("div", "formation-pane-title", "Formation"));
+    party.appendChild(createEl("div", "formation-zone-label", "FRONT (1-3)"));
     for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
       const unitId = draft[i] || null;
       const text = unitId ? getUnitName(unitId) : "EMPTY";
@@ -2571,19 +2654,64 @@
       row.dataset.slotIndex = String(i);
       row.appendChild(createEl("span", "formation-row-tag", isFront ? "FRONT" : "RESERVE"));
       party.appendChild(row);
+      if (i === CONFIG.PARTY_ACTIVE_COUNT - 1) party.appendChild(createEl("div", "formation-zone-label", "RESERVE (4-6)"));
     }
     const box = createEl("div", "formation-edit-box");
     box.appendChild(createEl("div", "formation-pane-title", "Available Monsters"));
     gameState.availableMonsters.forEach((unitId, idx) => {
       const isSelected = edit.selectedMonsterIndex === idx;
       const isHovered = edit.hoveredMonsterIndex === idx;
-      const row = createEl("button", `formation-row monster-row${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, getUnitName(unitId));
+      const assignedSlot = findMonsterSlotInDraft(draft, unitId);
+      const row = createEl("button", `formation-row monster-row${isSelected ? " active" : ""}${isHovered ? " hover" : ""}${assignedSlot >= 0 ? " assigned" : ""}`, getUnitName(unitId));
       row.dataset.action = "edit-monster-select";
       row.dataset.monsterIndex = String(idx);
+      if (assignedSlot >= 0) row.appendChild(createEl("span", "assigned-badge", `SET:${assignedSlot + 1}`));
       box.appendChild(row);
     });
     body.append(party, box);
-    wrap.append(body, createEl("div", "formation-help", "Slot選択→Monster選択で配置 / ↑↓:移動  ←→:列移動  Enter:確定  Backspace:スロット解除  S:保存  Esc:CANCEL"));
+    const editButtons = getFormationEditButtons();
+    const buttons = createEl("div", "screen-button-row");
+    buttons.style.setProperty("--button-row-x", `${editButtons.save.x}px`);
+    buttons.style.setProperty("--button-row-y", `${editButtons.save.y}px`);
+    const saveBtn = createEl("button", "screen-nav-btn", "Save");
+    saveBtn.dataset.action = "edit-save";
+    const cancelBtn = createEl("button", "screen-nav-btn", "Cancel");
+    cancelBtn.dataset.action = "edit-cancel";
+    const backBtn = createEl("button", "screen-nav-btn", "Back");
+    backBtn.dataset.action = "edit-back";
+    buttons.append(saveBtn, cancelBtn, backBtn);
+    wrap.append(body, buttons, createEl("div", "formation-help", "Select slot then monster / Backspace: clear slot"));
+    return wrap;
+  };
+
+  const renderBattlePrepareScreen = () => {
+    const wrap = createEl("section", "formation-screen");
+    wrap.style.setProperty("--formation-list-x", `${CONFIG.UI.FORMATION_LIST_X}px`);
+    wrap.style.setProperty("--formation-list-y", `${CONFIG.UI.FORMATION_LIST_Y}px`);
+    wrap.style.setProperty("--formation-list-width", `${CONFIG.UI.FORMATION_LIST_WIDTH}px`);
+    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT}px`);
+    wrap.style.setProperty("--formation-list-spacing-y", `${CONFIG.UI.FORMATION_LIST_SPACING_Y}px`);
+    wrap.appendChild(createEl("h2", "formation-title", "Battle Prepare"));
+    const list = createEl("div", "formation-slot-list");
+    for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
+      const formation = getFormationAt(gameState, i);
+      const lines = formatFormationPreview(formation).join(" / ");
+      const isSelected = i === gameState.ui.battlePrepareIndex;
+      const isHovered = i === gameState.ui.hoveredBattlePrepareIndex;
+      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
+      item.dataset.action = "battle-prepare-select";
+      item.dataset.index = String(i);
+      item.append(createEl("div", "formation-slot-name", `Slot ${i + 1}`), createEl("div", "formation-slot-value", lines));
+      list.appendChild(item);
+    }
+    const buttons = createEl("div", "screen-button-row");
+    const start = createEl("button", "screen-nav-btn", "Start Battle");
+    start.dataset.action = "battle-start";
+    start.disabled = gameState.ui.battlePrepareIndex < 0 || !Array.isArray(getFormationAt(gameState, gameState.ui.battlePrepareIndex));
+    const back = createEl("button", "screen-nav-btn", "Back HOME");
+    back.dataset.action = "go-home";
+    buttons.append(start, back);
+    wrap.append(list, buttons, createEl("div", "formation-help", "Choose a saved formation to start battle"));
     return wrap;
   };
 
@@ -2610,6 +2738,8 @@
       main.appendChild(renderHomeScreen());
     } else if (gameState.phase === PHASE.FORMATION) {
       main.appendChild(renderFormationScreen());
+    } else if (gameState.phase === PHASE.BATTLE_PREPARE) {
+      main.appendChild(renderBattlePrepareScreen());
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
       main.appendChild(renderFormationEditScreen());
     } else {
@@ -2634,14 +2764,18 @@
       const nextHover = getHoveredHomeIndex(gameState.input.mouseX, gameState.input.mouseY);
       if (gameState.ui.hoveredHomeIndex !== nextHover) {
         gameState.ui.hoveredHomeIndex = nextHover;
-        if (nextHover >= 0) gameState.ui.homeIndex = nextHover;
         render();
       }
     } else if (gameState.phase === PHASE.FORMATION) {
       const nextHover = getHoveredFormationIndex(gameState.input.mouseX, gameState.input.mouseY);
       if (gameState.ui.hoveredFormationIndex !== nextHover) {
         gameState.ui.hoveredFormationIndex = nextHover;
-        if (nextHover >= 0) gameState.ui.formationIndex = nextHover;
+        render();
+      }
+    } else if (gameState.phase === PHASE.BATTLE_PREPARE) {
+      const nextHover = getHoveredBattlePrepareIndex(gameState.input.mouseX, gameState.input.mouseY);
+      if (gameState.ui.hoveredBattlePrepareIndex !== nextHover) {
+        gameState.ui.hoveredBattlePrepareIndex = nextHover;
         render();
       }
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
@@ -2680,8 +2814,23 @@
     if (a === "formation-select") {
       const index = Number(target.dataset.index);
       const safe = getSafeFormationSlot(index);
-      const shouldEnter = safe === gameState.ui.formationIndex;
-      handleFormationSelection(safe, shouldEnter);
+      handleFormationSelection(safe, true);
+      render();
+      return;
+    }
+    if (a === "battle-prepare-select") {
+      gameState.ui.battlePrepareIndex = getSafeFormationSlot(Number(target.dataset.index));
+      gameState.battlePrepareIndex = gameState.ui.battlePrepareIndex;
+      render();
+      return;
+    }
+    if (a === "battle-start") {
+      if (gameState.ui.battlePrepareIndex >= 0) startBattleFromFormation(gameState.ui.battlePrepareIndex);
+      render();
+      return;
+    }
+    if (a === "go-home") {
+      enterHome();
       render();
       return;
     }
@@ -2692,6 +2841,16 @@
     }
     if (a === "edit-monster-select") {
       assignMonsterToSelectedSlot(Number(target.dataset.monsterIndex));
+      render();
+      return;
+    }
+    if (a === "edit-save") {
+      saveFormationEdit();
+      render();
+      return;
+    }
+    if (a === "edit-cancel" || a === "edit-back") {
+      cancelFormationEdit();
       render();
       return;
     }
@@ -2724,7 +2883,17 @@
       if (event.key === "ArrowUp") gameState.ui.formationIndex -= 1;
       if (event.key === "ArrowDown") gameState.ui.formationIndex += 1;
       if (event.key === "Enter") handleFormationSelection(gameState.ui.formationIndex, true);
-      if (event.key === "Escape") setPhase(PHASE.HOME);
+      if (event.key === "Escape") enterHome();
+      ensureUiSafety();
+      render();
+      return;
+    }
+
+    if (gameState.phase === PHASE.BATTLE_PREPARE) {
+      if (event.key === "ArrowUp") gameState.ui.battlePrepareIndex -= 1;
+      if (event.key === "ArrowDown") gameState.ui.battlePrepareIndex += 1;
+      if (event.key === "Enter" && gameState.ui.battlePrepareIndex >= 0) startBattleFromFormation(gameState.ui.battlePrepareIndex);
+      if (event.key === "Escape") enterHome();
       ensureUiSafety();
       render();
       return;
