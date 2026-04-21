@@ -33,11 +33,30 @@
       CARD_HEIGHT: 86,
       MENU_X: 64,
       MENU_Y: 110,
+      MENU_WIDTH: 220,
+      MENU_ITEM_HEIGHT: 42,
       MENU_SPACING_Y: 56,
       PANEL_X: 420,
       PANEL_Y: 90,
       PANEL_WIDTH: 760,
-      PANEL_HEIGHT: 680
+      PANEL_HEIGHT: 680,
+      FORMATION_LIST_X: 20,
+      FORMATION_LIST_Y: 72,
+      FORMATION_LIST_WIDTH: 740,
+      FORMATION_LIST_ITEM_HEIGHT: 56,
+      FORMATION_LIST_SPACING_Y: 8,
+      FORMATION_SLOT_X: 20,
+      FORMATION_SLOT_Y: 110,
+      FORMATION_SLOT_WIDTH: 520,
+      FORMATION_SLOT_HEIGHT: 74,
+      FORMATION_SLOT_SPACING_Y: 10,
+      MONSTER_LIST_X: 560,
+      MONSTER_LIST_Y: 110,
+      MONSTER_LIST_WIDTH: 520,
+      MONSTER_LIST_ITEM_HEIGHT: 52,
+      MONSTER_LIST_SPACING_Y: 8,
+      FRONT_SLOT_COLOR: "rgba(74, 113, 166, 0.28)",
+      RESERVE_SLOT_COLOR: "rgba(89, 122, 96, 0.26)"
     },
     UI_LAYOUT: {
       SHARED_CONTENT_COLUMN: {
@@ -173,7 +192,7 @@
     enemy: ["wyvern", "golem", "shinju"]
   };
   const FORMATION_SLOT_COUNT = 3;
-  const FORMATION_MEMBER_COUNT = CONFIG.PARTY_ACTIVE_COUNT;
+  const FORMATION_MEMBER_COUNT = CONFIG.PARTY_TOTAL_COUNT;
 
   const STATUS_LABELS = { poison: "どく", barrier: "バリア", atkUp: "こうげきアップ", defUp: "ぼうぎょアップ", critFocus: "精神集中" };
   const STATUS_APPLY_TEXT = {
@@ -196,8 +215,23 @@
     openingSurge: "オープニングサージ"
   };
 
+  const createEmptyFormation = () => Array.from({ length: FORMATION_MEMBER_COUNT }, () => null);
+
+  const cloneFormation = (formation) => {
+    if (!Array.isArray(formation)) return createEmptyFormation();
+    const out = createEmptyFormation();
+    for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
+      const unitId = formation[i];
+      out[i] = UNIT_LIBRARY[unitId] ? unitId : null;
+    }
+    return out;
+  };
+
   const createDefaultFormations = () => {
-    const base = INITIAL_PARTY.ally.slice(0, FORMATION_MEMBER_COUNT);
+    const base = createEmptyFormation();
+    INITIAL_PARTY.ally.slice(0, FORMATION_MEMBER_COUNT).forEach((unitId, idx) => {
+      if (UNIT_LIBRARY[unitId]) base[idx] = unitId;
+    });
     return [base, null, null];
   };
 
@@ -221,6 +255,8 @@
     const max = Math.max(0, FORMATION_MEMBER_COUNT - 1);
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
   };
+
+  const getSafeEditMonsterIndex = (state, value) => getSafeBoxIndex(state, value);
 
   let UID_COUNTER = 1;
   const backgroundLoadState = new Map();
@@ -254,9 +290,10 @@
     };
   };
 
-  const buildAllyPartyFromFormation = (formations, availableMonsters) => {
+  const buildAllyPartyFromFormation = (formations, availableMonsters, formationIndex = 0) => {
     const defaultParty = INITIAL_PARTY.ally.slice(0, CONFIG.PARTY_TOTAL_COUNT);
-    const primary = Array.isArray(formations?.[0]) ? formations[0].slice(0, FORMATION_MEMBER_COUNT) : [];
+    const selected = getSafeFormationSlot(formationIndex);
+    const primary = cloneFormation(formations?.[selected] || null);
     const picked = new Set(primary.filter(Boolean));
     const pool = Array.isArray(availableMonsters) ? availableMonsters.filter((unitId) => UNIT_LIBRARY[unitId]) : [];
     const fallbackPool = [...pool, ...defaultParty].filter((unitId, idx, arr) => unitId && arr.indexOf(unitId) === idx);
@@ -282,7 +319,8 @@
     const seedAvailableMonsters = Array.isArray(seed.availableMonsters) && seed.availableMonsters.length
       ? seed.availableMonsters.slice()
       : Object.keys(UNIT_LIBRARY);
-    const allyParty = buildAllyPartyFromFormation(seedFormations, seedAvailableMonsters);
+    const battleFormationIndex = getSafeFormationSlot(seed.battleFormationIndex);
+    const allyParty = buildAllyPartyFromFormation(seedFormations, seedAvailableMonsters, battleFormationIndex);
     return ({
       phase: PHASE.HOME,
       turn: 1,
@@ -290,6 +328,21 @@
       formations: seedFormations,
       availableMonsters: seedAvailableMonsters,
       currentEditIndex: null,
+      input: {
+        mouseX: 0,
+        mouseY: 0,
+        mouseClicked: false
+      },
+      battle: {
+        player: {
+          activeIndex: 0,
+          party: []
+        },
+        enemy: {
+          activeIndex: 0,
+          party: []
+        }
+      },
       battlefield: { background: getAssetPath("backgrounds", "battle") },
       teams: {
         ally: {
@@ -318,15 +371,19 @@
     currentActorIndex: 0,
     selectedMoveId: null,
     selectedTargets: [],
-    ui: {
-      homeIndex: 0,
-      formationIndex: 0,
-      formationEdit: {
-        selectedPartyIndex: 0,
-        selectedBoxIndex: 0,
-        mode: "party",
-        draft: []
-      },
+      ui: {
+        homeIndex: 0,
+        formationIndex: 0,
+        hoveredHomeIndex: -1,
+        hoveredFormationIndex: -1,
+        formationEdit: {
+          selectedSlotIndex: 0,
+          selectedMonsterIndex: 0,
+          hoveredSlotIndex: -1,
+          hoveredMonsterIndex: -1,
+          mode: "slot",
+          draft: []
+        },
       command: "fight",
       partyIndex: 0,
       selectingParty: false,
@@ -381,7 +438,7 @@
     const list = Array.isArray(state?.formations) ? state.formations : [];
     const safeIndex = getSafeFormationSlot(index);
     const value = list[safeIndex];
-    return Array.isArray(value) ? value.slice(0, FORMATION_MEMBER_COUNT) : null;
+    return Array.isArray(value) ? cloneFormation(value) : null;
   };
 
   const getUnitName = (unitId) => UNIT_LIBRARY?.[unitId]?.name || "UNKNOWN";
@@ -400,11 +457,12 @@
     const safeIndex = getSafeHomeIndex(index);
     const menu = HOME_MENU_ITEMS[safeIndex] || "";
     if (menu === "Battle") {
-      const preview = formatFormationPreview(getFormationAt(state, 0));
+      const previewIndex = getSafeFormationSlot(state?.ui?.formationIndex);
+      const preview = formatFormationPreview(getFormationAt(state, previewIndex));
       return {
         title: "Battle",
         description: "保存された編成でバトルを開始します。",
-        extra: { lines: preview, label: "Current Formation" }
+        extra: { lines: preview, label: `Current Formation: Slot ${previewIndex + 1}` }
       };
     }
     if (menu === "Formation") {
@@ -425,12 +483,16 @@
   const ensureUiSafety = () => {
     gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
     gameState.ui.formationIndex = getSafeFormationSlot(gameState.ui.formationIndex);
+    gameState.ui.hoveredHomeIndex = Number.isInteger(gameState.ui.hoveredHomeIndex) ? gameState.ui.hoveredHomeIndex : -1;
+    gameState.ui.hoveredFormationIndex = Number.isInteger(gameState.ui.hoveredFormationIndex) ? gameState.ui.hoveredFormationIndex : -1;
     const edit = gameState.ui.formationEdit;
-    edit.selectedPartyIndex = getSafeEditPartyIndex(edit.selectedPartyIndex);
-    edit.selectedBoxIndex = getSafeBoxIndex(gameState, edit.selectedBoxIndex);
-    edit.mode = edit.mode === "box" ? "box" : "party";
+    edit.selectedSlotIndex = getSafeEditPartyIndex(edit.selectedSlotIndex);
+    edit.selectedMonsterIndex = getSafeEditMonsterIndex(gameState, edit.selectedMonsterIndex);
+    edit.hoveredSlotIndex = Number.isInteger(edit.hoveredSlotIndex) ? edit.hoveredSlotIndex : -1;
+    edit.hoveredMonsterIndex = Number.isInteger(edit.hoveredMonsterIndex) ? edit.hoveredMonsterIndex : -1;
+    edit.mode = edit.mode === "monster" ? "monster" : "slot";
     if (!Array.isArray(edit.draft)) edit.draft = [];
-    if (edit.draft.length > FORMATION_MEMBER_COUNT) edit.draft = edit.draft.slice(0, FORMATION_MEMBER_COUNT);
+    edit.draft = cloneFormation(edit.draft);
   };
 
   const setPhase = (phase) => {
@@ -440,20 +502,20 @@
 
   const enterFormationEdit = (index) => {
     const safeIndex = getSafeFormationSlot(index);
-    const source = getFormationAt(gameState, safeIndex) || Array.from({ length: FORMATION_MEMBER_COUNT }, () => null);
+    const source = getFormationAt(gameState, safeIndex) || createEmptyFormation();
     gameState.currentEditIndex = safeIndex;
-    gameState.ui.formationEdit.selectedPartyIndex = 0;
-    gameState.ui.formationEdit.selectedBoxIndex = 0;
-    gameState.ui.formationEdit.mode = "party";
-    gameState.ui.formationEdit.draft = source.slice(0, FORMATION_MEMBER_COUNT);
+    gameState.ui.formationEdit.selectedSlotIndex = 0;
+    gameState.ui.formationEdit.selectedMonsterIndex = 0;
+    gameState.ui.formationEdit.hoveredSlotIndex = -1;
+    gameState.ui.formationEdit.hoveredMonsterIndex = -1;
+    gameState.ui.formationEdit.mode = "slot";
+    gameState.ui.formationEdit.draft = cloneFormation(source);
     setPhase(PHASE.FORMATION_EDIT);
   };
 
   const saveFormationEdit = () => {
     const index = getSafeFormationSlot(gameState.currentEditIndex);
-    const draft = Array.isArray(gameState.ui.formationEdit.draft)
-      ? gameState.ui.formationEdit.draft.slice(0, FORMATION_MEMBER_COUNT)
-      : [];
+    const draft = cloneFormation(gameState.ui.formationEdit.draft);
     const isEmpty = draft.every((unitId) => !unitId);
     gameState.formations[index] = isEmpty ? null : draft;
     gameState.currentEditIndex = null;
@@ -464,6 +526,41 @@
     gameState.ui.formationEdit.draft = [];
     gameState.currentEditIndex = null;
     setPhase(PHASE.FORMATION);
+  };
+
+  const handleHomeSelection = (index) => {
+    gameState.ui.homeIndex = getSafeHomeIndex(index);
+    const selected = HOME_MENU_ITEMS[gameState.ui.homeIndex];
+    if (selected === "Battle") {
+      startBattleFromFormation(gameState.ui.formationIndex);
+      return;
+    }
+    if (selected === "Formation") setPhase(PHASE.FORMATION);
+  };
+
+  const handleFormationSelection = (index, shouldEnterEdit = false) => {
+    gameState.ui.formationIndex = getSafeFormationSlot(index);
+    if (shouldEnterEdit) enterFormationEdit(gameState.ui.formationIndex);
+  };
+
+  const handleFormationSlotSelect = (index) => {
+    gameState.ui.formationEdit.selectedSlotIndex = getSafeEditPartyIndex(index);
+    gameState.ui.formationEdit.mode = "slot";
+  };
+
+  const assignMonsterToSelectedSlot = (monsterIndex) => {
+    const draft = cloneFormation(gameState.ui.formationEdit.draft);
+    const boxIndex = getSafeEditMonsterIndex(gameState, monsterIndex);
+    const unitId = gameState.availableMonsters[boxIndex] || null;
+    const slotIndex = getSafeEditPartyIndex(gameState.ui.formationEdit.selectedSlotIndex);
+    if (!unitId) return;
+    for (let i = 0; i < draft.length; i += 1) {
+      if (i !== slotIndex && draft[i] === unitId) draft[i] = null;
+    }
+    draft[slotIndex] = unitId;
+    gameState.ui.formationEdit.selectedMonsterIndex = boxIndex;
+    gameState.ui.formationEdit.mode = "monster";
+    gameState.ui.formationEdit.draft = draft;
   };
 
   const getTeamState = (state, team) => state.teams[team];
@@ -1805,25 +1902,30 @@
     if (next) gameState.ui.isLogOpen = false;
   };
 
-  const startBattleFromHome = () => {
+  const createBattlePartyFromFormation = (formationIndex) => {
+    const partyIds = buildAllyPartyFromFormation(gameState.formations, gameState.availableMonsters, formationIndex);
+    return partyIds
+      .filter((unitId) => UNIT_LIBRARY[unitId])
+      .map((unitId, idx) => ({ unitId, slot: idx, maxHp: UNIT_LIBRARY[unitId].hp, hp: UNIT_LIBRARY[unitId].hp, statuses: [] }));
+  };
+
+  const startBattleFromFormation = (formationIndex) => {
+    const safeIndex = getSafeFormationSlot(formationIndex);
+    const playerParty = createBattlePartyFromFormation(safeIndex);
     const nextState = createInitialState({
       formations: gameState.formations,
-      availableMonsters: gameState.availableMonsters
+      availableMonsters: gameState.availableMonsters,
+      battleFormationIndex: safeIndex
     });
+    nextState.battle.player.party = playerParty;
+    nextState.battle.player.activeIndex = 0;
+    nextState.battle.enemy.party = INITIAL_PARTY.enemy
+      .filter((unitId) => UNIT_LIBRARY[unitId])
+      .map((unitId, idx) => ({ unitId, slot: idx, maxHp: UNIT_LIBRARY[unitId].hp, hp: UNIT_LIBRARY[unitId].hp, statuses: [] }));
+    nextState.battle.enemy.activeIndex = 0;
     gameState = nextState;
     setPhase(PHASE.PLAYING);
     initializePlanningTurn();
-  };
-
-  const confirmHomeSelection = () => {
-    const selected = HOME_MENU_ITEMS[getSafeHomeIndex(gameState.ui.homeIndex)];
-    if (selected === "Battle") {
-      startBattleFromHome();
-      return;
-    }
-    if (selected === "Formation") {
-      setPhase(PHASE.FORMATION);
-    }
   };
 
   const dispatch = (action) => {
@@ -2322,11 +2424,71 @@
     return wrap;
   };
 
+  const isPointInRect = (x, y, rect) => {
+    if (!rect) return false;
+    return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+  };
+
+  const getHoveredHomeIndex = (x, y) => {
+    for (let i = 0; i < HOME_MENU_ITEMS.length; i += 1) {
+      const rect = {
+        x: CONFIG.UI.MENU_X,
+        y: CONFIG.UI.MENU_Y + (i * CONFIG.UI.MENU_SPACING_Y),
+        width: CONFIG.UI.MENU_WIDTH,
+        height: CONFIG.UI.MENU_ITEM_HEIGHT
+      };
+      if (isPointInRect(x, y, rect)) return i;
+    }
+    return -1;
+  };
+
+  const getHoveredFormationIndex = (x, y) => {
+    for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
+      const rect = {
+        x: CONFIG.UI.FORMATION_LIST_X,
+        y: CONFIG.UI.FORMATION_LIST_Y + (i * (CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT + CONFIG.UI.FORMATION_LIST_SPACING_Y)),
+        width: CONFIG.UI.FORMATION_LIST_WIDTH,
+        height: CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT
+      };
+      if (isPointInRect(x, y, rect)) return i;
+    }
+    return -1;
+  };
+
+  const getHoveredFormationSlotIndex = (x, y) => {
+    for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
+      const rect = {
+        x: CONFIG.UI.FORMATION_SLOT_X,
+        y: CONFIG.UI.FORMATION_SLOT_Y + (i * (CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_SPACING_Y)),
+        width: CONFIG.UI.FORMATION_SLOT_WIDTH,
+        height: CONFIG.UI.FORMATION_SLOT_HEIGHT
+      };
+      if (isPointInRect(x, y, rect)) return i;
+    }
+    return -1;
+  };
+
+  const getHoveredMonsterIndex = (x, y) => {
+    const count = Array.isArray(gameState.availableMonsters) ? gameState.availableMonsters.length : 0;
+    for (let i = 0; i < count; i += 1) {
+      const rect = {
+        x: CONFIG.UI.MONSTER_LIST_X,
+        y: CONFIG.UI.MONSTER_LIST_Y + (i * (CONFIG.UI.MONSTER_LIST_ITEM_HEIGHT + CONFIG.UI.MONSTER_LIST_SPACING_Y)),
+        width: CONFIG.UI.MONSTER_LIST_WIDTH,
+        height: CONFIG.UI.MONSTER_LIST_ITEM_HEIGHT
+      };
+      if (isPointInRect(x, y, rect)) return i;
+    }
+    return -1;
+  };
+
   const renderHomeScreen = () => {
     const wrap = createEl("section", "home-screen");
     wrap.style.setProperty("--menu-x", `${CONFIG.UI.MENU_X}px`);
     wrap.style.setProperty("--menu-y", `${CONFIG.UI.MENU_Y}px`);
     wrap.style.setProperty("--menu-spacing-y", `${CONFIG.UI.MENU_SPACING_Y}px`);
+    wrap.style.setProperty("--menu-width", `${CONFIG.UI.MENU_WIDTH}px`);
+    wrap.style.setProperty("--menu-item-height", `${CONFIG.UI.MENU_ITEM_HEIGHT}px`);
     wrap.style.setProperty("--panel-x", `${CONFIG.UI.PANEL_X}px`);
     wrap.style.setProperty("--panel-y", `${CONFIG.UI.PANEL_Y}px`);
     wrap.style.setProperty("--panel-width", `${CONFIG.UI.PANEL_WIDTH}px`);
@@ -2334,7 +2496,11 @@
 
     const menu = createEl("div", "home-menu");
     HOME_MENU_ITEMS.forEach((label, index) => {
-      const item = createEl("div", `home-menu-item${index === getSafeHomeIndex(gameState.ui.homeIndex) ? " active" : ""}`, label);
+      const isSelected = index === getSafeHomeIndex(gameState.ui.homeIndex);
+      const isHovered = index === gameState.ui.hoveredHomeIndex;
+      const item = createEl("button", `home-menu-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, label);
+      item.dataset.action = "home-select";
+      item.dataset.index = String(index);
       menu.appendChild(item);
     });
 
@@ -2351,12 +2517,21 @@
 
   const renderFormationScreen = () => {
     const wrap = createEl("section", "formation-screen");
+    wrap.style.setProperty("--formation-list-x", `${CONFIG.UI.FORMATION_LIST_X}px`);
+    wrap.style.setProperty("--formation-list-y", `${CONFIG.UI.FORMATION_LIST_Y}px`);
+    wrap.style.setProperty("--formation-list-width", `${CONFIG.UI.FORMATION_LIST_WIDTH}px`);
+    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT}px`);
+    wrap.style.setProperty("--formation-list-spacing-y", `${CONFIG.UI.FORMATION_LIST_SPACING_Y}px`);
     wrap.appendChild(createEl("h2", "formation-title", "Formation"));
     const list = createEl("div", "formation-slot-list");
     for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
       const formation = getFormationAt(gameState, i);
       const lines = formatFormationPreview(formation).join(" / ");
-      const item = createEl("div", `formation-slot-item${i === getSafeFormationSlot(gameState.ui.formationIndex) ? " active" : ""}`);
+      const isSelected = i === getSafeFormationSlot(gameState.ui.formationIndex);
+      const isHovered = i === gameState.ui.hoveredFormationIndex;
+      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
+      item.dataset.action = "formation-select";
+      item.dataset.index = String(i);
       item.append(createEl("div", "formation-slot-name", `Slot ${i + 1}`), createEl("div", "formation-slot-value", lines));
       list.appendChild(item);
     }
@@ -2370,21 +2545,45 @@
     const edit = gameState.ui.formationEdit;
     const draft = Array.isArray(edit.draft) ? edit.draft : [];
     wrap.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
+    wrap.style.setProperty("--formation-slot-x", `${CONFIG.UI.FORMATION_SLOT_X}px`);
+    wrap.style.setProperty("--formation-slot-y", `${CONFIG.UI.FORMATION_SLOT_Y}px`);
+    wrap.style.setProperty("--formation-slot-width", `${CONFIG.UI.FORMATION_SLOT_WIDTH}px`);
+    wrap.style.setProperty("--formation-slot-height", `${CONFIG.UI.FORMATION_SLOT_HEIGHT}px`);
+    wrap.style.setProperty("--formation-slot-spacing-y", `${CONFIG.UI.FORMATION_SLOT_SPACING_Y}px`);
+    wrap.style.setProperty("--monster-list-x", `${CONFIG.UI.MONSTER_LIST_X}px`);
+    wrap.style.setProperty("--monster-list-y", `${CONFIG.UI.MONSTER_LIST_Y}px`);
+    wrap.style.setProperty("--monster-list-width", `${CONFIG.UI.MONSTER_LIST_WIDTH}px`);
+    wrap.style.setProperty("--monster-list-item-height", `${CONFIG.UI.MONSTER_LIST_ITEM_HEIGHT}px`);
+    wrap.style.setProperty("--monster-list-spacing-y", `${CONFIG.UI.MONSTER_LIST_SPACING_Y}px`);
+    wrap.style.setProperty("--front-slot-color", CONFIG.UI.FRONT_SLOT_COLOR);
+    wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
     const body = createEl("div", "formation-edit-body");
     const party = createEl("div", "formation-edit-party");
-    party.appendChild(createEl("div", "formation-pane-title", "Party"));
+    party.appendChild(createEl("div", "formation-pane-title", "Formation (Front 1-3 / Reserve 4-6)"));
     for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
       const unitId = draft[i] || null;
       const text = unitId ? getUnitName(unitId) : "EMPTY";
-      party.appendChild(createEl("div", `formation-row${edit.mode === "party" && edit.selectedPartyIndex === i ? " active" : ""}`, `${i + 1}. ${text}`));
+      const isSelected = edit.selectedSlotIndex === i;
+      const isHovered = edit.hoveredSlotIndex === i;
+      const isFront = i < CONFIG.PARTY_ACTIVE_COUNT;
+      const row = createEl("button", `formation-row formation-slot-row ${isFront ? "front" : "reserve"}${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, `${i + 1}. ${text}`);
+      row.dataset.action = "edit-slot-select";
+      row.dataset.slotIndex = String(i);
+      row.appendChild(createEl("span", "formation-row-tag", isFront ? "FRONT" : "RESERVE"));
+      party.appendChild(row);
     }
     const box = createEl("div", "formation-edit-box");
-    box.appendChild(createEl("div", "formation-pane-title", "Box"));
+    box.appendChild(createEl("div", "formation-pane-title", "Available Monsters"));
     gameState.availableMonsters.forEach((unitId, idx) => {
-      box.appendChild(createEl("div", `formation-row${edit.mode === "box" && edit.selectedBoxIndex === idx ? " active" : ""}`, getUnitName(unitId)));
+      const isSelected = edit.selectedMonsterIndex === idx;
+      const isHovered = edit.hoveredMonsterIndex === idx;
+      const row = createEl("button", `formation-row monster-row${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, getUnitName(unitId));
+      row.dataset.action = "edit-monster-select";
+      row.dataset.monsterIndex = String(idx);
+      box.appendChild(row);
     });
     body.append(party, box);
-    wrap.append(body, createEl("div", "formation-help", "←→:モード  ↑↓:移動  Enter:設定/解除  S:保存  Esc:CANCEL"));
+    wrap.append(body, createEl("div", "formation-help", "Slot選択→Monster選択で配置 / ↑↓:移動  ←→:列移動  Enter:確定  Backspace:スロット解除  S:保存  Esc:CANCEL"));
     return wrap;
   };
 
@@ -2431,6 +2630,31 @@
   };
 
   const update = (now) => {
+    if (gameState.phase === PHASE.HOME) {
+      const nextHover = getHoveredHomeIndex(gameState.input.mouseX, gameState.input.mouseY);
+      if (gameState.ui.hoveredHomeIndex !== nextHover) {
+        gameState.ui.hoveredHomeIndex = nextHover;
+        if (nextHover >= 0) gameState.ui.homeIndex = nextHover;
+        render();
+      }
+    } else if (gameState.phase === PHASE.FORMATION) {
+      const nextHover = getHoveredFormationIndex(gameState.input.mouseX, gameState.input.mouseY);
+      if (gameState.ui.hoveredFormationIndex !== nextHover) {
+        gameState.ui.hoveredFormationIndex = nextHover;
+        if (nextHover >= 0) gameState.ui.formationIndex = nextHover;
+        render();
+      }
+    } else if (gameState.phase === PHASE.FORMATION_EDIT) {
+      const edit = gameState.ui.formationEdit;
+      const nextSlotHover = getHoveredFormationSlotIndex(gameState.input.mouseX, gameState.input.mouseY);
+      const nextMonsterHover = getHoveredMonsterIndex(gameState.input.mouseX, gameState.input.mouseY);
+      if (edit.hoveredSlotIndex !== nextSlotHover || edit.hoveredMonsterIndex !== nextMonsterHover) {
+        edit.hoveredSlotIndex = nextSlotHover;
+        edit.hoveredMonsterIndex = nextMonsterHover;
+        render();
+      }
+    }
+    gameState.input.mouseClicked = false;
     const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
     const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
     if (!hasHpAnimations && !hasPlayback) return;
@@ -2448,6 +2672,29 @@
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const a = target.dataset.action;
+    if (a === "home-select") {
+      handleHomeSelection(Number(target.dataset.index));
+      render();
+      return;
+    }
+    if (a === "formation-select") {
+      const index = Number(target.dataset.index);
+      const safe = getSafeFormationSlot(index);
+      const shouldEnter = safe === gameState.ui.formationIndex;
+      handleFormationSelection(safe, shouldEnter);
+      render();
+      return;
+    }
+    if (a === "edit-slot-select") {
+      handleFormationSlotSelect(Number(target.dataset.slotIndex));
+      render();
+      return;
+    }
+    if (a === "edit-monster-select") {
+      assignMonsterToSelectedSlot(Number(target.dataset.monsterIndex));
+      render();
+      return;
+    }
     if (a === "reset") dispatch({ type: "RESET" });
     if (a === "mode-fight") dispatch({ type: "MODE", mode: "fight" });
     if (a === "mode-party") dispatch({ type: "MODE", mode: "party" });
@@ -2467,7 +2714,7 @@
     if (gameState.phase === PHASE.HOME) {
       if (event.key === "ArrowUp") gameState.ui.homeIndex -= 1;
       if (event.key === "ArrowDown") gameState.ui.homeIndex += 1;
-      if (event.key === "Enter") confirmHomeSelection();
+      if (event.key === "Enter") handleHomeSelection(gameState.ui.homeIndex);
       ensureUiSafety();
       render();
       return;
@@ -2476,7 +2723,7 @@
     if (gameState.phase === PHASE.FORMATION) {
       if (event.key === "ArrowUp") gameState.ui.formationIndex -= 1;
       if (event.key === "ArrowDown") gameState.ui.formationIndex += 1;
-      if (event.key === "Enter") enterFormationEdit(gameState.ui.formationIndex);
+      if (event.key === "Enter") handleFormationSelection(gameState.ui.formationIndex, true);
       if (event.key === "Escape") setPhase(PHASE.HOME);
       ensureUiSafety();
       render();
@@ -2485,31 +2732,25 @@
 
     if (gameState.phase === PHASE.FORMATION_EDIT) {
       const edit = gameState.ui.formationEdit;
-      if (event.key === "ArrowLeft") edit.mode = "party";
-      if (event.key === "ArrowRight") edit.mode = "box";
+      if (event.key === "ArrowLeft") edit.mode = "slot";
+      if (event.key === "ArrowRight") edit.mode = "monster";
       if (event.key === "ArrowUp") {
-        if (edit.mode === "party") edit.selectedPartyIndex -= 1;
-        else edit.selectedBoxIndex -= 1;
+        if (edit.mode === "slot") edit.selectedSlotIndex -= 1;
+        else edit.selectedMonsterIndex -= 1;
       }
       if (event.key === "ArrowDown") {
-        if (edit.mode === "party") edit.selectedPartyIndex += 1;
-        else edit.selectedBoxIndex += 1;
+        if (edit.mode === "slot") edit.selectedSlotIndex += 1;
+        else edit.selectedMonsterIndex += 1;
       }
       if (event.key === "Enter") {
-        const draft = edit.draft;
-        if (edit.mode === "party") {
-          draft[getSafeEditPartyIndex(edit.selectedPartyIndex)] = null;
-        } else {
-          const boxIndex = getSafeBoxIndex(gameState, edit.selectedBoxIndex);
-          const unitId = gameState.availableMonsters[boxIndex] || null;
-          const partyIndex = getSafeEditPartyIndex(edit.selectedPartyIndex);
-          if (unitId) {
-            for (let i = 0; i < draft.length; i += 1) {
-              if (i !== partyIndex && draft[i] === unitId) draft[i] = null;
-            }
-            draft[partyIndex] = unitId;
-          }
-        }
+        if (edit.mode === "slot") handleFormationSlotSelect(edit.selectedSlotIndex);
+        else assignMonsterToSelectedSlot(edit.selectedMonsterIndex);
+      }
+      if (event.key === "Backspace") {
+        const idx = getSafeEditPartyIndex(edit.selectedSlotIndex);
+        const draft = cloneFormation(edit.draft);
+        draft[idx] = null;
+        edit.draft = draft;
       }
       if (event.key.toLowerCase() === "s") saveFormationEdit();
       if (event.key === "Escape") cancelFormationEdit();
@@ -2525,6 +2766,11 @@
   });
 
   document.addEventListener("mousemove", (event) => {
+    const appRect = document.getElementById("app")?.getBoundingClientRect?.();
+    const localX = appRect ? event.clientX - appRect.left : 0;
+    const localY = appRect ? event.clientY - appRect.top : 0;
+    gameState.input.mouseX = Number.isFinite(localX) ? localX : 0;
+    gameState.input.mouseY = Number.isFinite(localY) ? localY : 0;
     if (!isKoReplacementPhase()) return;
     const target = event.target?.closest?.("[data-action='target-cell']");
     const x = Number(target?.dataset?.x);
@@ -2534,6 +2780,10 @@
     gameState.ui.hoverSlot = nextHover;
     gameState.ui.pendingKoSlot = nextHover;
     render();
+  });
+
+  document.addEventListener("mousedown", () => {
+    gameState.input.mouseClicked = true;
   });
 
   ensureUiSafety();

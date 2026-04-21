@@ -925,14 +925,19 @@ button:disabled {
 }
 
 .home-menu-item {
-  min-width: 220px;
+  min-width: var(--menu-width);
+  min-height: var(--menu-item-height);
   padding: 8px 12px;
   border: 2px solid #4e638d;
   border-radius: 8px;
   background: rgba(30, 40, 62, 0.95);
+  color: #f3f7ff;
+  text-align: left;
+  cursor: pointer;
 }
 
-.home-menu-item.active {
+.home-menu-item.active,
+.home-menu-item.hover {
   border-color: #ffe163;
   box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
 }
@@ -968,8 +973,12 @@ button:disabled {
 .formation-title { margin: 0; }
 
 .formation-slot-list {
+  position: absolute;
+  left: var(--formation-list-x);
+  top: var(--formation-list-y);
+  width: var(--formation-list-width);
   display: grid;
-  gap: 8px;
+  gap: var(--formation-list-spacing-y);
 }
 
 .formation-slot-item,
@@ -978,12 +987,21 @@ button:disabled {
   border-radius: 8px;
   padding: 8px 10px;
   background: rgba(30, 40, 62, 0.95);
+  color: #f3f7ff;
+  text-align: left;
 }
 
 .formation-slot-item.active,
-.formation-row.active {
+.formation-row.active,
+.formation-slot-item.hover,
+.formation-row.hover {
   border-color: #ffe163;
   box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
+}
+
+.formation-slot-item {
+  min-height: var(--formation-list-item-height);
+  cursor: pointer;
 }
 
 .formation-help {
@@ -992,9 +1010,7 @@ button:disabled {
 }
 
 .formation-edit-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  display: block;
 }
 
 .formation-pane-title {
@@ -1004,7 +1020,42 @@ button:disabled {
 
 .formation-edit-party,
 .formation-edit-box {
+  position: absolute;
+  top: var(--formation-slot-y);
   display: grid;
-  gap: 8px;
+  gap: var(--formation-slot-spacing-y);
   align-content: start;
+}
+
+.formation-edit-party {
+  left: var(--formation-slot-x);
+  width: var(--formation-slot-width);
+}
+
+.formation-edit-box {
+  left: var(--monster-list-x);
+  width: var(--monster-list-width);
+  gap: var(--monster-list-spacing-y);
+}
+
+.formation-slot-row {
+  min-height: var(--formation-slot-height);
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.formation-slot-row.front { background: var(--front-slot-color); }
+.formation-slot-row.reserve { background: var(--reserve-slot-color); }
+
+.monster-row {
+  min-height: var(--monster-list-item-height);
+  cursor: pointer;
+}
+
+.formation-row-tag {
+  font-size: 11px;
+  opacity: 0.8;
 }
