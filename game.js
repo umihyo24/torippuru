@@ -7,6 +7,7 @@
     PARTY_ACTIVE_COUNT: 3,
     PARTY_TOTAL_COUNT: 6,
     PARTY_RESERVE_COUNT: 3,
+    FRONTLINE_DEPLOY_PRIORITY: [1, 0, 2],
     MAX_LOG_LINES: 160,
     MAX_TURNS: 60,
     POISON_RATIO: 0.1,
@@ -303,27 +304,31 @@
     };
   };
 
-  const buildAllyPartyFromFormation = (formations, availableMonsters, formationIndex = 0) => {
-    const defaultParty = INITIAL_PARTY.ally.slice(0, CONFIG.PARTY_TOTAL_COUNT);
-    const selected = getSafeFormationSlot(formationIndex);
-    const primary = cloneFormation(formations?.[selected] || null);
-    const picked = new Set(primary.filter(Boolean));
-    const pool = Array.isArray(availableMonsters) ? availableMonsters.filter((unitId) => UNIT_LIBRARY[unitId]) : [];
-    const fallbackPool = [...pool, ...defaultParty].filter((unitId, idx, arr) => unitId && arr.indexOf(unitId) === idx);
-    const active = [];
-    for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
-      const fromFormation = primary[i];
-      if (fromFormation && UNIT_LIBRARY[fromFormation]) {
-        active.push(fromFormation);
-        continue;
-      }
-      const candidate = fallbackPool.find((unitId) => !picked.has(unitId));
-      if (!candidate) continue;
-      active.push(candidate);
-      picked.add(candidate);
-    }
-    const reserve = fallbackPool.filter((unitId) => !picked.has(unitId)).slice(0, CONFIG.PARTY_RESERVE_COUNT);
-    return [...active, ...reserve].slice(0, CONFIG.PARTY_TOTAL_COUNT);
+  const getFormationUnitIds = (formation) => cloneFormation(formation)
+    .filter((unitId) => !!unitId && !!UNIT_LIBRARY[unitId]);
+
+  const getFrontFormationUnitIds = (formation) => cloneFormation(formation)
+    .slice(0, CONFIG.PARTY_ACTIVE_COUNT)
+    .filter((unitId) => !!unitId && !!UNIT_LIBRARY[unitId]);
+
+  const hasAnyValidFormationMember = (formation) => getFormationUnitIds(formation).length > 0;
+
+  const createAllyTeamFromFormation = (formation) => {
+    const normalized = cloneFormation(formation);
+    const frontIds = getFrontFormationUnitIds(normalized);
+    const activeIdsBySlot = Array.from({ length: CONFIG.BOARD_COLS }, () => null);
+    frontIds.slice(0, CONFIG.BOARD_COLS).forEach((unitId, index) => {
+      const slot = CONFIG.FRONTLINE_DEPLOY_PRIORITY[index];
+      if (!Number.isInteger(slot) || slot < 0 || slot >= CONFIG.BOARD_COLS) return;
+      activeIdsBySlot[slot] = unitId;
+    });
+
+    const active = activeIdsBySlot.map((unitId, slot) => (unitId ? createUnit(unitId, TEAM.ALLY, slot) : null));
+    const reserveIds = normalized
+      .slice(CONFIG.PARTY_ACTIVE_COUNT, FORMATION_MEMBER_COUNT)
+      .filter((unitId) => !!unitId && !!UNIT_LIBRARY[unitId]);
+    const reserve = reserveIds.map((unitId, idx) => createUnit(unitId, TEAM.ALLY, `r${idx}`));
+    return { active, reserve };
   };
 
   const createInitialState = (seed = {}) => {
@@ -333,7 +338,8 @@
       ? seed.availableMonsters.slice()
       : Object.keys(UNIT_LIBRARY);
     const battleFormationIndex = getSafeFormationSlot(seed.battleFormationIndex);
-    const allyParty = buildAllyPartyFromFormation(seedFormations, seedAvailableMonsters, battleFormationIndex);
+    const selectedFormation = cloneFormation(seedFormations[battleFormationIndex] || null);
+    const allyTeam = createAllyTeamFromFormation(selectedFormation);
     return ({
       phase: PHASE.HOME,
       turn: 1,
@@ -347,7 +353,7 @@
         mouseY: 0,
         mouseClicked: false
       },
-      battle: {
+    battle: {
         player: {
           activeIndex: 0,
           party: []
@@ -360,10 +366,8 @@
       battlefield: { background: getAssetPath("backgrounds", "battle") },
       teams: {
         ally: {
-          active: allyParty.slice(0, CONFIG.PARTY_ACTIVE_COUNT).map((unitId, slot) => createUnit(unitId, TEAM.ALLY, slot)),
-          reserve: allyParty
-            .slice(CONFIG.PARTY_ACTIVE_COUNT, CONFIG.PARTY_ACTIVE_COUNT + CONFIG.PARTY_RESERVE_COUNT)
-            .map((unitId, idx) => createUnit(unitId, TEAM.ALLY, `r${idx}`)),
+          active: allyTeam.active,
+          reserve: allyTeam.reserve,
         statuses: [],
         tileEffects: [[], [], []]
       },
@@ -429,6 +433,10 @@
         activeTeam: null,
         pendingSlots: []
       }
+    },
+    playing: {
+      turnCount: 0,
+      hasCompletedFirstTurn: false
     },
     displayState: {
       hpAnimations: {},
@@ -630,6 +638,20 @@
     if (!inBounds(pos)) return null;
     const team = pos.y === 0 ? TEAM.ENEMY : TEAM.ALLY;
     return state.teams[team].active[pos.x] || null;
+  };
+
+  const getLivingMonsters = (team, state = gameState) => {
+    const teamState = state?.teams?.[team];
+    if (!teamState) return [];
+    const active = Array.isArray(teamState.active) ? teamState.active.filter(isAlive) : [];
+    const reserve = Array.isArray(teamState.reserve) ? teamState.reserve.filter(isAlive) : [];
+    return [...active, ...reserve];
+  };
+
+  const getActiveFieldUnits = (team, state = gameState) => {
+    const active = state?.teams?.[team]?.active;
+    if (!Array.isArray(active)) return [];
+    return active.filter(isAlive);
   };
 
   const getUnitByUid = (uid) => {
@@ -910,6 +932,63 @@
     if (move.targetRule === "allyOtherSingle") return targetUnit.team === actor.team && targetUnit.uid !== actor.uid;
     if (move.targetRule === "anyOtherSingle") return targetUnit.uid !== actor.uid;
     return true;
+  };
+
+  const canMoveReachTarget = (attacker, defender, moveId) => {
+    if (!attacker || !defender || !moveId) return null;
+    const move = MOVES[moveId];
+    if (!move) return null;
+    if (move.category !== "attack") return false;
+    if (!patterns[move.patternId]) return null;
+    const reachable = getPatternPositionsForMove(attacker, move);
+    const targetPos = toBoardPos(defender.team, defender.slot);
+    if (!reachable.some((pos) => pos.x === targetPos.x && pos.y === targetPos.y)) return false;
+    return isRuleMatchAtPosition(attacker, move, defender);
+  };
+
+  const hasAnyReachableMove = (attacker, defender) => {
+    if (!attacker || !defender) return true;
+    const moveIds = Array.isArray(attacker.moveIds) ? attacker.moveIds : [];
+    let checkedAnyAttackMove = false;
+    for (const moveId of moveIds) {
+      const move = MOVES[moveId];
+      if (!move) return true;
+      if (move.category !== "attack") continue;
+      checkedAnyAttackMove = true;
+      const canReach = canMoveReachTarget(attacker, defender, moveId);
+      if (canReach === null) return true;
+      if (canReach) return true;
+    }
+    return !checkedAnyAttackMove ? true : false;
+  };
+
+  const shouldTriggerResetMove = (state = gameState) => {
+    if (!state?.playing?.hasCompletedFirstTurn) return false;
+    const allyLiving = getLivingMonsters(TEAM.ALLY, state);
+    const enemyLiving = getLivingMonsters(TEAM.ENEMY, state);
+    if (allyLiving.length !== 1 || enemyLiving.length !== 1) return false;
+    const allyActive = getActiveFieldUnits(TEAM.ALLY, state);
+    const enemyActive = getActiveFieldUnits(TEAM.ENEMY, state);
+    if (allyActive.length !== 1 || enemyActive.length !== 1) return false;
+    if (allyActive[0].uid !== allyLiving[0].uid || enemyActive[0].uid !== enemyLiving[0].uid) return false;
+    const allyCanReach = hasAnyReachableMove(allyActive[0], enemyActive[0]);
+    const enemyCanReach = hasAnyReachableMove(enemyActive[0], allyActive[0]);
+    return !allyCanReach && !enemyCanReach;
+  };
+
+  const applyResetMove = (state = gameState) => {
+    const centerSlot = Math.floor(CONFIG.BOARD_COLS / 2);
+    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+      const activeUnits = getActiveFieldUnits(team, state);
+      if (activeUnits.length !== 1) return;
+      const unit = activeUnits[0];
+      if (unit.slot === centerSlot) return;
+      const teamActive = state.teams[team].active;
+      if (!Array.isArray(teamActive)) return;
+      teamActive[unit.slot] = null;
+      teamActive[centerSlot] = unit;
+      unit.slot = centerSlot;
+    });
   };
 
   const isPlaybackBusy = () => gameState.battleFlow.mode === "playback" || gameState.battleFlow.mode === "resolve";
@@ -1675,6 +1754,12 @@
       gameState.winner = winner;
       return;
     }
+    if (shouldTriggerResetMove(gameState)) {
+      applyResetMove(gameState);
+      appendBattleLogEntry("距離が離れすぎたため、両者は中央へ移動した。");
+    }
+    gameState.playing.turnCount += 1;
+    if (gameState.playing.turnCount >= 1) gameState.playing.hasCompletedFirstTurn = true;
     initializePlanningTurn();
     if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
       gameState.phase = PHASE.GAMEOVER;
@@ -1962,15 +2047,18 @@
   };
 
   const createBattlePartyFromFormation = (formationIndex) => {
-    const partyIds = buildAllyPartyFromFormation(gameState.formations, gameState.availableMonsters, formationIndex);
+    const safeIndex = getSafeFormationSlot(formationIndex);
+    const formation = getFormationAt(gameState, safeIndex);
+    const partyIds = getFormationUnitIds(formation);
     return partyIds
       .filter((unitId) => UNIT_LIBRARY[unitId])
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: UNIT_LIBRARY[unitId].hp, hp: UNIT_LIBRARY[unitId].hp, statuses: [] }));
   };
 
   const startBattleFromFormation = (formationIndex) => {
-    if (!Array.isArray(getFormationAt(gameState, formationIndex))) return;
     const safeIndex = getSafeFormationSlot(formationIndex);
+    const formation = getFormationAt(gameState, safeIndex);
+    if (!hasAnyValidFormationMember(formation)) return;
     const playerParty = createBattlePartyFromFormation(safeIndex);
     const nextState = createInitialState({
       formations: gameState.formations,
@@ -2707,7 +2795,8 @@
     const buttons = createEl("div", "screen-button-row");
     const start = createEl("button", "screen-nav-btn", "Start Battle");
     start.dataset.action = "battle-start";
-    start.disabled = gameState.ui.battlePrepareIndex < 0 || !Array.isArray(getFormationAt(gameState, gameState.ui.battlePrepareIndex));
+    const selectedFormation = gameState.ui.battlePrepareIndex >= 0 ? getFormationAt(gameState, gameState.ui.battlePrepareIndex) : null;
+    start.disabled = gameState.ui.battlePrepareIndex < 0 || !hasAnyValidFormationMember(selectedFormation);
     const back = createEl("button", "screen-nav-btn", "Back HOME");
     back.dataset.action = "go-home";
     buttons.append(start, back);
