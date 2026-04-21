@@ -28,24 +28,31 @@
     SPEED_BASE: 1,
     UI: {
       FORMATION_EDIT_PADDING: 20,
-      FORMATION_GRID_X: 20,
-      FORMATION_GRID_Y: 92,
-      FORMATION_GRID_COLS: 3,
-      FORMATION_GRID_ROWS: 2,
-      FORMATION_SLOT_WIDTH: 240,
-      FORMATION_SLOT_HEIGHT: 96,
-      FORMATION_SLOT_GAP_X: 12,
-      FORMATION_SLOT_GAP_Y: 12,
-      MONSTER_LIST_X: 20,
-      MONSTER_LIST_Y: 326,
-      MONSTER_LIST_WIDTH: 740,
-      MONSTER_LIST_HEIGHT: 392,
-      MONSTER_ITEM_HEIGHT: 56,
-      MONSTER_ITEM_GAP: 8,
+      FORMATION_TOP_X: 20,
+      FORMATION_TOP_Y: 72,
+      FORMATION_TOP_WIDTH: 740,
+      FORMATION_TOP_HEIGHT: 248,
+      SLOT_WIDTH: 238,
+      SLOT_HEIGHT: 112,
+      SLOT_IMAGE_HEIGHT: 78,
+      SLOT_NAME_HEIGHT: 24,
+      SLOT_GAP_X: 12,
+      SLOT_GAP_Y: 12,
+      DIVIDER_Y: 336,
+      DIVIDER_HEIGHT: 4,
+      MONSTER_GRID_X: 20,
+      MONSTER_GRID_Y: 352,
+      MONSTER_GRID_WIDTH: 740,
+      MONSTER_GRID_HEIGHT: 424,
+      MONSTER_CARD_WIDTH: 116,
+      MONSTER_CARD_HEIGHT: 96,
+      MONSTER_GRID_COLS: 6,
+      MONSTER_GRID_GAP_X: 8,
+      MONSTER_GRID_GAP_Y: 8,
       BUTTON_AREA_X: 20,
-      BUTTON_AREA_Y: 730,
+      BUTTON_AREA_Y: 790,
       BUTTON_AREA_WIDTH: 740,
-      BUTTON_AREA_HEIGHT: 80,
+      BUTTON_AREA_HEIGHT: 56,
       BUTTON_WIDTH: 140,
       BUTTON_HEIGHT: 42,
       BUTTON_GAP: 12,
@@ -401,7 +408,8 @@
         battlePrepareIndex: -1,
         formationEdit: {
           selectedSlotIndex: -1,
-          draft: null
+          draft: null,
+          scrollOffset: 0
         },
       command: "fight",
       partyIndex: 0,
@@ -512,6 +520,7 @@
     edit.selectedSlotIndex = getSelectableIndex(edit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
     if (!Array.isArray(edit.draft)) edit.draft = createEmptyFormation();
     edit.draft = cloneFormation(edit.draft);
+    edit.scrollOffset = Math.max(0, Number.isFinite(edit.scrollOffset) ? Math.trunc(edit.scrollOffset) : 0);
   };
 
   const setPhase = (phase) => {
@@ -537,6 +546,7 @@
     gameState.currentEditIndex = safeIndex;
     gameState.ui.formationEdit.selectedSlotIndex = -1;
     gameState.ui.formationEdit.draft = cloneFormation(source);
+    gameState.ui.formationEdit.scrollOffset = 0;
     setPhase(PHASE.FORMATION_EDIT);
   };
 
@@ -586,6 +596,11 @@
   };
 
   const findMonsterSlotInDraft = (draft, monsterId) => cloneFormation(draft).findIndex((unitId) => unitId === monsterId);
+
+  const getAssignedSlotLabel = (draft, monsterId) => {
+    const slotIndex = findMonsterSlotInDraft(draft, monsterId);
+    return slotIndex >= 0 ? `SET:${slotIndex + 1}` : "";
+  };
 
   const assignOrSwapMonsterInDraft = (draft, targetSlotIndex, monsterId) => {
     const out = cloneFormation(draft);
@@ -2559,63 +2574,57 @@
     return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
   };
 
-  const getFormationGridRect = () => {
-    const width = (CONFIG.UI.FORMATION_SLOT_WIDTH * CONFIG.UI.FORMATION_GRID_COLS)
-      + (CONFIG.UI.FORMATION_SLOT_GAP_X * (CONFIG.UI.FORMATION_GRID_COLS - 1));
-    const height = (CONFIG.UI.FORMATION_SLOT_HEIGHT * CONFIG.UI.FORMATION_GRID_ROWS)
-      + (CONFIG.UI.FORMATION_SLOT_GAP_Y * (CONFIG.UI.FORMATION_GRID_ROWS - 1));
-    return { x: CONFIG.UI.FORMATION_GRID_X, y: CONFIG.UI.FORMATION_GRID_Y, width, height };
-  };
-
-  const getMonsterListRect = () => ({
-    x: CONFIG.UI.MONSTER_LIST_X,
-    y: CONFIG.UI.MONSTER_LIST_Y,
-    width: CONFIG.UI.MONSTER_LIST_WIDTH,
-    height: CONFIG.UI.MONSTER_LIST_HEIGHT
-  });
-
-  const getButtonAreaRect = () => ({
-    x: CONFIG.UI.BUTTON_AREA_X,
-    y: CONFIG.UI.BUTTON_AREA_Y,
-    width: CONFIG.UI.BUTTON_AREA_WIDTH,
-    height: CONFIG.UI.BUTTON_AREA_HEIGHT
-  });
-
   const getFormationSlotRects = () => {
     const rects = [];
     for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
-      const row = Math.floor(i / CONFIG.UI.FORMATION_GRID_COLS);
-      const col = i % CONFIG.UI.FORMATION_GRID_COLS;
+      const row = Math.floor(i / CONFIG.PARTY_ACTIVE_COUNT);
+      const col = i % CONFIG.PARTY_ACTIVE_COUNT;
       rects.push({
         index: i,
-        x: CONFIG.UI.FORMATION_GRID_X + (col * (CONFIG.UI.FORMATION_SLOT_WIDTH + CONFIG.UI.FORMATION_SLOT_GAP_X)),
-        y: CONFIG.UI.FORMATION_GRID_Y + (row * (CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_GAP_Y)),
-        width: CONFIG.UI.FORMATION_SLOT_WIDTH,
-        height: CONFIG.UI.FORMATION_SLOT_HEIGHT
+        x: CONFIG.UI.FORMATION_TOP_X + (col * (CONFIG.UI.SLOT_WIDTH + CONFIG.UI.SLOT_GAP_X)),
+        y: CONFIG.UI.FORMATION_TOP_Y + (row * (CONFIG.UI.SLOT_HEIGHT + CONFIG.UI.SLOT_GAP_Y)),
+        width: CONFIG.UI.SLOT_WIDTH,
+        height: CONFIG.UI.SLOT_HEIGHT
       });
     }
     return rects;
   };
 
-  const getMonsterListItemRects = (count = 0) => {
+  const getMonsterGridItemRects = (scrollOffset = 0, count = 0) => {
     const itemCount = Math.max(0, count);
+    const maxVisibleRows = Math.max(1, Math.floor((CONFIG.UI.MONSTER_GRID_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)
+      / (CONFIG.UI.MONSTER_CARD_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)));
+    const maxScroll = Math.max(0, Math.ceil(itemCount / CONFIG.UI.MONSTER_GRID_COLS) - maxVisibleRows);
+    const safeScroll = clamp(Number.isFinite(scrollOffset) ? Math.trunc(scrollOffset) : 0, 0, maxScroll);
     const rects = [];
     for (let i = 0; i < itemCount; i += 1) {
+      const row = Math.floor(i / CONFIG.UI.MONSTER_GRID_COLS);
+      const col = i % CONFIG.UI.MONSTER_GRID_COLS;
+      const viewRow = row - safeScroll;
+      if (viewRow < 0) continue;
+      const y = CONFIG.UI.MONSTER_GRID_Y + (viewRow * (CONFIG.UI.MONSTER_CARD_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y));
+      if (y + CONFIG.UI.MONSTER_CARD_HEIGHT > CONFIG.UI.MONSTER_GRID_Y + CONFIG.UI.MONSTER_GRID_HEIGHT) continue;
       rects.push({
         index: i,
-        x: CONFIG.UI.MONSTER_LIST_X,
-        y: CONFIG.UI.MONSTER_LIST_Y + (i * (CONFIG.UI.MONSTER_ITEM_HEIGHT + CONFIG.UI.MONSTER_ITEM_GAP)),
-        width: CONFIG.UI.MONSTER_LIST_WIDTH,
-        height: CONFIG.UI.MONSTER_ITEM_HEIGHT
+        x: CONFIG.UI.MONSTER_GRID_X + (col * (CONFIG.UI.MONSTER_CARD_WIDTH + CONFIG.UI.MONSTER_GRID_GAP_X)),
+        y,
+        width: CONFIG.UI.MONSTER_CARD_WIDTH,
+        height: CONFIG.UI.MONSTER_CARD_HEIGHT
       });
     }
     return rects;
+  };
+
+  const getMonsterGridMaxScroll = (count = 0) => {
+    const itemCount = Math.max(0, count);
+    const visibleRows = Math.max(1, Math.floor((CONFIG.UI.MONSTER_GRID_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)
+      / (CONFIG.UI.MONSTER_CARD_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)));
+    return Math.max(0, Math.ceil(itemCount / CONFIG.UI.MONSTER_GRID_COLS) - visibleRows);
   };
 
   const getFormationEditButtonRects = () => {
-    const area = getButtonAreaRect();
-    const y = area.y + Math.floor((area.height - CONFIG.UI.BUTTON_HEIGHT) / 2);
-    const firstX = area.x;
+    const y = CONFIG.UI.BUTTON_AREA_Y + Math.floor((CONFIG.UI.BUTTON_AREA_HEIGHT - CONFIG.UI.BUTTON_HEIGHT) / 2);
+    const firstX = CONFIG.UI.BUTTON_AREA_X;
     const stride = CONFIG.UI.BUTTON_WIDTH + CONFIG.UI.BUTTON_GAP;
     return {
       save: { x: firstX, y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT },
@@ -2689,89 +2698,119 @@
     const edit = gameState.ui.formationEdit;
     const draft = cloneFormation(edit.draft);
     const slotRects = getFormationSlotRects();
-    const monsterRects = getMonsterListItemRects(gameState.availableMonsters.length);
+    const monsterRects = getMonsterGridItemRects(edit.scrollOffset, gameState.availableMonsters.length);
     const buttonRects = getFormationEditButtonRects();
-    const gridRect = getFormationGridRect();
-    const monsterListRect = getMonsterListRect();
-    const buttonAreaRect = getButtonAreaRect();
     wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
+    wrap.style.setProperty("--front-slot-color", CONFIG.UI.FRONT_SLOT_COLOR);
+    wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
     wrap.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
     const body = createEl("div", "formation-edit-body");
-
     const formationArea = createEl("div", "formation-edit-area formation-grid-area");
-    formationArea.style.left = `${gridRect.x}px`;
-    formationArea.style.top = `${gridRect.y}px`;
-    formationArea.style.width = `${gridRect.width}px`;
-    formationArea.style.height = `${gridRect.height}px`;
-    formationArea.appendChild(createEl("div", "formation-pane-title", "Formation"));
-    const frontLabel = createEl("div", "formation-zone-label front", "FRONT");
-    frontLabel.style.top = "-12px";
-    const reserveLabel = createEl("div", "formation-zone-label reserve", "RESERVE");
-    reserveLabel.style.top = `${CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_GAP_Y - 12}px`;
+    formationArea.style.left = `${CONFIG.UI.FORMATION_TOP_X}px`;
+    formationArea.style.top = `${CONFIG.UI.FORMATION_TOP_Y}px`;
+    formationArea.style.width = `${CONFIG.UI.FORMATION_TOP_WIDTH}px`;
+    formationArea.style.height = `${CONFIG.UI.FORMATION_TOP_HEIGHT}px`;
+    formationArea.appendChild(createEl("div", "formation-pane-title", "Formation Slots"));
+    const frontLabel = createEl("div", "formation-zone-label front", "FRONT 1-3");
+    frontLabel.style.top = "4px";
+    const reserveLabel = createEl("div", "formation-zone-label reserve", "RESERVE 4-6");
+    reserveLabel.style.top = `${CONFIG.UI.SLOT_HEIGHT + CONFIG.UI.SLOT_GAP_Y + 4}px`;
     formationArea.append(frontLabel, reserveLabel);
     slotRects.forEach((rect) => {
       const unitId = draft[rect.index] || null;
-      const text = unitId ? getUnitName(unitId) : "EMPTY";
+      const unit = unitId ? UNIT_LIBRARY[unitId] : null;
       const isSelected = edit.selectedSlotIndex === rect.index;
       const isFront = rect.index < CONFIG.PARTY_ACTIVE_COUNT;
-      const row = createEl("button", `formation-row formation-slot-row ${isFront ? "front" : "reserve"}${isSelected ? " active" : ""}`, `${rect.index + 1}. ${text}`);
-      row.style.left = `${rect.x - gridRect.x}px`;
-      row.style.top = `${rect.y - gridRect.y}px`;
+      const row = createEl("button", `formation-row formation-slot-row ${isFront ? "front" : "reserve"}${isSelected ? " active" : ""}`);
+      row.style.left = `${rect.x - CONFIG.UI.FORMATION_TOP_X}px`;
+      row.style.top = `${rect.y - CONFIG.UI.FORMATION_TOP_Y}px`;
       row.style.width = `${rect.width}px`;
       row.style.height = `${rect.height}px`;
       row.dataset.action = "edit-slot-select";
       row.dataset.slotIndex = String(rect.index);
-      row.appendChild(createEl("span", "formation-row-tag", isFront ? "FRONT" : "RESERVE"));
+      const imageWrap = createEl("div", "formation-slot-image");
+      if (unit) {
+        const portrait = createImageWithFallback({
+          src: getAssetPath("portraits", unit.portrait),
+          alt: unit.name,
+          wrapperClass: "slot-portrait",
+          placeholderLabel: unit.name,
+          placeholderSubLabel: "NO IMAGE"
+        });
+        imageWrap.appendChild(portrait);
+      } else {
+        imageWrap.appendChild(createEl("div", "formation-slot-empty-image", "EMPTY"));
+      }
+      const name = createEl("div", "formation-slot-name", unit ? unit.name : "未設定");
+      const zone = createEl("span", "formation-row-tag", isFront ? "FRONT" : "RESERVE");
+      row.append(imageWrap, name, zone);
       formationArea.appendChild(row);
     });
 
+    const divider = createEl("div", "formation-edit-divider");
+    divider.style.left = `${CONFIG.UI.FORMATION_TOP_X}px`;
+    divider.style.top = `${CONFIG.UI.DIVIDER_Y}px`;
+    divider.style.width = `${CONFIG.UI.FORMATION_TOP_WIDTH}px`;
+    divider.style.height = `${CONFIG.UI.DIVIDER_HEIGHT}px`;
+
     const box = createEl("div", "formation-edit-area formation-monster-area");
-    box.style.left = `${monsterListRect.x}px`;
-    box.style.top = `${monsterListRect.y}px`;
-    box.style.width = `${monsterListRect.width}px`;
-    box.style.height = `${monsterListRect.height}px`;
+    box.style.left = `${CONFIG.UI.MONSTER_GRID_X}px`;
+    box.style.top = `${CONFIG.UI.MONSTER_GRID_Y}px`;
+    box.style.width = `${CONFIG.UI.MONSTER_GRID_WIDTH}px`;
+    box.style.height = `${CONFIG.UI.MONSTER_GRID_HEIGHT}px`;
     box.appendChild(createEl("div", "formation-pane-title", "Available Monsters"));
-    gameState.availableMonsters.forEach((unitId, idx) => {
+    monsterRects.forEach((rect) => {
+      const unitId = gameState.availableMonsters[rect.index];
+      const unit = UNIT_LIBRARY[unitId];
+      if (!unit) return;
       const assignedSlot = findMonsterSlotInDraft(draft, unitId);
-      const rect = monsterRects[idx];
-      if (!rect) return;
-      const row = createEl("button", `formation-row monster-row${assignedSlot >= 0 ? " assigned" : ""}`, getUnitName(unitId));
-      row.style.left = "0px";
-      row.style.top = `${rect.y - monsterListRect.y}px`;
+      const row = createEl("button", `formation-row monster-row${assignedSlot >= 0 ? " assigned" : ""}`);
+      row.style.left = `${rect.x - CONFIG.UI.MONSTER_GRID_X}px`;
+      row.style.top = `${rect.y - CONFIG.UI.MONSTER_GRID_Y}px`;
       row.style.width = `${rect.width}px`;
       row.style.height = `${rect.height}px`;
       row.dataset.action = "edit-monster-select";
-      row.dataset.monsterIndex = String(idx);
-      if (assignedSlot >= 0) row.appendChild(createEl("span", "assigned-badge", `SET:${assignedSlot + 1}`));
+      row.dataset.monsterIndex = String(rect.index);
+      const portrait = createImageWithFallback({
+        src: getAssetPath("portraits", unit.portrait),
+        alt: unit.name,
+        wrapperClass: "monster-card-portrait",
+        placeholderLabel: unit.name,
+        placeholderSubLabel: "NO IMAGE"
+      });
+      row.appendChild(portrait);
+      row.appendChild(createEl("div", "monster-card-name", unit.name));
+      const slotLabel = getAssignedSlotLabel(draft, unitId);
+      if (slotLabel) row.appendChild(createEl("span", "assigned-badge", slotLabel));
       box.appendChild(row);
     });
 
     const buttons = createEl("div", "formation-edit-area formation-button-area");
-    buttons.style.left = `${buttonAreaRect.x}px`;
-    buttons.style.top = `${buttonAreaRect.y}px`;
-    buttons.style.width = `${buttonAreaRect.width}px`;
-    buttons.style.height = `${buttonAreaRect.height}px`;
+    buttons.style.left = `${CONFIG.UI.BUTTON_AREA_X}px`;
+    buttons.style.top = `${CONFIG.UI.BUTTON_AREA_Y}px`;
+    buttons.style.width = `${CONFIG.UI.BUTTON_AREA_WIDTH}px`;
+    buttons.style.height = `${CONFIG.UI.BUTTON_AREA_HEIGHT}px`;
     const saveBtn = createEl("button", "screen-nav-btn", "Save");
     saveBtn.dataset.action = "edit-save";
-    saveBtn.style.left = `${buttonRects.save.x - buttonAreaRect.x}px`;
-    saveBtn.style.top = `${buttonRects.save.y - buttonAreaRect.y}px`;
+    saveBtn.style.left = `${buttonRects.save.x - CONFIG.UI.BUTTON_AREA_X}px`;
+    saveBtn.style.top = `${buttonRects.save.y - CONFIG.UI.BUTTON_AREA_Y}px`;
     saveBtn.style.width = `${buttonRects.save.width}px`;
     saveBtn.style.height = `${buttonRects.save.height}px`;
     const cancelBtn = createEl("button", "screen-nav-btn", "Cancel");
     cancelBtn.dataset.action = "edit-cancel";
-    cancelBtn.style.left = `${buttonRects.cancel.x - buttonAreaRect.x}px`;
-    cancelBtn.style.top = `${buttonRects.cancel.y - buttonAreaRect.y}px`;
+    cancelBtn.style.left = `${buttonRects.cancel.x - CONFIG.UI.BUTTON_AREA_X}px`;
+    cancelBtn.style.top = `${buttonRects.cancel.y - CONFIG.UI.BUTTON_AREA_Y}px`;
     cancelBtn.style.width = `${buttonRects.cancel.width}px`;
     cancelBtn.style.height = `${buttonRects.cancel.height}px`;
     const backBtn = createEl("button", "screen-nav-btn", "Back");
     backBtn.dataset.action = "edit-back";
-    backBtn.style.left = `${buttonRects.back.x - buttonAreaRect.x}px`;
-    backBtn.style.top = `${buttonRects.back.y - buttonAreaRect.y}px`;
+    backBtn.style.left = `${buttonRects.back.x - CONFIG.UI.BUTTON_AREA_X}px`;
+    backBtn.style.top = `${buttonRects.back.y - CONFIG.UI.BUTTON_AREA_Y}px`;
     backBtn.style.width = `${buttonRects.back.width}px`;
     backBtn.style.height = `${buttonRects.back.height}px`;
     buttons.append(saveBtn, cancelBtn, backBtn);
-    body.append(formationArea, box, buttons);
-    wrap.append(body, createEl("div", "formation-help", "Select slot then monster / Backspace: clear slot"));
+    body.append(formationArea, divider, box, buttons);
+    wrap.append(body, createEl("div", "formation-help", "スロット選択→モンスター選択 / マウスホイールで一覧スクロール"));
     return wrap;
   };
 
@@ -2883,7 +2922,7 @@
         return true;
       }
     }
-    const monsterRects = getMonsterListItemRects(gameState.availableMonsters.length);
+    const monsterRects = getMonsterGridItemRects(gameState.ui.formationEdit.scrollOffset, gameState.availableMonsters.length);
     for (const rect of monsterRects) {
       if (isPointInRect(x, y, rect)) {
         assignMonsterToSelectedSlot(rect.index);
@@ -3045,6 +3084,26 @@
     gameState.ui.pendingKoSlot = nextHover;
     render();
   });
+
+  document.addEventListener("wheel", (event) => {
+    if (gameState.phase !== PHASE.FORMATION_EDIT) return;
+    const pointer = getLocalPointerPosition(event);
+    const gridRect = {
+      x: CONFIG.UI.MONSTER_GRID_X,
+      y: CONFIG.UI.MONSTER_GRID_Y,
+      width: CONFIG.UI.MONSTER_GRID_WIDTH,
+      height: CONFIG.UI.MONSTER_GRID_HEIGHT
+    };
+    if (!isPointInRect(pointer.x, pointer.y, gridRect)) return;
+    const maxScroll = getMonsterGridMaxScroll(gameState.availableMonsters.length);
+    if (maxScroll <= 0) return;
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? 1 : -1;
+    const next = clamp(gameState.ui.formationEdit.scrollOffset + direction, 0, maxScroll);
+    if (next === gameState.ui.formationEdit.scrollOffset) return;
+    gameState.ui.formationEdit.scrollOffset = next;
+    render();
+  }, { passive: false });
 
   document.addEventListener("mousedown", () => {
     gameState.input.mouseClicked = true;
