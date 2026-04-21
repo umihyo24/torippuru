@@ -905,3 +905,106 @@ button:disabled {
   align-items: center;
   height: 100%;
 }
+
+.home-screen,
+.formation-screen,
+.formation-edit-screen {
+  position: relative;
+  min-height: 840px;
+  border: 2px solid #5b6f95;
+  border-radius: 12px;
+  background: rgba(14, 21, 34, 0.88);
+}
+
+.home-menu {
+  position: absolute;
+  left: var(--menu-x);
+  top: var(--menu-y);
+  display: grid;
+  gap: var(--menu-spacing-y);
+}
+
+.home-menu-item {
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 2px solid #4e638d;
+  border-radius: 8px;
+  background: rgba(30, 40, 62, 0.95);
+}
+
+.home-menu-item.active {
+  border-color: #ffe163;
+  box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
+}
+
+.home-info-panel {
+  position: absolute;
+  left: var(--panel-x);
+  top: var(--panel-y);
+  width: var(--panel-width);
+  min-height: var(--panel-height);
+  border: 2px solid #4e638d;
+  border-radius: 10px;
+  background: rgba(20, 30, 50, 0.85);
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.home-info-title { margin: 0; }
+.home-info-description { margin: 0; color: #d5e0f7; }
+.home-info-sub { color: #9eb4e9; font-size: 12px; }
+.home-info-line { font-size: 14px; }
+
+.formation-screen,
+.formation-edit-screen {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.formation-title { margin: 0; }
+
+.formation-slot-list {
+  display: grid;
+  gap: 8px;
+}
+
+.formation-slot-item,
+.formation-row {
+  border: 2px solid #4e638d;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(30, 40, 62, 0.95);
+}
+
+.formation-slot-item.active,
+.formation-row.active {
+  border-color: #ffe163;
+  box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
+}
+
+.formation-help {
+  color: #b7c8ee;
+  font-size: 13px;
+}
+
+.formation-edit-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formation-pane-title {
+  margin-bottom: 6px;
+  color: #b7c8ee;
+}
+
+.formation-edit-party,
+.formation-edit-box {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
