@@ -1514,14 +1514,23 @@
     const activeAllyIds = gameState.teams.ally.active.map((unit) => unit?.uid).filter(Boolean);
     const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds, ...activeAllyIds]);
     if (!candidates.some((c) => c.index === selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
+    const replacement = replaceActiveUnitFromReserve({
+      state: gameState,
+      team: TEAM.ALLY,
+      slot: gameState.currentActorIndex,
+      incomingUnitId: reserve.uid,
+      reserveIndexHint: selectedReserveIndex,
+      reserveMode: "swap"
+    });
+    if (!replacement) return;
     gameState.confirmedCommands[gameState.currentActorIndex] = {
-      actorId: actor.uid,
-      actorName: actor.name,
+      actorId: replacement.incoming.uid,
+      actorName: replacement.incoming.name,
       moveId: "switch",
-      moveName: `Switch → ${reserve.name}`,
+      moveName: `Switch → ${replacement.incoming.name}`,
       targetType: "交代",
-      targetNames: reserve ? [reserve.name] : [],
-      action: { type: "switch", team: TEAM.ALLY, slot: gameState.currentActorIndex, actorId: actor.uid, switchTargetId: reserve.uid }
+      targetNames: [replacement.incoming.name],
+      action: null
     };
     setPartyUiCommand("fight");
     if (!advancePlanningSlot()) queueTurnResolution();
