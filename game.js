@@ -241,6 +241,10 @@
     },
     globalStatuses: [],
     confirmedCommands: Array.from({ length: CONFIG.BOARD_COLS }, () => null),
+    turnSwitchRequests: {
+      ally: Array.from({ length: CONFIG.BOARD_COLS }, () => null),
+      enemy: Array.from({ length: CONFIG.BOARD_COLS }, () => null)
+    },
     plannedActions: {},
     enemyPlannedActions: {},
     currentActorIndex: 0,
@@ -408,6 +412,43 @@
     return reserve
       .map((unit, index) => ({ unit, index }))
       .filter(({ unit }) => !!unit && isAlive(unit) && !blocked.has(unit.uid));
+  };
+
+  const clearTurnSwitchRequests = () => {
+    gameState.turnSwitchRequests = {
+      ally: Array.from({ length: CONFIG.BOARD_COLS }, () => null),
+      enemy: Array.from({ length: CONFIG.BOARD_COLS }, () => null)
+    };
+  };
+
+  const clearSwitchRequestForSlot = (team, slot) => {
+    const requests = gameState?.turnSwitchRequests?.[team];
+    if (!Array.isArray(requests)) return;
+    if (!Number.isInteger(slot) || slot < 0 || slot >= requests.length) return;
+    requests[slot] = null;
+  };
+
+  const isValidSwitchTarget = ({ state, team, slot, targetIndex }) => {
+    const teamState = state?.teams?.[team];
+    if (!teamState || !Array.isArray(teamState.active) || !Array.isArray(teamState.reserve)) return false;
+    if (!Number.isInteger(slot) || slot < 0 || slot >= teamState.active.length) return false;
+    if (!Number.isInteger(targetIndex) || !teamState.reserve.length) return false;
+    const clampedIndex = clamp(targetIndex, 0, teamState.reserve.length - 1);
+    const actor = teamState.active[slot];
+    const target = teamState.reserve[clampedIndex];
+    if (!actor || !isAlive(actor)) return false;
+    if (!target || !isAlive(target)) return false;
+    if (actor.uid === target.uid) return false;
+    return true;
+  };
+
+  const requestSwitch = ({ team, slot, targetIndex }) => {
+    if (!isValidSwitchTarget({ state: gameState, team, slot, targetIndex })) return false;
+    const requests = gameState?.turnSwitchRequests?.[team];
+    if (!Array.isArray(requests) || !Number.isInteger(slot) || slot < 0 || slot >= requests.length) return false;
+    const clampedIndex = clamp(targetIndex, 0, gameState.teams[team].reserve.length - 1);
+    requests[slot] = { team, slot, targetIndex: clampedIndex };
+    return true;
   };
 
   const replaceActiveUnitFromReserve = ({
@@ -1299,6 +1340,7 @@
     gameState.enemyPlannedActions = {};
     gameState.plannedActions = {};
     gameState.confirmedCommands = Array.from({ length: CONFIG.BOARD_COLS }, () => null);
+    clearTurnSwitchRequests();
     clearTargetPreview();
     autoResolveKoReplacementsForTeam(TEAM.ENEMY);
     if (getPendingKoReplacementSlots(TEAM.ALLY).length) {
@@ -1374,7 +1416,17 @@
 
   const buildPlannedActionsFromConfirmedCommands = () => {
     const out = {};
-    gameState.confirmedCommands.forEach((c, i) => { if (c?.action) out[i] = { ...c.action }; });
+    gameState.confirmedCommands.forEach((c, i) => {
+      if (c?.action && c.action.type !== "switch") out[i] = { ...c.action };
+    });
+    const allyRequests = Array.isArray(gameState?.turnSwitchRequests?.ally) ? gameState.turnSwitchRequests.ally : [];
+    allyRequests.forEach((request, slot) => {
+      if (!request) return;
+      if (!isValidSwitchTarget({ state: gameState, team: TEAM.ALLY, slot, targetIndex: request.targetIndex })) return;
+      const reserve = gameState.teams.ally.reserve[request.targetIndex];
+      if (!reserve?.uid) return;
+      out[slot] = { type: "switch", team: TEAM.ALLY, slot, switchTargetId: reserve.uid };
+    });
     return out;
   };
 
@@ -1427,6 +1479,7 @@
     if (!targets.length) return;
 
     gameState.confirmedCommands[slot] = createConfirmedFightCommand({ slot, actor, move, targets });
+    clearSwitchRequestForSlot(TEAM.ALLY, slot);
     if (!advancePlanningSlot()) queueTurnResolution();
   };
 
@@ -1496,7 +1549,7 @@
     if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || isKoReplacementPhase()) return;
     const actor = getCurrentActor();
     const selectedReserveIndex = gameState.ui.switchSelection?.mode === "commandSwitch"
-      ? getSafePartyIndex(gameState.ui.switchSelection.reserveIndex)
+      ? clamp(getSafePartyIndex(gameState.ui.switchSelection.reserveIndex), 0, Math.max(0, getPartyReserve().length - 1))
       : null;
     if (!actor || !isAlive(actor) || selectedReserveIndex === null) return;
     const state = getStatusState(actor);
@@ -1514,23 +1567,15 @@
     const activeAllyIds = gameState.teams.ally.active.map((unit) => unit?.uid).filter(Boolean);
     const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds, ...activeAllyIds]);
     if (!candidates.some((c) => c.index === selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
-    const replacement = replaceActiveUnitFromReserve({
-      state: gameState,
-      team: TEAM.ALLY,
-      slot: gameState.currentActorIndex,
-      incomingUnitId: reserve.uid,
-      reserveIndexHint: selectedReserveIndex,
-      reserveMode: "swap"
-    });
-    if (!replacement) return;
+    if (!requestSwitch({ team: TEAM.ALLY, slot: gameState.currentActorIndex, targetIndex: selectedReserveIndex })) return;
     gameState.confirmedCommands[gameState.currentActorIndex] = {
-      actorId: replacement.incoming.uid,
-      actorName: replacement.incoming.name,
+      actorId: actor.uid,
+      actorName: actor.name,
       moveId: "switch",
-      moveName: `Switch → ${replacement.incoming.name}`,
+      moveName: `Switch予約 → ${reserve.name}`,
       targetType: "交代",
-      targetNames: [replacement.incoming.name],
-      action: null
+      targetNames: [reserve.name],
+      action: { type: "switch", team: TEAM.ALLY, slot: gameState.currentActorIndex, switchTargetId: reserve.uid }
     };
     setPartyUiCommand("fight");
     if (!advancePlanningSlot()) queueTurnResolution();
@@ -1559,6 +1604,7 @@
     for (let i = CONFIG.BOARD_COLS - 1; i >= 0; i -= 1) {
       if (!gameState.confirmedCommands[i]) continue;
       gameState.confirmedCommands[i] = null;
+      clearSwitchRequestForSlot(TEAM.ALLY, i);
       gameState.currentActorIndex = i;
       clearTargetPreview();
       setPartyUiCommand("fight");
