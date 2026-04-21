@@ -27,6 +27,28 @@
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
     UI: {
+      FORMATION_EDIT_PADDING: 20,
+      FORMATION_GRID_X: 20,
+      FORMATION_GRID_Y: 92,
+      FORMATION_GRID_COLS: 3,
+      FORMATION_GRID_ROWS: 2,
+      FORMATION_SLOT_WIDTH: 240,
+      FORMATION_SLOT_HEIGHT: 96,
+      FORMATION_SLOT_GAP_X: 12,
+      FORMATION_SLOT_GAP_Y: 12,
+      MONSTER_LIST_X: 20,
+      MONSTER_LIST_Y: 326,
+      MONSTER_LIST_WIDTH: 740,
+      MONSTER_LIST_HEIGHT: 392,
+      MONSTER_ITEM_HEIGHT: 56,
+      MONSTER_ITEM_GAP: 8,
+      BUTTON_AREA_X: 20,
+      BUTTON_AREA_Y: 730,
+      BUTTON_AREA_WIDTH: 740,
+      BUTTON_AREA_HEIGHT: 80,
+      BUTTON_WIDTH: 140,
+      BUTTON_HEIGHT: 42,
+      BUTTON_GAP: 12,
       PARTY_START_X: 0,
       PARTY_START_Y: 0,
       PARTY_SPACING_X: 12,
@@ -46,22 +68,6 @@
       FORMATION_LIST_WIDTH: 740,
       FORMATION_LIST_ITEM_HEIGHT: 56,
       FORMATION_LIST_SPACING_Y: 8,
-      FORMATION_SLOT_X: 20,
-      FORMATION_SLOT_Y: 110,
-      FORMATION_SLOT_WIDTH: 176,
-      FORMATION_SLOT_HEIGHT: 74,
-      FORMATION_SLOT_SPACING_Y: 10,
-      FORMATION_SLOT_SPACING_X: 12,
-      MONSTER_LIST_X: 20,
-      MONSTER_LIST_Y: 250,
-      MONSTER_LIST_WIDTH: 740,
-      MONSTER_LIST_ITEM_HEIGHT: 52,
-      MONSTER_LIST_SPACING_Y: 8,
-      BUTTON_X: 20,
-      BUTTON_Y: 780,
-      BUTTON_WIDTH: 140,
-      BUTTON_HEIGHT: 42,
-      BUTTON_GAP: 12,
       FRONT_SLOT_COLOR: "rgba(74, 113, 166, 0.28)",
       RESERVE_SLOT_COLOR: "rgba(89, 122, 96, 0.26)"
     },
@@ -393,15 +399,8 @@
         homeIndex: -1,
         formationIndex: -1,
         battlePrepareIndex: -1,
-        hoveredHomeIndex: -1,
-        hoveredFormationIndex: -1,
-        hoveredBattlePrepareIndex: -1,
         formationEdit: {
           selectedSlotIndex: -1,
-          selectedMonsterIndex: -1,
-          hoveredSlotIndex: -1,
-          hoveredMonsterIndex: -1,
-          mode: "slot",
           draft: null
         },
       command: "fight",
@@ -509,15 +508,8 @@
     gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, HOME_MENU_ITEMS.length - 1);
     gameState.ui.formationIndex = getSelectableIndex(gameState.ui.formationIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.battlePrepareIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
-    gameState.ui.hoveredHomeIndex = Number.isInteger(gameState.ui.hoveredHomeIndex) ? gameState.ui.hoveredHomeIndex : -1;
-    gameState.ui.hoveredFormationIndex = Number.isInteger(gameState.ui.hoveredFormationIndex) ? gameState.ui.hoveredFormationIndex : -1;
-    gameState.ui.hoveredBattlePrepareIndex = Number.isInteger(gameState.ui.hoveredBattlePrepareIndex) ? gameState.ui.hoveredBattlePrepareIndex : -1;
     const edit = gameState.ui.formationEdit;
     edit.selectedSlotIndex = getSelectableIndex(edit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
-    edit.selectedMonsterIndex = getSelectableIndex(edit.selectedMonsterIndex, gameState.availableMonsters.length - 1);
-    edit.hoveredSlotIndex = Number.isInteger(edit.hoveredSlotIndex) ? edit.hoveredSlotIndex : -1;
-    edit.hoveredMonsterIndex = Number.isInteger(edit.hoveredMonsterIndex) ? edit.hoveredMonsterIndex : -1;
-    edit.mode = edit.mode === "monster" ? "monster" : "slot";
     if (!Array.isArray(edit.draft)) edit.draft = createEmptyFormation();
     edit.draft = cloneFormation(edit.draft);
   };
@@ -529,7 +521,6 @@
 
   const enterHome = () => {
     gameState.ui.homeIndex = -1;
-    gameState.ui.hoveredHomeIndex = -1;
     gameState.ui.formationIndex = -1;
     gameState.ui.battlePrepareIndex = -1;
     setPhase(PHASE.HOME);
@@ -537,7 +528,6 @@
 
   const enterFormation = () => {
     gameState.ui.formationIndex = -1;
-    gameState.ui.hoveredFormationIndex = -1;
     setPhase(PHASE.FORMATION);
   };
 
@@ -546,10 +536,6 @@
     const source = getFormationAt(gameState, safeIndex) || createEmptyFormation();
     gameState.currentEditIndex = safeIndex;
     gameState.ui.formationEdit.selectedSlotIndex = -1;
-    gameState.ui.formationEdit.selectedMonsterIndex = -1;
-    gameState.ui.formationEdit.hoveredSlotIndex = -1;
-    gameState.ui.formationEdit.hoveredMonsterIndex = -1;
-    gameState.ui.formationEdit.mode = "slot";
     gameState.ui.formationEdit.draft = cloneFormation(source);
     setPhase(PHASE.FORMATION_EDIT);
   };
@@ -557,7 +543,6 @@
   const enterBattlePrepare = () => {
     gameState.battlePrepareIndex = -1;
     gameState.ui.battlePrepareIndex = -1;
-    gameState.ui.hoveredBattlePrepareIndex = -1;
     setPhase(PHASE.BATTLE_PREPARE);
   };
 
@@ -598,7 +583,6 @@
 
   const handleFormationSlotSelect = (index) => {
     gameState.ui.formationEdit.selectedSlotIndex = getSafeEditPartyIndex(index);
-    gameState.ui.formationEdit.mode = "slot";
   };
 
   const findMonsterSlotInDraft = (draft, monsterId) => cloneFormation(draft).findIndex((unitId) => unitId === monsterId);
@@ -625,8 +609,6 @@
     const boxIndex = getSafeEditMonsterIndex(gameState, monsterIndex);
     const unitId = gameState.availableMonsters[boxIndex] || null;
     if (!unitId) return;
-    gameState.ui.formationEdit.selectedMonsterIndex = boxIndex;
-    gameState.ui.formationEdit.mode = "monster";
     gameState.ui.formationEdit.draft = assignOrSwapMonsterInDraft(gameState.ui.formationEdit.draft, slotIndex, unitId);
   };
 
@@ -2577,61 +2559,69 @@
     return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
   };
 
-  const getHoveredHomeIndex = (x, y) => {
-    for (let i = 0; i < HOME_MENU_ITEMS.length; i += 1) {
-      const rect = {
-        x: CONFIG.UI.MENU_X,
-        y: CONFIG.UI.MENU_Y + (i * CONFIG.UI.MENU_SPACING_Y),
-        width: CONFIG.UI.MENU_WIDTH,
-        height: CONFIG.UI.MENU_ITEM_HEIGHT
-      };
-      if (isPointInRect(x, y, rect)) return i;
-    }
-    return -1;
+  const getFormationGridRect = () => {
+    const width = (CONFIG.UI.FORMATION_SLOT_WIDTH * CONFIG.UI.FORMATION_GRID_COLS)
+      + (CONFIG.UI.FORMATION_SLOT_GAP_X * (CONFIG.UI.FORMATION_GRID_COLS - 1));
+    const height = (CONFIG.UI.FORMATION_SLOT_HEIGHT * CONFIG.UI.FORMATION_GRID_ROWS)
+      + (CONFIG.UI.FORMATION_SLOT_GAP_Y * (CONFIG.UI.FORMATION_GRID_ROWS - 1));
+    return { x: CONFIG.UI.FORMATION_GRID_X, y: CONFIG.UI.FORMATION_GRID_Y, width, height };
   };
 
-  const getHoveredFormationIndex = (x, y) => {
-    for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
-      const rect = {
-        x: CONFIG.UI.FORMATION_LIST_X,
-        y: CONFIG.UI.FORMATION_LIST_Y + (i * (CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT + CONFIG.UI.FORMATION_LIST_SPACING_Y)),
-        width: CONFIG.UI.FORMATION_LIST_WIDTH,
-        height: CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT
-      };
-      if (isPointInRect(x, y, rect)) return i;
-    }
-    return -1;
-  };
+  const getMonsterListRect = () => ({
+    x: CONFIG.UI.MONSTER_LIST_X,
+    y: CONFIG.UI.MONSTER_LIST_Y,
+    width: CONFIG.UI.MONSTER_LIST_WIDTH,
+    height: CONFIG.UI.MONSTER_LIST_HEIGHT
+  });
 
-  const getHoveredFormationSlotIndex = (x, y) => {
+  const getButtonAreaRect = () => ({
+    x: CONFIG.UI.BUTTON_AREA_X,
+    y: CONFIG.UI.BUTTON_AREA_Y,
+    width: CONFIG.UI.BUTTON_AREA_WIDTH,
+    height: CONFIG.UI.BUTTON_AREA_HEIGHT
+  });
+
+  const getFormationSlotRects = () => {
+    const rects = [];
     for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
-      const row = i < CONFIG.PARTY_ACTIVE_COUNT ? 0 : 1;
-      const col = i % CONFIG.PARTY_ACTIVE_COUNT;
-      const rect = {
-        x: CONFIG.UI.FORMATION_SLOT_X + (col * (CONFIG.UI.FORMATION_SLOT_WIDTH + CONFIG.UI.FORMATION_SLOT_SPACING_X)),
-        y: CONFIG.UI.FORMATION_SLOT_Y + (row * (CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_SPACING_Y)),
+      const row = Math.floor(i / CONFIG.UI.FORMATION_GRID_COLS);
+      const col = i % CONFIG.UI.FORMATION_GRID_COLS;
+      rects.push({
+        index: i,
+        x: CONFIG.UI.FORMATION_GRID_X + (col * (CONFIG.UI.FORMATION_SLOT_WIDTH + CONFIG.UI.FORMATION_SLOT_GAP_X)),
+        y: CONFIG.UI.FORMATION_GRID_Y + (row * (CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_GAP_Y)),
         width: CONFIG.UI.FORMATION_SLOT_WIDTH,
         height: CONFIG.UI.FORMATION_SLOT_HEIGHT
-      };
-      if (isPointInRect(x, y, rect)) return i;
+      });
     }
-    return -1;
+    return rects;
   };
 
-  const getHoveredBattlePrepareIndex = (x, y) => getHoveredFormationIndex(x, y);
-
-  const getHoveredMonsterIndex = (x, y) => {
-    const count = Array.isArray(gameState.availableMonsters) ? gameState.availableMonsters.length : 0;
-    for (let i = 0; i < count; i += 1) {
-      const rect = {
+  const getMonsterListItemRects = (count = 0) => {
+    const itemCount = Math.max(0, count);
+    const rects = [];
+    for (let i = 0; i < itemCount; i += 1) {
+      rects.push({
+        index: i,
         x: CONFIG.UI.MONSTER_LIST_X,
-        y: CONFIG.UI.MONSTER_LIST_Y + (i * (CONFIG.UI.MONSTER_LIST_ITEM_HEIGHT + CONFIG.UI.MONSTER_LIST_SPACING_Y)),
+        y: CONFIG.UI.MONSTER_LIST_Y + (i * (CONFIG.UI.MONSTER_ITEM_HEIGHT + CONFIG.UI.MONSTER_ITEM_GAP)),
         width: CONFIG.UI.MONSTER_LIST_WIDTH,
-        height: CONFIG.UI.MONSTER_LIST_ITEM_HEIGHT
-      };
-      if (isPointInRect(x, y, rect)) return i;
+        height: CONFIG.UI.MONSTER_ITEM_HEIGHT
+      });
     }
-    return -1;
+    return rects;
+  };
+
+  const getFormationEditButtonRects = () => {
+    const area = getButtonAreaRect();
+    const y = area.y + Math.floor((area.height - CONFIG.UI.BUTTON_HEIGHT) / 2);
+    const firstX = area.x;
+    const stride = CONFIG.UI.BUTTON_WIDTH + CONFIG.UI.BUTTON_GAP;
+    return {
+      save: { x: firstX, y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT },
+      cancel: { x: firstX + stride, y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT },
+      back: { x: firstX + (stride * 2), y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT }
+    };
   };
 
   const renderHomeScreen = () => {
@@ -2649,8 +2639,7 @@
     const menu = createEl("div", "home-menu");
     HOME_MENU_ITEMS.forEach((label, index) => {
       const isSelected = index === gameState.ui.homeIndex;
-      const isHovered = index === gameState.ui.hoveredHomeIndex;
-      const item = createEl("button", `home-menu-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, label);
+      const item = createEl("button", `home-menu-item${isSelected ? " active" : ""}`, label);
       item.dataset.action = "home-select";
       item.dataset.index = String(index);
       menu.appendChild(item);
@@ -2680,8 +2669,7 @@
       const formation = getFormationAt(gameState, i);
       const lines = formatFormationPreview(formation).join(" / ");
       const isSelected = i === gameState.ui.formationIndex;
-      const isHovered = i === gameState.ui.hoveredFormationIndex;
-      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
+      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}`);
       item.dataset.action = "formation-select";
       item.dataset.index = String(i);
       item.append(createEl("div", "formation-slot-name", `Slot ${i + 1}`), createEl("div", "formation-slot-value", lines));
@@ -2696,79 +2684,94 @@
     return wrap;
   };
 
-  const getFormationEditButtons = () => {
-    const y = CONFIG.UI.BUTTON_Y;
-    const w = CONFIG.UI.BUTTON_WIDTH;
-    const h = CONFIG.UI.BUTTON_HEIGHT;
-    const gap = CONFIG.UI.BUTTON_GAP;
-    const x = CONFIG.UI.BUTTON_X;
-    return {
-      save: { x, y, width: w, height: h },
-      cancel: { x: x + (w + gap), y, width: w, height: h },
-      back: { x: x + ((w + gap) * 2), y, width: w, height: h }
-    };
-  };
-
   const renderFormationEditScreen = () => {
     const wrap = createEl("section", "formation-edit-screen");
     const edit = gameState.ui.formationEdit;
-    const draft = Array.isArray(edit.draft) ? edit.draft : [];
+    const draft = cloneFormation(edit.draft);
+    const slotRects = getFormationSlotRects();
+    const monsterRects = getMonsterListItemRects(gameState.availableMonsters.length);
+    const buttonRects = getFormationEditButtonRects();
+    const gridRect = getFormationGridRect();
+    const monsterListRect = getMonsterListRect();
+    const buttonAreaRect = getButtonAreaRect();
+    wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
     wrap.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
-    wrap.style.setProperty("--formation-slot-x", `${CONFIG.UI.FORMATION_SLOT_X}px`);
-    wrap.style.setProperty("--formation-slot-y", `${CONFIG.UI.FORMATION_SLOT_Y}px`);
-    wrap.style.setProperty("--formation-slot-width", `${CONFIG.UI.FORMATION_SLOT_WIDTH}px`);
-    wrap.style.setProperty("--formation-slot-height", `${CONFIG.UI.FORMATION_SLOT_HEIGHT}px`);
-    wrap.style.setProperty("--formation-slot-spacing-y", `${CONFIG.UI.FORMATION_SLOT_SPACING_Y}px`);
-    wrap.style.setProperty("--formation-slot-spacing-x", `${CONFIG.UI.FORMATION_SLOT_SPACING_X}px`);
-    wrap.style.setProperty("--monster-list-x", `${CONFIG.UI.MONSTER_LIST_X}px`);
-    wrap.style.setProperty("--monster-list-y", `${CONFIG.UI.MONSTER_LIST_Y}px`);
-    wrap.style.setProperty("--monster-list-width", `${CONFIG.UI.MONSTER_LIST_WIDTH}px`);
-    wrap.style.setProperty("--monster-list-item-height", `${CONFIG.UI.MONSTER_LIST_ITEM_HEIGHT}px`);
-    wrap.style.setProperty("--monster-list-spacing-y", `${CONFIG.UI.MONSTER_LIST_SPACING_Y}px`);
-    wrap.style.setProperty("--front-slot-color", CONFIG.UI.FRONT_SLOT_COLOR);
-    wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
     const body = createEl("div", "formation-edit-body");
-    const party = createEl("div", "formation-edit-party");
-    party.appendChild(createEl("div", "formation-pane-title", "Formation"));
-    party.appendChild(createEl("div", "formation-zone-label", "FRONT (1-3)"));
-    for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
-      const unitId = draft[i] || null;
+
+    const formationArea = createEl("div", "formation-edit-area formation-grid-area");
+    formationArea.style.left = `${gridRect.x}px`;
+    formationArea.style.top = `${gridRect.y}px`;
+    formationArea.style.width = `${gridRect.width}px`;
+    formationArea.style.height = `${gridRect.height}px`;
+    formationArea.appendChild(createEl("div", "formation-pane-title", "Formation"));
+    const frontLabel = createEl("div", "formation-zone-label front", "FRONT");
+    frontLabel.style.top = "-12px";
+    const reserveLabel = createEl("div", "formation-zone-label reserve", "RESERVE");
+    reserveLabel.style.top = `${CONFIG.UI.FORMATION_SLOT_HEIGHT + CONFIG.UI.FORMATION_SLOT_GAP_Y - 12}px`;
+    formationArea.append(frontLabel, reserveLabel);
+    slotRects.forEach((rect) => {
+      const unitId = draft[rect.index] || null;
       const text = unitId ? getUnitName(unitId) : "EMPTY";
-      const isSelected = edit.selectedSlotIndex === i;
-      const isHovered = edit.hoveredSlotIndex === i;
-      const isFront = i < CONFIG.PARTY_ACTIVE_COUNT;
-      const row = createEl("button", `formation-row formation-slot-row ${isFront ? "front" : "reserve"}${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`, `${i + 1}. ${text}`);
+      const isSelected = edit.selectedSlotIndex === rect.index;
+      const isFront = rect.index < CONFIG.PARTY_ACTIVE_COUNT;
+      const row = createEl("button", `formation-row formation-slot-row ${isFront ? "front" : "reserve"}${isSelected ? " active" : ""}`, `${rect.index + 1}. ${text}`);
+      row.style.left = `${rect.x - gridRect.x}px`;
+      row.style.top = `${rect.y - gridRect.y}px`;
+      row.style.width = `${rect.width}px`;
+      row.style.height = `${rect.height}px`;
       row.dataset.action = "edit-slot-select";
-      row.dataset.slotIndex = String(i);
+      row.dataset.slotIndex = String(rect.index);
       row.appendChild(createEl("span", "formation-row-tag", isFront ? "FRONT" : "RESERVE"));
-      party.appendChild(row);
-      if (i === CONFIG.PARTY_ACTIVE_COUNT - 1) party.appendChild(createEl("div", "formation-zone-label", "RESERVE (4-6)"));
-    }
-    const box = createEl("div", "formation-edit-box");
+      formationArea.appendChild(row);
+    });
+
+    const box = createEl("div", "formation-edit-area formation-monster-area");
+    box.style.left = `${monsterListRect.x}px`;
+    box.style.top = `${monsterListRect.y}px`;
+    box.style.width = `${monsterListRect.width}px`;
+    box.style.height = `${monsterListRect.height}px`;
     box.appendChild(createEl("div", "formation-pane-title", "Available Monsters"));
     gameState.availableMonsters.forEach((unitId, idx) => {
-      const isSelected = edit.selectedMonsterIndex === idx;
-      const isHovered = edit.hoveredMonsterIndex === idx;
       const assignedSlot = findMonsterSlotInDraft(draft, unitId);
-      const row = createEl("button", `formation-row monster-row${isSelected ? " active" : ""}${isHovered ? " hover" : ""}${assignedSlot >= 0 ? " assigned" : ""}`, getUnitName(unitId));
+      const rect = monsterRects[idx];
+      if (!rect) return;
+      const row = createEl("button", `formation-row monster-row${assignedSlot >= 0 ? " assigned" : ""}`, getUnitName(unitId));
+      row.style.left = "0px";
+      row.style.top = `${rect.y - monsterListRect.y}px`;
+      row.style.width = `${rect.width}px`;
+      row.style.height = `${rect.height}px`;
       row.dataset.action = "edit-monster-select";
       row.dataset.monsterIndex = String(idx);
       if (assignedSlot >= 0) row.appendChild(createEl("span", "assigned-badge", `SET:${assignedSlot + 1}`));
       box.appendChild(row);
     });
-    body.append(party, box);
-    const editButtons = getFormationEditButtons();
-    const buttons = createEl("div", "screen-button-row");
-    buttons.style.setProperty("--button-row-x", `${editButtons.save.x}px`);
-    buttons.style.setProperty("--button-row-y", `${editButtons.save.y}px`);
+
+    const buttons = createEl("div", "formation-edit-area formation-button-area");
+    buttons.style.left = `${buttonAreaRect.x}px`;
+    buttons.style.top = `${buttonAreaRect.y}px`;
+    buttons.style.width = `${buttonAreaRect.width}px`;
+    buttons.style.height = `${buttonAreaRect.height}px`;
     const saveBtn = createEl("button", "screen-nav-btn", "Save");
     saveBtn.dataset.action = "edit-save";
+    saveBtn.style.left = `${buttonRects.save.x - buttonAreaRect.x}px`;
+    saveBtn.style.top = `${buttonRects.save.y - buttonAreaRect.y}px`;
+    saveBtn.style.width = `${buttonRects.save.width}px`;
+    saveBtn.style.height = `${buttonRects.save.height}px`;
     const cancelBtn = createEl("button", "screen-nav-btn", "Cancel");
     cancelBtn.dataset.action = "edit-cancel";
+    cancelBtn.style.left = `${buttonRects.cancel.x - buttonAreaRect.x}px`;
+    cancelBtn.style.top = `${buttonRects.cancel.y - buttonAreaRect.y}px`;
+    cancelBtn.style.width = `${buttonRects.cancel.width}px`;
+    cancelBtn.style.height = `${buttonRects.cancel.height}px`;
     const backBtn = createEl("button", "screen-nav-btn", "Back");
     backBtn.dataset.action = "edit-back";
+    backBtn.style.left = `${buttonRects.back.x - buttonAreaRect.x}px`;
+    backBtn.style.top = `${buttonRects.back.y - buttonAreaRect.y}px`;
+    backBtn.style.width = `${buttonRects.back.width}px`;
+    backBtn.style.height = `${buttonRects.back.height}px`;
     buttons.append(saveBtn, cancelBtn, backBtn);
-    wrap.append(body, buttons, createEl("div", "formation-help", "Select slot then monster / Backspace: clear slot"));
+    body.append(formationArea, box, buttons);
+    wrap.append(body, createEl("div", "formation-help", "Select slot then monster / Backspace: clear slot"));
     return wrap;
   };
 
@@ -2785,8 +2788,7 @@
       const formation = getFormationAt(gameState, i);
       const lines = formatFormationPreview(formation).join(" / ");
       const isSelected = i === gameState.ui.battlePrepareIndex;
-      const isHovered = i === gameState.ui.hoveredBattlePrepareIndex;
-      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
+      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}`);
       item.dataset.action = "battle-prepare-select";
       item.dataset.index = String(i);
       item.append(createEl("div", "formation-slot-name", `Slot ${i + 1}`), createEl("div", "formation-slot-value", lines));
@@ -2849,34 +2851,6 @@
   };
 
   const update = (now) => {
-    if (gameState.phase === PHASE.HOME) {
-      const nextHover = getHoveredHomeIndex(gameState.input.mouseX, gameState.input.mouseY);
-      if (gameState.ui.hoveredHomeIndex !== nextHover) {
-        gameState.ui.hoveredHomeIndex = nextHover;
-        render();
-      }
-    } else if (gameState.phase === PHASE.FORMATION) {
-      const nextHover = getHoveredFormationIndex(gameState.input.mouseX, gameState.input.mouseY);
-      if (gameState.ui.hoveredFormationIndex !== nextHover) {
-        gameState.ui.hoveredFormationIndex = nextHover;
-        render();
-      }
-    } else if (gameState.phase === PHASE.BATTLE_PREPARE) {
-      const nextHover = getHoveredBattlePrepareIndex(gameState.input.mouseX, gameState.input.mouseY);
-      if (gameState.ui.hoveredBattlePrepareIndex !== nextHover) {
-        gameState.ui.hoveredBattlePrepareIndex = nextHover;
-        render();
-      }
-    } else if (gameState.phase === PHASE.FORMATION_EDIT) {
-      const edit = gameState.ui.formationEdit;
-      const nextSlotHover = getHoveredFormationSlotIndex(gameState.input.mouseX, gameState.input.mouseY);
-      const nextMonsterHover = getHoveredMonsterIndex(gameState.input.mouseX, gameState.input.mouseY);
-      if (edit.hoveredSlotIndex !== nextSlotHover || edit.hoveredMonsterIndex !== nextMonsterHover) {
-        edit.hoveredSlotIndex = nextSlotHover;
-        edit.hoveredMonsterIndex = nextMonsterHover;
-        render();
-      }
-    }
     gameState.input.mouseClicked = false;
     const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
     const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
@@ -2891,7 +2865,51 @@
     requestAnimationFrame(loop);
   };
 
+  const getLocalPointerPosition = (event) => {
+    const appRect = document.getElementById("app")?.getBoundingClientRect?.();
+    const localX = appRect ? event.clientX - appRect.left : 0;
+    const localY = appRect ? event.clientY - appRect.top : 0;
+    return {
+      x: Number.isFinite(localX) ? localX : 0,
+      y: Number.isFinite(localY) ? localY : 0
+    };
+  };
+
+  const handleFormationEditPointerClick = (x, y) => {
+    const slotRects = getFormationSlotRects();
+    for (const rect of slotRects) {
+      if (isPointInRect(x, y, rect)) {
+        handleFormationSlotSelect(rect.index);
+        return true;
+      }
+    }
+    const monsterRects = getMonsterListItemRects(gameState.availableMonsters.length);
+    for (const rect of monsterRects) {
+      if (isPointInRect(x, y, rect)) {
+        assignMonsterToSelectedSlot(rect.index);
+        return true;
+      }
+    }
+    const buttons = getFormationEditButtonRects();
+    if (isPointInRect(x, y, buttons.save)) {
+      saveFormationEdit();
+      return true;
+    }
+    if (isPointInRect(x, y, buttons.cancel) || isPointInRect(x, y, buttons.back)) {
+      cancelFormationEdit();
+      return true;
+    }
+    return false;
+  };
+
   document.addEventListener("click", (event) => {
+    if (gameState.phase === PHASE.FORMATION_EDIT) {
+      const pointer = getLocalPointerPosition(event);
+      if (handleFormationEditPointerClick(pointer.x, pointer.y)) {
+        render();
+        return;
+      }
+    }
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const a = target.dataset.action;
@@ -2990,25 +3008,15 @@
 
     if (gameState.phase === PHASE.FORMATION_EDIT) {
       const edit = gameState.ui.formationEdit;
-      if (event.key === "ArrowLeft") edit.mode = "slot";
-      if (event.key === "ArrowRight") edit.mode = "monster";
-      if (event.key === "ArrowUp") {
-        if (edit.mode === "slot") edit.selectedSlotIndex -= 1;
-        else edit.selectedMonsterIndex -= 1;
-      }
-      if (event.key === "ArrowDown") {
-        if (edit.mode === "slot") edit.selectedSlotIndex += 1;
-        else edit.selectedMonsterIndex += 1;
-      }
-      if (event.key === "Enter") {
-        if (edit.mode === "slot") handleFormationSlotSelect(edit.selectedSlotIndex);
-        else assignMonsterToSelectedSlot(edit.selectedMonsterIndex);
-      }
+      if (event.key === "ArrowUp" || event.key === "ArrowLeft") edit.selectedSlotIndex -= 1;
+      if (event.key === "ArrowDown" || event.key === "ArrowRight") edit.selectedSlotIndex += 1;
       if (event.key === "Backspace") {
-        const idx = getSafeEditPartyIndex(edit.selectedSlotIndex);
-        const draft = cloneFormation(edit.draft);
-        draft[idx] = null;
-        edit.draft = draft;
+        const idx = getSelectableIndex(edit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
+        if (idx >= 0) {
+          const draft = cloneFormation(edit.draft);
+          draft[idx] = null;
+          edit.draft = draft;
+        }
       }
       if (event.key.toLowerCase() === "s") saveFormationEdit();
       if (event.key === "Escape") cancelFormationEdit();
@@ -3024,11 +3032,9 @@
   });
 
   document.addEventListener("mousemove", (event) => {
-    const appRect = document.getElementById("app")?.getBoundingClientRect?.();
-    const localX = appRect ? event.clientX - appRect.left : 0;
-    const localY = appRect ? event.clientY - appRect.top : 0;
-    gameState.input.mouseX = Number.isFinite(localX) ? localX : 0;
-    gameState.input.mouseY = Number.isFinite(localY) ? localY : 0;
+    const pointer = getLocalPointerPosition(event);
+    gameState.input.mouseX = pointer.x;
+    gameState.input.mouseY = pointer.y;
     if (!isKoReplacementPhase()) return;
     const target = event.target?.closest?.("[data-action='target-cell']");
     const x = Number(target?.dataset?.x);
