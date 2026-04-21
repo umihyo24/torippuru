@@ -412,7 +412,8 @@ body {
 }
 
 .portrait-wrap,
-.unit-portrait {
+.unit-portrait,
+.party-slot-thumb {
   position: relative;
   width: 100%;
   height: 100%;
@@ -423,7 +424,8 @@ body {
 }
 
 .portrait-wrap img,
-.unit-portrait img {
+.unit-portrait img,
+.party-slot-thumb img {
   width: 100%;
   height: 100%;
   display: none;
@@ -437,14 +439,18 @@ body {
 }
 
 .portrait-wrap.is-loaded img,
-.unit-portrait.is-loaded img { display: block; }
+.unit-portrait.is-loaded img,
+.party-slot-thumb.is-loaded img { display: block; }
 .portrait-wrap.is-loaded .img-placeholder,
-.unit-portrait.is-loaded .img-placeholder { display: none; }
+.unit-portrait.is-loaded .img-placeholder,
+.party-slot-thumb.is-loaded .img-placeholder { display: none; }
 .portrait-wrap.is-fallback .img-placeholder,
-.unit-portrait.is-fallback .img-placeholder { display: flex; }
+.unit-portrait.is-fallback .img-placeholder,
+.party-slot-thumb.is-fallback .img-placeholder { display: flex; }
 
 .portrait-wrap.mirror img,
-.unit-portrait.mirror img {
+.unit-portrait.mirror img,
+.party-slot-thumb.mirror img {
   transform: scaleX(-1);
   transform-origin: center;
 }
