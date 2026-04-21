@@ -1018,6 +1018,12 @@ button:disabled {
   color: #b7c8ee;
 }
 
+.formation-zone-label {
+  color: #9eb4e9;
+  font-size: 12px;
+  margin: 2px 0 4px;
+}
+
 .formation-edit-party,
 .formation-edit-box {
   position: absolute;
@@ -1029,13 +1035,40 @@ button:disabled {
 
 .formation-edit-party {
   left: var(--formation-slot-x);
-  width: var(--formation-slot-width);
+  width: calc((var(--formation-slot-width) * 3) + (var(--formation-slot-spacing-x, 0px) * 2));
+  grid-template-columns: repeat(3, var(--formation-slot-width));
+  column-gap: var(--formation-slot-spacing-x, 0px);
 }
 
 .formation-edit-box {
   left: var(--monster-list-x);
+  top: var(--monster-list-y);
   width: var(--monster-list-width);
   gap: var(--monster-list-spacing-y);
+}
+
+.formation-row.monster-row.assigned {
+  border-color: #6da7ff;
+  background: rgba(28, 49, 86, 0.9);
+}
+
+.assigned-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  color: #b7d3ff;
+}
+
+.screen-button-row {
+  position: absolute;
+  left: var(--button-row-x, 20px);
+  top: var(--button-row-y, 780px);
+  display: flex;
+  gap: 12px;
+}
+
+.screen-nav-btn {
+  min-width: 140px;
+  min-height: 42px;
 }
 
 .formation-slot-row {
