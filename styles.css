@@ -814,6 +814,64 @@ button:disabled {
 .reserve-card:disabled { opacity: 0.45; cursor: not-allowed; }
 .dest-btn.active { outline: 2px solid #ffe162; }
 
+.party-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--party-spacing-x, 12px);
+  overflow-x: auto;
+  padding-left: var(--party-start-x, 0px);
+  padding-top: var(--party-start-y, 0px);
+}
+
+.party-slot {
+  width: var(--party-card-width, 220px);
+  min-width: var(--party-card-width, 220px);
+  height: var(--party-card-height, 86px);
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #6c82ad;
+  border-radius: 8px;
+  background: rgba(31, 39, 60, 0.95);
+  padding: 8px;
+}
+
+.party-slot.active { outline: 2px solid #ffd34a; }
+
+.party-slot-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(173, 190, 226, 0.72);
+}
+
+.party-slot-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.party-slot-body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+
+.party-slot-name,
+.party-slot-hp,
+.party-slot-status {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.party-slot-name { font-size: 13px; font-weight: 700; }
+.party-slot-hp,
+.party-slot-status { font-size: 11px; color: #d7e4ff; }
+
 .move-detail-panel {
   border: 1px solid #667da8;
   border-radius: 6px;

@@ -25,6 +25,13 @@
     HP_ANIM_MS: 520,
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
+    UI: {
+      PARTY_START_X: 0,
+      PARTY_START_Y: 0,
+      PARTY_SPACING_X: 12,
+      CARD_WIDTH: 220,
+      CARD_HEIGHT: 86
+    },
     UI_LAYOUT: {
       SHARED_CONTENT_COLUMN: {
         maxWidthPx: 920,
@@ -240,6 +247,9 @@
     selectedMoveId: null,
     selectedTargets: [],
     ui: {
+      command: "fight",
+      partyIndex: 0,
+      selectingParty: false,
       commandMode: "fight",
       previewTargets: [],
       hoverSlot: null,
@@ -1184,6 +1194,22 @@
 
   const getCurrentActor = () => gameState.teams.ally.active[gameState.currentActorIndex] || null;
   const getSelectedMove = () => MOVES[gameState.selectedMoveId] || null;
+  const getPartyReserve = () => (Array.isArray(gameState?.teams?.ally?.reserve) ? gameState.teams.ally.reserve : []);
+  const getSafePartyIndex = (index = gameState.ui.partyIndex) => {
+    const reserve = getPartyReserve();
+    if (reserve.length <= 0) return 0;
+    return clamp(Number.isFinite(index) ? Math.trunc(index) : 0, 0, reserve.length - 1);
+  };
+  const syncPartyUiState = () => {
+    gameState.ui.partyIndex = getSafePartyIndex(gameState.ui.partyIndex);
+    gameState.ui.commandMode = gameState.ui.command === "party" ? "switch" : "fight";
+    gameState.ui.selectingParty = gameState.ui.command === "party";
+  };
+  const setPartyUiCommand = (command = "fight") => {
+    gameState.ui.command = command === "party" ? "party" : "fight";
+    syncPartyUiState();
+    if (gameState.ui.command !== "party") clearSwitchUiState();
+  };
   const clearSwitchUiState = () => {
     gameState.ui.hoverSlot = null;
     gameState.ui.switchSelection = null;
@@ -1218,7 +1244,7 @@
     gameState.battleFlow.koReplacement.pendingSlots = getPendingKoReplacementSlots(team);
     gameState.battleFlow.currentMessage = "Choose a reserve monster to replace a defeated ally.";
     clearSwitchUiState();
-    gameState.ui.commandMode = "fight";
+    setPartyUiCommand("fight");
     appendBattleLogEntry(`— ${team === TEAM.ALLY ? "Ally" : "Enemy"} KO Replacement —`);
   };
 
@@ -1297,7 +1323,7 @@
     if (first === null) return;
     gameState.currentActorIndex = first;
     clearTargetPreview();
-    gameState.ui.commandMode = "fight";
+    setPartyUiCommand("fight");
   };
 
   const advancePlanningSlot = () => {
@@ -1365,7 +1391,7 @@
 
   const chooseMode = (mode) => {
     if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || isKoReplacementPhase()) return;
-    gameState.ui.commandMode = mode;
+    setPartyUiCommand(mode);
     clearTargetPreview();
     gameState.ui.selectedAction = mode;
   };
@@ -1441,13 +1467,15 @@
 
   const chooseReserve = (reserveIndex) => {
     if (isPlaybackBusy()) return;
+    const safeReserveIndex = getSafePartyIndex(reserveIndex);
     if (isKoReplacementPhase()) {
-      const reserve = gameState.teams.ally.reserve[reserveIndex];
+      const reserve = gameState.teams.ally.reserve[safeReserveIndex];
       if (!reserve || !isAlive(reserve)) return;
-      gameState.ui.switchSelection = { mode: "koReplacement", reserveIndex };
+      gameState.ui.partyIndex = safeReserveIndex;
+      gameState.ui.switchSelection = { mode: "koReplacement", reserveIndex: safeReserveIndex };
       return;
     }
-    const reserve = gameState.teams.ally.reserve[reserveIndex];
+    const reserve = gameState.teams.ally.reserve[safeReserveIndex];
     if (!reserve) return;
     const alreadyPickedTargetIds = gameState.confirmedCommands
       .map((c) => c?.action)
@@ -1458,14 +1486,17 @@
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
     const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
-    if (!candidates.some((c) => c.index === reserveIndex && c.unit?.uid === reserve.uid)) return;
-    gameState.ui.switchSelection = { mode: "commandSwitch", reserveIndex };
+    if (!candidates.some((c) => c.index === safeReserveIndex && c.unit?.uid === reserve.uid)) return;
+    gameState.ui.partyIndex = safeReserveIndex;
+    gameState.ui.switchSelection = { mode: "commandSwitch", reserveIndex: safeReserveIndex };
   };
 
   const confirmCurrentSwitchAction = () => {
     if (gameState.phase !== PHASE.PLAYING || isPlaybackBusy() || isKoReplacementPhase()) return;
     const actor = getCurrentActor();
-    const selectedReserveIndex = gameState.ui.switchSelection?.mode === "commandSwitch" ? gameState.ui.switchSelection.reserveIndex : null;
+    const selectedReserveIndex = gameState.ui.switchSelection?.mode === "commandSwitch"
+      ? getSafePartyIndex(gameState.ui.switchSelection.reserveIndex)
+      : null;
     if (!actor || !isAlive(actor) || selectedReserveIndex === null) return;
     const state = getStatusState(actor);
     if (!state.canSwitch) return;
@@ -1481,23 +1512,40 @@
       .map((a) => a.actorId);
     const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
     if (!candidates.some((c) => c.index === selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
+    const replacement = replaceActiveUnitFromReserve({
+      state: gameState,
+      team: TEAM.ALLY,
+      slot: gameState.currentActorIndex,
+      incomingUnitId: reserve.uid,
+      reserveIndexHint: selectedReserveIndex,
+      reserveMode: "swap"
+    });
+    if (!replacement) return;
     gameState.confirmedCommands[gameState.currentActorIndex] = {
-      actorId: actor.uid,
-      actorName: actor.name,
+      actorId: replacement.incoming.uid,
+      actorName: replacement.incoming.name,
       moveId: "switch",
-      moveName: `Switch → ${reserve.name}`,
+      moveName: `Switch → ${replacement.incoming.name}`,
       targetType: "交代",
-      targetNames: reserve ? [reserve.name] : [],
-      action: { type: "switch", team: TEAM.ALLY, slot: gameState.currentActorIndex, actorId: actor.uid, switchTargetId: reserve.uid }
+      targetNames: [replacement.incoming.name],
+      action: null
     };
+    setPartyUiCommand("fight");
     if (!advancePlanningSlot()) queueTurnResolution();
   };
 
-  const canCancelSelection = () => gameState.ui.commandMode === "fight" && (!!gameState.selectedMoveId || gameState.selectedTargets.length > 0);
+  const canCancelSelection = () => {
+    if (gameState.ui.selectingParty) return true;
+    return gameState.ui.command === "fight" && (!!gameState.selectedMoveId || gameState.selectedTargets.length > 0);
+  };
   const canUndoPreviousCommand = () => !isKoReplacementPhase() && gameState.confirmedCommands.some(Boolean);
 
   const cancelCurrentSelection = () => {
     if (!canCancelSelection() || isPlaybackBusy()) return;
+    if (gameState.ui.selectingParty) {
+      setPartyUiCommand("fight");
+      return;
+    }
     gameState.selectedMoveId = null;
     gameState.selectedTargets = [];
     gameState.ui.previewTargets = [];
@@ -1511,7 +1559,7 @@
       gameState.confirmedCommands[i] = null;
       gameState.currentActorIndex = i;
       clearTargetPreview();
-      gameState.ui.commandMode = "fight";
+      setPartyUiCommand("fight");
       return;
     }
   };
@@ -1663,7 +1711,7 @@
     if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
     if (isPlaybackBusy()) return getCurrentPlaybackMessage() || "戦闘演出中…";
     if (isKoReplacementPhase()) return "Choose a reserve monster to replace a defeated ally.";
-    if (gameState.ui.commandMode === "switch") return gameState.ui.switchSelection?.mode === "commandSwitch" ? "選択中の交代先で確定してください。" : "交代する控えを選んでください。";
+    if (gameState.ui.selectingParty) return gameState.ui.switchSelection?.mode === "commandSwitch" ? "選択中の交代先で確定してください。" : "交代する控えを選んでください。";
     if (!getSelectedMove()) return "わざを選んでください。";
     return getSelectedMove().targetMode === "single" ? "ハイライトされたマスから対象を選んでください。" : "このわざはハイライト対象全員に当たります。";
   };
@@ -1841,6 +1889,38 @@
     return wrap;
   };
 
+  const getPartyStatusLabel = (unit) => {
+    if (!unit || !Array.isArray(unit.statuses) || unit.statuses.length === 0) return "-";
+    const firstStatus = unit.statuses.find((status) => !!status?.kind);
+    if (!firstStatus) return "-";
+    return STATUS_LABELS[firstStatus.kind] || firstStatus.kind || "-";
+  };
+
+  const createPartySlotButton = ({ unit, index, isActive, isDisabled }) => {
+    const btn = createEl("button", `party-slot${isActive ? " active" : ""}`);
+    btn.dataset.action = "pick-reserve";
+    btn.dataset.reserveIndex = String(index);
+    btn.disabled = !!isDisabled;
+    btn.style.setProperty("--party-card-width", `${CONFIG.UI.CARD_WIDTH}px`);
+    btn.style.setProperty("--party-card-height", `${CONFIG.UI.CARD_HEIGHT}px`);
+
+    const thumb = createImageWithFallback({
+      src: getUnitPortraitPath(unit),
+      alt: unit?.name || "empty",
+      wrapperClass: "party-slot-thumb",
+      placeholderLabel: unit?.name || "空き",
+      placeholderSubLabel: "NO IMG"
+    });
+    const body = createEl("div", "party-slot-body");
+    const name = createEl("div", "party-slot-name", unit?.name || "空き");
+    const hpText = `${Math.max(0, Number(unit?.hp) || 0)} / ${Math.max(0, Number(unit?.maxHp) || 0)}`;
+    const hp = createEl("div", "party-slot-hp", `HP ${hpText}`);
+    const status = createEl("div", "party-slot-status", `状態 ${getPartyStatusLabel(unit)}`);
+    body.append(name, hp, status);
+    btn.append(thumb, body);
+    return btn;
+  };
+
   const renderStatusPanel = (x, y) => {
     const panel = createBattleCellButton("status-panel", x, y);
     const unit = getUnitAtFromState(gameState, { x, y });
@@ -1932,11 +2012,11 @@
     wrap.appendChild(createEl("h3", "", `コマンド：${actor ? actor.name : "-"}`));
 
     const actions = createEl("div", "actions");
-    const fight = createEl("button", `action-btn${gameState.ui.commandMode === "fight" ? " active" : ""}`, "たたかう");
+    const fight = createEl("button", `action-btn${gameState.ui.command === "fight" ? " active" : ""}`, "たたかう");
     fight.dataset.action = "mode-fight";
     fight.disabled = isPlaybackBusy();
-    const sw = createEl("button", `action-btn${gameState.ui.commandMode === "switch" ? " active" : ""}`, "なかま");
-    sw.dataset.action = "mode-switch";
+    const sw = createEl("button", `action-btn${gameState.ui.command === "party" ? " active" : ""}`, "なかま");
+    sw.dataset.action = "mode-party";
     const actorStatusState = actor ? getStatusState(actor) : { canSwitch: false, statuses: [] };
     sw.disabled = isPlaybackBusy() || !actorStatusState.canSwitch;
     const cancel = createEl("button", "action-btn", "キャンセル");
@@ -1951,7 +2031,7 @@
       wrap.appendChild(createEl("div", "mini", "Cannot switch (Bound)"));
     }
 
-    if (gameState.ui.commandMode === "fight" && actor) {
+    if (gameState.ui.command === "fight" && actor) {
       const moves = createEl("div", "moves");
       actor.moveIds.forEach((moveId) => {
         const move = MOVES[moveId];
@@ -1965,8 +2045,11 @@
       wrap.appendChild(moves);
     }
 
-    if (gameState.ui.commandMode === "switch") {
-      const switches = createEl("div", "switches");
+    if (gameState.ui.selectingParty) {
+      const switches = createEl("div", "party-row");
+      switches.style.setProperty("--party-start-x", `${CONFIG.UI.PARTY_START_X}px`);
+      switches.style.setProperty("--party-start-y", `${CONFIG.UI.PARTY_START_Y}px`);
+      switches.style.setProperty("--party-spacing-x", `${CONFIG.UI.PARTY_SPACING_X}px`);
       const alreadyPickedTargetIds = gameState.confirmedCommands
         .map((c) => c?.action)
         .filter((a) => a?.type === "switch")
@@ -1977,14 +2060,11 @@
         .map((a) => a.actorId);
       const allowedCandidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
       const allowedIndexSet = new Set(allowedCandidates.map((entry) => entry.index));
+      const safePartyIndex = getSafePartyIndex(gameState.ui.partyIndex);
       gameState.teams.ally.reserve.forEach((u, idx) => {
-        const isActive = gameState.ui.switchSelection?.mode === "commandSwitch" && gameState.ui.switchSelection.reserveIndex === idx;
-        const btn = createEl("button", `reserve-card${isActive ? " active" : ""}`);
-        btn.dataset.action = "pick-reserve";
-        btn.dataset.reserveIndex = String(idx);
         const blocked = !u || !allowedIndexSet.has(idx);
-        btn.disabled = blocked || isPlaybackBusy();
-        btn.appendChild(createEl("div", "name", u ? u.name : "空き"));
+        const isActive = idx === safePartyIndex;
+        const btn = createPartySlotButton({ unit: u, index: idx, isActive, isDisabled: blocked || isPlaybackBusy() });
         switches.appendChild(btn);
       });
       wrap.appendChild(switches);
@@ -1993,7 +2073,8 @@
       const btn = createEl("button", "dest-btn", "こうたい");
       btn.dataset.action = "pick-destination";
       btn.dataset.toSlot = String(gameState.currentActorIndex);
-      btn.disabled = isPlaybackBusy() || gameState.ui.switchSelection?.mode !== "commandSwitch" || !actorStatusState.canSwitch;
+      const selectedReserve = getPartyReserve()[getSafePartyIndex(gameState.ui.partyIndex)];
+      btn.disabled = isPlaybackBusy() || !gameState.ui.selectingParty || !selectedReserve || !actorStatusState.canSwitch;
       dests.appendChild(btn);
       wrap.appendChild(dests);
     }
@@ -2002,6 +2083,7 @@
   };
 
   const render = () => {
+    syncPartyUiState();
     clearTempArrays();
     const app = document.getElementById("app");
     app.innerHTML = "";
@@ -2051,7 +2133,7 @@
     const a = target.dataset.action;
     if (a === "reset") dispatch({ type: "RESET" });
     if (a === "mode-fight") dispatch({ type: "MODE", mode: "fight" });
-    if (a === "mode-switch") dispatch({ type: "MODE", mode: "switch" });
+    if (a === "mode-party") dispatch({ type: "MODE", mode: "party" });
     if (a === "pick-move") dispatch({ type: "MOVE", moveId: target.dataset.moveId });
     if (a === "target-cell") dispatch({ type: "TARGET", x: Number(target.dataset.x), y: Number(target.dataset.y) });
     if (a === "pick-reserve") dispatch({ type: "RESERVE", reserveIndex: Number(target.dataset.reserveIndex) });
