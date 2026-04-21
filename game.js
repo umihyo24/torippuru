@@ -1485,7 +1485,8 @@
       .map((c) => c?.action)
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
-    const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
+    const activeAllyIds = gameState.teams.ally.active.map((unit) => unit?.uid).filter(Boolean);
+    const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds, ...activeAllyIds]);
     if (!candidates.some((c) => c.index === safeReserveIndex && c.unit?.uid === reserve.uid)) return;
     gameState.ui.partyIndex = safeReserveIndex;
     gameState.ui.switchSelection = { mode: "commandSwitch", reserveIndex: safeReserveIndex };
@@ -1510,7 +1511,8 @@
       .map((c) => c?.action)
       .filter((a) => a?.type === "switch")
       .map((a) => a.actorId);
-    const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
+    const activeAllyIds = gameState.teams.ally.active.map((unit) => unit?.uid).filter(Boolean);
+    const candidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds, ...activeAllyIds]);
     if (!candidates.some((c) => c.index === selectedReserveIndex && c.unit?.uid === reserve.uid)) return;
     const replacement = replaceActiveUnitFromReserve({
       state: gameState,
@@ -2058,7 +2060,8 @@
         .map((c) => c?.action)
         .filter((a) => a?.type === "switch")
         .map((a) => a.actorId);
-      const allowedCandidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds]);
+      const activeAllyIds = gameState.teams.ally.active.map((unit) => unit?.uid).filter(Boolean);
+      const allowedCandidates = getAvailableSwitchCandidates(gameState, TEAM.ALLY, [...alreadyPickedTargetIds, ...switchingActorIds, ...activeAllyIds]);
       const allowedIndexSet = new Set(allowedCandidates.map((entry) => entry.index));
       const safePartyIndex = getSafePartyIndex(gameState.ui.partyIndex);
       gameState.teams.ally.reserve.forEach((u, idx) => {
