@@ -230,8 +230,121 @@
       guaranteedCrit: true,
       beforeDamage: [],
       afterDamage: []
+    },
+    iwana_nadare: {
+      id: "iwana_nadare",
+      name: "イワナなだれ",
+      category: "physical",
+      role: "attack",
+      type: "earth",
+      target: "all-enemies",
+      power: 24,
+      description: "全体攻撃",
+      effectType: "normal",
+      special: null,
+      patternId: "front3",
+      targetRule: "enemy",
+      targetMode: "all-enemies",
+      beforeDamage: [],
+      afterDamage: []
+    },
+    kenkon_itteki: {
+      id: "kenkon_itteki",
+      name: "けんこんいってき",
+      category: "physical",
+      role: "attack",
+      type: "earth",
+      target: "single",
+      power: 48,
+      description: "つよいこうげき",
+      effectType: "normal",
+      special: null,
+      patternId: "singleAttackReach",
+      targetRule: "anyOtherSingle",
+      targetMode: "single",
+      beforeDamage: [],
+      afterDamage: []
+    },
+    shippu_jinrai: {
+      id: "shippu_jinrai",
+      name: "しっぷうじんらい",
+      category: "physical",
+      role: "attack",
+      type: "light",
+      target: "single",
+      power: 48,
+      description: "つよいこうげき",
+      effectType: "normal",
+      special: null,
+      patternId: "singleAttackReach",
+      targetRule: "anyOtherSingle",
+      targetMode: "single",
+      beforeDamage: [],
+      afterDamage: []
+    },
+    mukoumizu: {
+      id: "mukoumizu",
+      name: "むこうみず",
+      category: "special",
+      role: "attack",
+      type: "water",
+      target: "single",
+      power: 48,
+      description: "つよいこうげき",
+      effectType: "normal",
+      special: null,
+      patternId: "singleAttackReach",
+      targetRule: "anyOtherSingle",
+      targetMode: "single",
+      beforeDamage: [],
+      afterDamage: []
+    },
+    thunder_judgment: {
+      id: "thunder_judgment",
+      name: "サンダージャッジメント",
+      category: "special",
+      role: "attack",
+      type: "light",
+      target: "single",
+      power: 50,
+      description: "つよいこうげき",
+      effectType: "normal",
+      special: null,
+      patternId: "singleAttackReach",
+      targetRule: "anyOtherSingle",
+      targetMode: "single",
+      beforeDamage: [],
+      afterDamage: []
+    },
+    shudan_bokoboko: {
+      id: "shudan_bokoboko",
+      name: "しゅうだんボコボコ",
+      category: "physical",
+      role: "attack",
+      type: "nature",
+      target: "single",
+      power: 10,
+      description: "生存しているモンスターの数だけ攻撃する",
+      effectType: "multi-hit-scaling",
+      special: { kind: "hit-per-alive-ally" },
+      patternId: "singleAttackReach",
+      targetRule: "anyOtherSingle",
+      targetMode: "single",
+      beforeDamage: [],
+      afterDamage: []
     }
   };
+  Object.values(MOVES).forEach((move) => {
+    if (!move || typeof move !== "object") return;
+    if (!move.role) move.role = move.category === "status" ? "support" : "attack";
+    if (!move.target) move.target = move.targetMode === "all-enemies" ? "all-enemies" : "single";
+    if (typeof move.description !== "string" || !move.description) {
+      move.description = move.role === "support" ? "補助効果" : (move.target === "all-enemies" ? "全体攻撃" : "単体攻撃");
+    }
+    if (!move.effectType) move.effectType = "normal";
+    if (move.special === undefined) move.special = null;
+    if (move.role === "attack" && !Number.isFinite(Number(move.power))) move.power = 0;
+  });
 
   const STATUSES = {
     poison: { kind: "poison", category: "dot", duration: 3, tags: ["poison"] },
@@ -248,11 +361,11 @@
   };
 
   const UNIT_LIBRARY = {
-    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, abilityId: "venomTouch", moves: ["shippu_jinrai", "drainBite", "rallyHowl", "shellStance"] },
+    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, abilityId: "venomTouch", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
+    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, abilityId: "openingSurge", moves: ["iwana_nadare", "shudan_bokoboko", "ironGuard", "rallyHowl"] },
     mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 95, atk: 65, mag: 75, def: 90, res: 85, spd: 70, abilityId: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
-    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, abilityId: null, moves: ["frostLance", "precisionStrike", "rallyHowl", "shellStance"] },
+    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, abilityId: null, moves: ["mukoumizu", "thunder_judgment", "rallyHowl", "shellStance"] },
     sandko: { id: "sandko", name: "サンドコ", portrait: "sandko", hp: 85, atk: 70, mag: 85, def: 65, res: 70, spd: 105, abilityId: "battleRhythm", moves: ["frostLance", "precisionStrike", "focusMind", "shellStance"] },
     stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 65, atk: 55, mag: 100, def: 45, res: 70, spd: 105, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
     ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 105, atk: 100, mag: 40, def: 100, res: 65, spd: 70, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
@@ -300,18 +413,24 @@
     status: "ST"
   };
   const MOVE_ROLE_LABELS = {
-    attack: "attack",
-    support: "support"
+    attack: "攻撃",
+    support: "補助"
+  };
+  const MOVE_TARGET_LABELS = {
+    single: "単体",
+    "all-enemies": "敵全体"
   };
 
-  const getMoveRole = (move) => (move?.category === "status" ? "support" : "attack");
+  const getMoveRole = (move) => move?.role || (move?.category === "status" ? "support" : "attack");
+  const getMoveTargetLabel = (move) => MOVE_TARGET_LABELS[move?.target] || (move?.targetMode === "all-enemies" ? "敵全体" : "単体");
   const getMoveEffectText = (move) => {
     if (!move) return "-";
-    if ((Number(move.power) || 0) > 0) return `Power ${move.power}`;
+    if (move.effectType === "multi-hit-scaling" && move.special?.kind === "hit-per-alive-ally") return "生存味方数ぶん多段攻撃";
+    if ((Number(move.power) || 0) > 0) return `威力 ${move.power}`;
     const effects = Array.isArray(move.beforeDamage) ? move.beforeDamage : [];
-    if (effects.some((e) => e?.type === "applyStatus")) return "Applies status";
-    if (effects.some((e) => e?.type === "modifyCritStage")) return "Boosts critical chance";
-    return "Support effect";
+    if (effects.some((e) => e?.type === "applyStatus")) return "状態異常を付与";
+    if (effects.some((e) => e?.type === "modifyCritStage")) return "急所率を上げる";
+    return move.description || "補助効果";
   };
 
   const createEmptyFormation = () => Array.from({ length: FORMATION_MEMBER_COUNT }, () => null);
@@ -1486,6 +1605,13 @@
   };
 
   const getValidTargetsForMoveInState = (state, actor, move) => {
+    if (!state || !actor || !move) return [];
+    if (move.targetMode === "all-enemies") {
+      return collectAllUnits(state)
+        .filter((unit) => unit && isAlive(unit) && isRuleMatchForTarget(actor, move, unit))
+        .map((unit) => ({ x: toBoardPos(unit.team, unit.slot).x, y: toBoardPos(unit.team, unit.slot).y, uid: unit.uid }))
+        .filter((pos) => inBounds(pos));
+    }
     const actorPos = toBoardPos(actor.team, actor.slot);
     const orientation = actor.team === TEAM.ALLY ? 1 : -1;
     const offsets = patterns[move.patternId] || [];
@@ -1495,6 +1621,29 @@
       .map((pos) => ({ pos, unit: getUnitAtFromState(state, pos) }))
       .filter(({ unit }) => isRuleMatchForTarget(actor, move, unit))
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
+  };
+
+  const getActionTargetPositions = ({ state, actor, move, action }) => {
+    if (!state || !actor || !move || !action) return [];
+    if (move.targetMode === "single") return action.targetPos ? [{ x: action.targetPos.x, y: action.targetPos.y }] : [];
+    if (move.targetMode === "all-enemies") return getValidTargetsForMoveInState(state, actor, move);
+    return getPatternPositionsForMove(actor, move);
+  };
+
+  const getAliveAlliesCount = (state, team) => {
+    const teamState = state?.teams?.[team];
+    if (!teamState) return 1;
+    const alive = [...(Array.isArray(teamState.active) ? teamState.active : []), ...(Array.isArray(teamState.reserve) ? teamState.reserve : [])]
+      .filter((unit) => unit && isAlive(unit)).length;
+    return Math.max(1, alive);
+  };
+
+  const getMoveHitCount = ({ state, actor, move }) => {
+    if (!state || !actor || !move) return 1;
+    if (move.effectType === "multi-hit-scaling" && move.special?.kind === "hit-per-alive-ally") {
+      return getAliveAlliesCount(state, actor.team);
+    }
+    return 1;
   };
 
   const getPatternPositionsForMove = (actor, move) => {
@@ -1738,15 +1887,14 @@
         moveTargetRule: move.targetRule
       });
       const patternPositions = getPatternPositionsForMove(actor, move);
-      const targets = move.targetMode === "single"
-        ? (action.targetPos ? [{ x: action.targetPos.x, y: action.targetPos.y }] : [])
-        : patternPositions;
+      const targets = getActionTargetPositions({ state: sim, actor, move, action });
       const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0, isCritical: false };
       const isCritical = isCriticalHit(actor, move);
+      const hitCount = getMoveHitCount({ state: sim, actor, move });
 
       targets.forEach((targetPos) => {
         if (!inBounds(targetPos)) return;
-        if (!patternPositions.some((p) => p.x === targetPos.x && p.y === targetPos.y)) return;
+        if (move.targetMode !== "all-enemies" && !patternPositions.some((p) => p.x === targetPos.x && p.y === targetPos.y)) return;
         const target = getUnitAtFromState(sim, targetPos);
         if (!validateTargetingContext(actor, target, move, "resolveTurn")) return;
         const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false, isCritical: false };
@@ -1768,12 +1916,15 @@
         });
 
         if (isDamageMoveCategory(move.category)) {
-          const damage = calcDamage(actor, target, move, { isCritical });
-          target.hp = clamp(target.hp - damage, 0, target.maxHp);
-          targetResult.damage = damage;
-          targetResult.hpAfter = target.hp;
-          targetResult.isCritical = isCritical;
-          actionResult.isCritical = isCritical;
+          for (let hit = 0; hit < hitCount; hit += 1) {
+            if (!isAlive(target)) break;
+            const damage = calcDamage(actor, target, move, { isCritical });
+            target.hp = clamp(target.hp - damage, 0, target.maxHp);
+            targetResult.damage += damage;
+            targetResult.hpAfter = target.hp;
+            targetResult.isCritical = isCritical;
+            actionResult.isCritical = isCritical;
+          }
         }
 
         move.afterDamage.forEach((effect) => {
@@ -2378,6 +2529,7 @@
     let best = null;
     actor.moveIds.forEach((moveId) => {
       const move = MOVES[moveId];
+      if (!move) return;
       const cands = getValidTargetsForMoveInState(gameState, actor, move);
       if (move.targetMode === "single") {
         cands.forEach((c) => {
@@ -2442,11 +2594,12 @@
     const actor = getCurrentActor();
     if (!actor || !isAlive(actor)) return;
     const move = MOVES[moveId];
+    if (!move) return;
     const cands = getValidTargetsForMoveInState(gameState, actor, move);
     gameState.selectedMoveId = moveId;
     gameState.ui.selectedAction = "fight";
-    gameState.ui.previewTargets = cands.map((c) => ({ x: c.x, y: c.y }));
-    gameState.ui.targetCandidates = cands;
+    gameState.ui.previewTargets = (Array.isArray(cands) ? cands : []).map((c) => ({ x: c.x, y: c.y }));
+    gameState.ui.targetCandidates = Array.isArray(cands) ? cands : [];
   };
 
   const createConfirmedFightCommand = ({ slot, actor, move, targets }) => ({
@@ -2454,7 +2607,7 @@
     actorName: actor.name,
     moveId: move.id,
     moveName: move.name,
-    targetType: move.targetMode === "single" ? "単体" : "範囲",
+    targetType: getMoveTargetLabel(move),
     targetNames: targets.map((t) => t.name),
     action: { type: "fight", team: TEAM.ALLY, slot, moveId: move.id, targetPos: move.targetMode === "single" ? toBoardPos(targets[0].team, targets[0].slot) : null }
   });
@@ -3122,8 +3275,10 @@
 
     if (gameState.ui.command === "fight" && actor) {
       const moves = createEl("div", "moves");
-      actor.moveIds.forEach((moveId) => {
+      const moveIds = Array.isArray(actor.moveIds) ? actor.moveIds : [];
+      moveIds.forEach((moveId) => {
         const move = MOVES[moveId];
+        if (!move) return;
         const btn = createEl("button", `move ${move.category} type-${move.type}${gameState.selectedMoveId === moveId ? " active" : ""}`);
         btn.dataset.action = "pick-move";
         btn.dataset.moveId = moveId;
@@ -3133,7 +3288,10 @@
         iconBadge.appendChild(renderMoveTypeIcon(move));
         const details = createEl("div", "move-detail");
         details.appendChild(createEl("div", "move-name", move.name));
-        details.appendChild(createEl("div", "move-meta", `${MOVE_CATEGORY_LABELS[move.category] || move.category} / 威力 ${move.power}`));
+        const role = MOVE_ROLE_LABELS[getMoveRole(move)] || "-";
+        const targetLabel = getMoveTargetLabel(move);
+        details.appendChild(createEl("div", "move-meta", `${role} / ${targetLabel} / ${getMoveEffectText(move)}`));
+        details.appendChild(createEl("div", "mini", move.description || "-"));
         btn.append(iconBadge, details);
         moves.appendChild(btn);
       });
@@ -3407,8 +3565,9 @@
     const card = createEl("div", className);
     card.append(
       createEl("div", "move-info-name", move?.name || "未設定"),
-      createEl("div", "move-info-meta", `Type: ${move?.type || "-"} / Role: ${MOVE_ROLE_LABELS[getMoveRole(move)] || "-"}`),
-      createEl("div", "move-info-power", getMoveEffectText(move))
+      createEl("div", "move-info-meta", `Type: ${move?.type || "-"} / Role: ${MOVE_ROLE_LABELS[getMoveRole(move)] || "-"} / Target: ${getMoveTargetLabel(move)}`),
+      createEl("div", "move-info-power", getMoveEffectText(move)),
+      createEl("div", "mini", move?.description || "-")
     );
     return card;
   };
