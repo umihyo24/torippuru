@@ -380,24 +380,27 @@
     bind: { kind: "bind", category: "debuffBind", duration: 2, tags: ["debuff", "bind"] }
   };
 
-  const ABILITIES = {
-    venomTouch: { id: "venomTouch", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
-    battleRhythm: { id: "battleRhythm", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
-    openingSurge: { id: "openingSurge", onSwitchIn: [{ type: "addAtkStage", amount: 2, target: "self" }] }
+  const TRAIT_LIBRARY = {
+    venomTouch: { key: "venomTouch", name: "ベノムタッチ", description: "攻撃を当てた後、相手をどくにする。", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
+    battleRhythm: { key: "battleRhythm", name: "バトルリズム", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
+    openingSurge: { key: "openingSurge", name: "オープニングサージ", description: "登場時、こうげき段階が2上がる。", onSwitchIn: [{ type: "addAtkStage", amount: 2, target: "self" }] },
+    intimidate: { key: "intimidate", name: "いあつかん", description: "登場時、正面の相手のこうげきを1段階さげる" },
+    wonder_guard: { key: "wonder_guard", name: "ふしぎなまもり", description: "弱点以外の攻撃を受けない" },
+    no_guard: { key: "no_guard", name: "ノーガード", description: "お互いのすべての技が必中になる" }
   };
 
   const UNIT_LIBRARY = {
-    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, abilityId: "venomTouch", moves: ["shippu_jinrai", "drainBite", "rallyHowl", "shellStance"] },
-    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, abilityId: "venomTouch", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
-    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, abilityId: "openingSurge", moves: ["iwana_nadare", "shudan_bokoboko", "ironGuard", "rallyHowl"] },
-    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 95, atk: 65, mag: 75, def: 90, res: 85, spd: 70, abilityId: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
-    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, abilityId: null, moves: ["mukoumizu", "thunder_judgment", "rallyHowl", "shellStance"] },
-    sandko: { id: "sandko", name: "サンドコ", portrait: "sandko", hp: 85, atk: 70, mag: 85, def: 65, res: 70, spd: 105, abilityId: "battleRhythm", moves: ["frostLance", "precisionStrike", "focusMind", "shellStance"] },
-    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 65, atk: 55, mag: 100, def: 45, res: 70, spd: 105, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
-    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 105, atk: 100, mag: 40, def: 100, res: 65, spd: 70, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
-    wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 85, atk: 95, mag: 70, def: 65, res: 65, spd: 100, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 90, mag: 40, def: 110, res: 50, spd: 40, abilityId: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
-    shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 80, atk: 55, mag: 100, def: 55, res: 70, spd: 120, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
+    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, weaknessTypes: ["water", "earth"], traits: ["venomTouch", "battleRhythm", "openingSurge"], selectedTraitKey: "venomTouch", moves: ["shippu_jinrai", "drainBite", "rallyHowl", "shellStance"] },
+    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, weaknessTypes: ["water", "earth"], traits: ["intimidate", "venomTouch", "openingSurge"], selectedTraitKey: "intimidate", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
+    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, weaknessTypes: ["water", "earth"], traits: ["openingSurge", "battleRhythm", "intimidate"], selectedTraitKey: "openingSurge", moves: ["iwana_nadare", "shudan_bokoboko", "ironGuard", "rallyHowl"] },
+    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 95, atk: 65, mag: 75, def: 90, res: 85, spd: 70, weaknessTypes: ["fire", "shadow"], traits: ["battleRhythm", "venomTouch", "openingSurge"], selectedTraitKey: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
+    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, weaknessTypes: ["nature", "light"], traits: ["battleRhythm", "intimidate", "openingSurge"], selectedTraitKey: "battleRhythm", moves: ["mukoumizu", "thunder_judgment", "rallyHowl", "shellStance"] },
+    sandko: { id: "sandko", name: "サンドコ", portrait: "sandko", hp: 85, atk: 70, mag: 85, def: 65, res: 70, spd: 105, weaknessTypes: ["nature", "water"], traits: ["battleRhythm", "intimidate", "venomTouch"], selectedTraitKey: "battleRhythm", moves: ["frostLance", "precisionStrike", "focusMind", "shellStance"] },
+    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 65, atk: 55, mag: 100, def: 45, res: 70, spd: 105, weaknessTypes: ["light", "earth"], traits: ["venomTouch", "no_guard", "battleRhythm"], selectedTraitKey: "venomTouch", moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
+    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 105, atk: 100, mag: 40, def: 100, res: 65, spd: 70, weaknessTypes: ["water", "nature"], traits: ["openingSurge", "battleRhythm", "intimidate"], selectedTraitKey: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 85, atk: 95, mag: 70, def: 65, res: 65, spd: 100, weaknessTypes: ["light", "water"], traits: ["intimidate", "battleRhythm", "openingSurge"], selectedTraitKey: "intimidate", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 90, mag: 40, def: 110, res: 50, spd: 40, weaknessTypes: ["water", "nature"], traits: ["battleRhythm", "openingSurge", "intimidate"], selectedTraitKey: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
+    shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 80, atk: 55, mag: 100, def: 55, res: 70, spd: 120, weaknessTypes: ["shadow", "earth"], traits: ["intimidate", "wonder_guard", "no_guard"], selectedTraitKey: "intimidate", moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
   const INITIAL_PARTY = {
     ally: ["maguma", "sandko", "frostfang", "emberlynx", "hittokage", "stormimp"],
@@ -421,11 +424,7 @@
     defUp: (n) => `${n}の ぼうぎょアップが切れた。`,
     critFocus: (n) => `${n}の 精神集中が切れた。`,
   };
-  const ABILITY_LABELS = {
-    venomTouch: "ベノムタッチ",
-    battleRhythm: "バトルリズム",
-    openingSurge: "オープニングサージ"
-  };
+  const getTraitLabel = (traitKey) => TRAIT_LIBRARY?.[traitKey]?.name || traitKey || "trait";
 
   const MOVE_CATEGORY_LABELS = {
     physical: "物理",
@@ -512,26 +511,6 @@
     spark: "✨"
   };
   const TYPE_FILTER_ORDER = ["all", "fire", "nature", "earth", "shadow", "light", "water"];
-  const MONSTER_TRAITS = {
-    hittokage: [
-      {
-        key: "iatsukan",
-        name: "いあつかん",
-        description: "ばにでたときに正面のモンスターのこうげきを1段階さげる"
-      },
-      {
-        key: "gyakkyo",
-        name: "ぎゃっきょう◯",
-        description: "HPが1/3以下のとき、わざの威力が1.5倍"
-      },
-      {
-        key: "kokakudahou",
-        name: "こうかくだほう",
-        description: "わざが届かないモンスターにもわざがとどく。"
-      }
-    ]
-  };
-
   const createNatureModifierByKey = (key) => {
     const preset = NATURE_MODIFIER_PRESETS.find((entry) => entry.key === key) || NATURE_MODIFIER_PRESETS[0];
     return {
@@ -609,8 +588,39 @@
   const cloneStatus = (kind, duration) => ({ ...STATUSES[kind], duration: duration ?? STATUSES[kind].duration, tags: [...STATUSES[kind].tags] });
   const findStatus = (statuses, kind) => statuses.find((s) => s.kind === kind);
 
-  const createUnit = (unitId, team, slot) => {
+  const normalizeTraitList = (traits = []) => traits
+    .map((entry) => {
+      if (typeof entry === "string") {
+        const lib = TRAIT_LIBRARY[entry];
+        if (!lib) return null;
+        return { key: lib.key, name: lib.name, description: lib.description };
+      }
+      const key = typeof entry?.key === "string" ? entry.key : "";
+      if (!key) return null;
+      const lib = TRAIT_LIBRARY[key];
+      return {
+        key,
+        name: typeof entry?.name === "string" ? entry.name : (lib?.name || "未設定"),
+        description: typeof entry?.description === "string" ? entry.description : (lib?.description || "説明なし")
+      };
+    })
+    .filter((trait) => !!trait?.key)
+    .slice(0, 3);
+
+  const resolveSelectedTraitKey = (unitId, selectedTraitMap = {}) => {
+    const traits = normalizeTraitList(UNIT_LIBRARY?.[unitId]?.traits || []);
+    if (!traits.length) return null;
+    const selectedFromDraft = selectedTraitMap?.[unitId];
+    if (traits.some((trait) => trait.key === selectedFromDraft)) return selectedFromDraft;
+    const selectedFromBase = UNIT_LIBRARY?.[unitId]?.selectedTraitKey;
+    if (traits.some((trait) => trait.key === selectedFromBase)) return selectedFromBase;
+    return traits[0].key;
+  };
+
+  const createUnit = (unitId, team, slot, options = {}) => {
     const base = UNIT_LIBRARY[unitId];
+    const traitList = normalizeTraitList(base?.traits || []);
+    const selectedTraitKey = resolveSelectedTraitKey(unitId, options.selectedTraitByMonsterId || {});
     return {
       uid: `${team}-${unitId}-${slot}-${UID_COUNTER++}`,
       unitId: base.id,
@@ -625,7 +635,9 @@
       def: base.def,
       res: base.res,
       spd: base.spd,
-      abilityId: base.abilityId,
+      weaknessTypes: Array.isArray(base.weaknessTypes) ? base.weaknessTypes.slice() : [],
+      traits: traitList,
+      selectedTraitKey,
       moveIds: [...base.moves],
       statuses: [],
       buffs: { atkStage: 0, critStage: 0, critStageDuration: 0 },
@@ -643,7 +655,7 @@
 
   const hasAnyValidFormationMember = (formation) => getFormationUnitIds(formation).length > 0;
 
-  const createAllyTeamFromFormation = (formation) => {
+  const createAllyTeamFromFormation = (formation, options = {}) => {
     const normalized = cloneFormation(formation);
     const frontIds = getFrontFormationUnitIds(normalized);
     const activeIdsBySlot = Array.from({ length: CONFIG.BOARD_COLS }, () => null);
@@ -653,11 +665,11 @@
       activeIdsBySlot[slot] = unitId;
     });
 
-    const active = activeIdsBySlot.map((unitId, slot) => (unitId ? createUnit(unitId, TEAM.ALLY, slot) : null));
+    const active = activeIdsBySlot.map((unitId, slot) => (unitId ? createUnit(unitId, TEAM.ALLY, slot, options) : null));
     const reserveIds = normalized
       .slice(CONFIG.PARTY_ACTIVE_COUNT, FORMATION_MEMBER_COUNT)
       .filter((unitId) => !!unitId && !!UNIT_LIBRARY[unitId]);
-    const reserve = reserveIds.map((unitId, idx) => createUnit(unitId, TEAM.ALLY, `r${idx}`));
+    const reserve = reserveIds.map((unitId, idx) => createUnit(unitId, TEAM.ALLY, `r${idx}`, options));
     return { active, reserve };
   };
 
@@ -669,7 +681,10 @@
       : Object.keys(UNIT_LIBRARY);
     const battleFormationIndex = getSafeFormationSlot(seed.battleFormationIndex);
     const selectedFormation = cloneFormation(seedFormations[battleFormationIndex] || null);
-    const allyTeam = createAllyTeamFromFormation(selectedFormation);
+    const seedMonsterTraitDrafts = (seed?.monsterTraitDrafts && typeof seed.monsterTraitDrafts === "object")
+      ? { ...seed.monsterTraitDrafts }
+      : {};
+    const allyTeam = createAllyTeamFromFormation(selectedFormation, { selectedTraitByMonsterId: seedMonsterTraitDrafts });
     return ({
       phase: PHASE.HOME,
       turn: 1,
@@ -789,7 +804,7 @@
       monsterTrainingDrafts: {},
       monsterMoveDrafts: {},
       monsterNatureDrafts: {},
-      monsterTraitDrafts: {},
+      monsterTraitDrafts: seedMonsterTraitDrafts,
       trainerCard: {
         badges: {
           novice: true,
@@ -931,14 +946,7 @@
   };
 
   const getMonsterTraits = (monsterId) => {
-    const traits = Array.isArray(MONSTER_TRAITS?.[monsterId]) ? MONSTER_TRAITS[monsterId] : [];
-    return traits
-      .map((trait) => ({
-        key: typeof trait?.key === "string" ? trait.key : "",
-        name: typeof trait?.name === "string" ? trait.name : "未設定",
-        description: typeof trait?.description === "string" ? trait.description : "説明なし"
-      }))
-      .filter((trait) => !!trait.key);
+    return normalizeTraitList(UNIT_LIBRARY?.[monsterId]?.traits || []);
   };
 
   const getMonsterTraitDraft = (monsterId, state = gameState) => {
@@ -1522,8 +1530,8 @@
     const { ignoreDefUp = false } = options;
     let value = unit[key];
     if (key === "atk" && findStatus(unit.statuses, "atkUp")) value = Math.floor(value * (1 + CONFIG.ATK_UP_RATIO));
-    if (key === "atk" && Number.isFinite(unit?.buffs?.atkStage) && unit.buffs.atkStage > 0) {
-      value = Math.floor(value * (1 + (CONFIG.TURN_START_ATK_STAGE_RATIO * unit.buffs.atkStage)));
+    if (key === "atk" && Number.isFinite(unit?.buffs?.atkStage) && unit.buffs.atkStage !== 0) {
+      value = Math.max(1, Math.floor(value * (1 + (CONFIG.TURN_START_ATK_STAGE_RATIO * unit.buffs.atkStage))));
     }
     if (key === "def" && !ignoreDefUp && findStatus(unit.statuses, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
     return value;
@@ -1554,8 +1562,99 @@
     return Math.random() < chance;
   };
 
+  const getSelectedTrait = (unit) => {
+    if (!unit) return null;
+    const traits = Array.isArray(unit.traits) ? unit.traits : [];
+    if (!traits.length) return null;
+    return traits.find((trait) => trait.key === unit.selectedTraitKey) || traits[0] || null;
+  };
+
+  const adjustAtkStage = (unit, amount) => {
+    if (!unit || !Number.isFinite(amount)) return 0;
+    const before = Number(unit?.buffs?.atkStage) || 0;
+    const next = clamp(before + Math.trunc(amount), -CONFIG.CRIT_STAGE_MAX, CONFIG.CRIT_STAGE_MAX);
+    unit.buffs.atkStage = next;
+    return next - before;
+  };
+
+  const isWeaknessHit = (defender, move) => {
+    const weaknessTypes = Array.isArray(defender?.weaknessTypes) ? defender.weaknessTypes : [];
+    if (!weaknessTypes.length) return true;
+    const moveType = typeof move?.type === "string" ? move.type : "";
+    return weaknessTypes.includes(moveType);
+  };
+
+  const applyTraitEffects = (eventType, context = {}) => {
+    const out = { forceHit: false, overrideDamage: null, messages: [], effects: [] };
+    const actor = context.actor || null;
+    const target = context.target || null;
+    const source = context.source || actor || null;
+    const sourceTrait = getSelectedTrait(source);
+    const targetTrait = getSelectedTrait(target);
+
+    if ((eventType === "onBattleStart" || eventType === "onSwitchIn") && source && sourceTrait?.key === "intimidate") {
+      const opponent = context.opponent || null;
+      if (opponent && isAlive(opponent)) {
+        const changed = adjustAtkStage(opponent, -1);
+        if (changed !== 0) {
+          out.effects.push({ type: "addAtkStage", amount: changed, targetId: opponent.uid, targetName: opponent.name });
+          out.messages.push(`${source.name}の ${sourceTrait.name}が 発動した！`);
+          out.messages.push(`${opponent.name}の こうげきが さがった！`);
+        }
+      }
+    }
+
+    if (eventType === "beforeHitCheck") {
+      if (sourceTrait?.key === "no_guard" || targetTrait?.key === "no_guard") out.forceHit = true;
+    }
+
+    if (eventType === "beforeDamage" && target && targetTrait?.key === "wonder_guard" && context.move) {
+      if (!isWeaknessHit(target, context.move)) out.overrideDamage = 0;
+    }
+
+    if (eventType === "afterDamage" && source && sourceTrait) {
+      const traitDef = TRAIT_LIBRARY[sourceTrait.key];
+      (traitDef?.onAfterDamage || []).forEach((effect) => {
+        if (effect.type === "applyStatus" && target && isAlive(target)) {
+          addStatus(target, effect.status, effect.duration);
+          out.effects.push({
+            type: "applyStatus",
+            statusId: effect.status,
+            duration: effect.duration,
+            sourceType: "trait",
+            sourceId: source.uid,
+            sourceName: source.name,
+            traitKind: sourceTrait.key,
+            targetId: target.uid,
+            targetName: target.name
+          });
+        }
+      });
+    }
+
+    if (eventType === "onTurnStart" && source && sourceTrait) {
+      const traitDef = TRAIT_LIBRARY[sourceTrait.key];
+      (traitDef?.onTurnStart || []).forEach((effect) => {
+        if (effect.type === "addAtkStage") {
+          const changed = adjustAtkStage(source, Number(effect.amount) || 0);
+          if (changed !== 0) out.effects.push({ type: "addAtkStage", amount: changed, targetId: source.uid, targetName: source.name });
+        }
+      });
+    }
+
+    return out;
+  };
+
+  const doesMoveHit = ({ actor, target, move }) => {
+    const traitResult = applyTraitEffects("beforeHitCheck", { actor, target, move });
+    if (traitResult.forceHit) return true;
+    return true;
+  };
+
   const calcDamage = (attacker, defender, move, options = {}) => {
     const { isCritical = false } = options;
+    const beforeDamageTrait = applyTraitEffects("beforeDamage", { actor: attacker, target: defender, move });
+    if (beforeDamageTrait.overrideDamage === 0) return 0;
     const atk = getAttackStatForMove(attacker, move) + Math.floor(move.power / 10);
     const def = getDefenseStatForMove(defender, move, { ignoreDefUp: isCritical });
     let dmg = Math.max(1, atk - def);
@@ -1725,7 +1824,7 @@
         if (effect.type === "addAtkStage") {
           const amount = Math.max(0, Number(effect.amount) || 0);
           if (amount <= 0) return;
-          unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, 0, CONFIG.CRIT_STAGE_MAX);
+          unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, -CONFIG.CRIT_STAGE_MAX, CONFIG.CRIT_STAGE_MAX);
           messages.push(`${unit.name}の こうげき体勢が高まった！`);
         }
       });
@@ -1734,9 +1833,13 @@
     state.globalStatuses.forEach((status) => applyEffects(status.onEnter, STATUS_LABELS[status.kind] || status.kind));
     state.teams[team].statuses.forEach((status) => applyEffects(status.onEnter, STATUS_LABELS[status.kind] || status.kind));
     (state.teams[team].tileEffects?.[slot] || []).forEach((tileEffect) => applyEffects(tileEffect.onEnter, tileEffect.name || tileEffect.kind || "tile effect"));
-    const ability = ABILITIES[unit.abilityId];
-    applyEffects(ability?.onSwitchIn, ABILITY_LABELS[ability?.id] || ability?.id || "ability", true);
-    applyStatEffects(ability?.onSwitchIn, ABILITY_LABELS[ability?.id] || ability?.id || "ability", false);
+    const selectedTrait = getSelectedTrait(unit);
+    const traitDef = TRAIT_LIBRARY[selectedTrait?.key];
+    applyEffects(traitDef?.onSwitchIn, selectedTrait?.name || selectedTrait?.key || "trait", true);
+    applyStatEffects(traitDef?.onSwitchIn, selectedTrait?.name || selectedTrait?.key || "trait", false);
+    const opponent = state?.teams?.[team === TEAM.ALLY ? TEAM.ENEMY : TEAM.ALLY]?.active?.[slot] || null;
+    const traitResult = applyTraitEffects("onSwitchIn", { source: unit, opponent, state, team, slot });
+    messages.push(...traitResult.messages);
 
     return { messages, statusApplies };
   };
@@ -1967,35 +2070,19 @@
 
     const processTurnStartPassives = () => {
       getCurrentFieldMonsters().forEach((unit) => {
-        if (!unit?.abilityId) return;
-        const ability = ABILITIES[unit.abilityId];
-        (ability?.onTurnStart || []).forEach((e) => {
-          if (e.type === "applyStatus") {
-            addStatus(unit, e.status, e.duration);
-            turnResult.turnStartStepResults.abilityStatuses.push({
-              sourceId: unit.uid,
-              sourceName: unit.name,
-              traitKind: unit.abilityId || "ability",
-              targetId: unit.uid,
-              targetName: unit.name,
-              statusId: e.status,
-              duration: e.duration
-            });
-            return;
-          }
-          if (e.type === "addAtkStage") {
-            const amount = Math.max(0, Number(e.amount) || 0);
-            if (!amount) return;
-            unit.buffs.atkStage = clamp((Number(unit?.buffs?.atkStage) || 0) + amount, 0, CONFIG.CRIT_STAGE_MAX);
-            turnResult.turnStartStepResults.statBoosts.push({
-              sourceId: unit.uid,
-              sourceName: unit.name,
-              traitKind: unit.abilityId || "ability",
-              targetId: unit.uid,
-              targetName: unit.name,
-              amount
-            });
-          }
+        const selectedTrait = getSelectedTrait(unit);
+        if (!selectedTrait) return;
+        const traitResult = applyTraitEffects("onTurnStart", { source: unit, state: sim });
+        traitResult.effects.forEach((effect) => {
+          if (effect.type !== "addAtkStage") return;
+          turnResult.turnStartStepResults.statBoosts.push({
+            sourceId: unit.uid,
+            sourceName: unit.name,
+            traitKind: selectedTrait.key || "trait",
+            targetId: unit.uid,
+            targetName: unit.name,
+            amount: effect.amount
+          });
         });
       });
     };
@@ -2103,6 +2190,7 @@
         if (isDamageMoveCategory(move.category)) {
           for (let hit = 0; hit < hitCount; hit += 1) {
             if (!isAlive(target)) break;
+            if (!doesMoveHit({ actor, target, move })) continue;
             const damage = calcDamage(actor, target, move, { isCritical });
             target.hp = clamp(target.hp - damage, 0, target.maxHp);
             targetResult.damage += damage;
@@ -2125,19 +2213,19 @@
           }
         });
 
-        const ability = ABILITIES[actor.abilityId];
-        (ability?.onAfterDamage || []).forEach((effect) => {
-          if (effect.type === "applyStatus" && isAlive(target)) {
-            addStatus(target, effect.status, effect.duration);
-            targetResult.appliedStatuses.push({
-              statusId: effect.status,
-              duration: effect.duration,
-              sourceType: "trait",
-              sourceId: actor.uid,
-              sourceName: actor.name,
-              traitKind: actor.abilityId || "ability"
-            });
-          }
+        const afterDamageTrait = applyTraitEffects("afterDamage", { source: actor, target, move, damage: targetResult.damage, state: sim });
+        afterDamageTrait.effects.forEach((effect) => {
+          if (effect.type !== "applyStatus") return;
+          targetResult.appliedStatuses.push({
+            statusId: effect.statusId,
+            duration: effect.duration,
+            sourceType: effect.sourceType,
+            sourceId: effect.sourceId,
+            sourceName: effect.sourceName,
+            traitKind: effect.traitKind,
+            targetId: effect.targetId,
+            targetName: effect.targetName
+          });
         });
 
         targetResult.defeated = target.hp <= 0;
@@ -2209,7 +2297,7 @@
       q.push({ type: "message", text: "場のモンスターの特性発動", loggable: true });
     }
     turnResult.turnStartStepResults.abilityStatuses.forEach((s) => {
-      const abilityName = ABILITY_LABELS[s.traitKind] || s.traitKind || "ability";
+      const abilityName = getTraitLabel(s.traitKind);
       q.push({
         type: "battleHighlight",
         sources: [s.sourceId],
@@ -2224,7 +2312,7 @@
       q.push({ type: "clearBattleHighlight" });
     });
     turnResult.turnStartStepResults.statBoosts.forEach((boost) => {
-      const abilityName = ABILITY_LABELS[boost.traitKind] || boost.traitKind || "ability";
+      const abilityName = getTraitLabel(boost.traitKind);
       q.push({
         type: "battleHighlight",
         sources: [boost.sourceId],
@@ -2268,7 +2356,7 @@
           const appliedTargetId = applied?.targetId || t.targetId;
           const appliedTargetName = applied?.targetName || t.targetName;
           if (applied.sourceType === "trait") {
-            const abilityName = ABILITY_LABELS[applied.traitKind] || applied.traitKind || "ability";
+            const abilityName = getTraitLabel(applied.traitKind);
             q.push({
               type: "battleHighlight",
               sources: [applied.sourceId],
@@ -2693,6 +2781,34 @@
     setPartyUiCommand("fight");
   };
 
+  const applyBattleStartTraitEffects = (state = gameState) => {
+    if (!state?.teams) return;
+    const events = [];
+    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+      const opponentTeam = team === TEAM.ALLY ? TEAM.ENEMY : TEAM.ALLY;
+      const active = Array.isArray(state.teams?.[team]?.active) ? state.teams[team].active : [];
+      active.forEach((unit, slot) => {
+        if (!unit || !isAlive(unit)) return;
+        const opponent = state?.teams?.[opponentTeam]?.active?.[slot] || null;
+        const traitResult = applyTraitEffects("onBattleStart", { source: unit, opponent, state, team, slot });
+        if (!traitResult.messages.length) return;
+        events.push({ sourceId: unit.uid, targetId: opponent?.uid || null, traitKind: getSelectedTrait(unit)?.key || null, messages: traitResult.messages });
+      });
+    });
+    events.forEach((event) => {
+      if (event.sourceId) {
+        setBattleHighlight({
+          sources: [event.sourceId],
+          targets: event.targetId ? [event.targetId] : [],
+          effectType: "trait",
+          traitKind: event.traitKind
+        });
+      }
+      event.messages.forEach((line) => appendBattleLogEntry(line));
+      clearBattleHighlight();
+    });
+  };
+
   const advancePlanningSlot = () => {
     const next = findNextLivingAllySlot(gameState.currentActorIndex);
     if (next === null) return false;
@@ -2942,9 +3058,11 @@
   const resetBattle = () => {
     gameState = createInitialState({
       formations: gameState.formations,
-      availableMonsters: gameState.availableMonsters
+      availableMonsters: gameState.availableMonsters,
+      monsterTraitDrafts: gameState.monsterTraitDrafts
     });
     setPhase(PHASE.PLAYING);
+    applyBattleStartTraitEffects(gameState);
     initializePlanningTurn();
   };
 
@@ -2983,7 +3101,8 @@
     const nextState = createInitialState({
       formations: gameState.formations,
       availableMonsters: gameState.availableMonsters,
-      battleFormationIndex: safeIndex
+      battleFormationIndex: safeIndex,
+      monsterTraitDrafts: gameState.monsterTraitDrafts
     });
     nextState.battle.player.party = playerParty;
     nextState.battle.player.activeIndex = 0;
@@ -2994,6 +3113,7 @@
     gameState = nextState;
     debugLogBattleTeams(gameState, "battle-start");
     setPhase(PHASE.PLAYING);
+    applyBattleStartTraitEffects(gameState);
     initializePlanningTurn();
   };
 
