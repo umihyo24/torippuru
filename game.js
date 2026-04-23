@@ -228,6 +228,14 @@
     quakeWave: { id: "quakeWave", name: "クエイクウェーブ", category: "physical", type: "earth", power: 24, patternId: "front3", targetRule: "enemy", targetMode: "allPattern", beforeDamage: [], afterDamage: [] },
     frostLance: { id: "frostLance", name: "フロストランス", category: "special", type: "water", power: 34, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
     toxicSpit: { id: "toxicSpit", name: "トキシックスピット", category: "special", type: "shadow", power: 18, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    yamiuchi: { id: "yamiuchi", name: "やみうち", category: "physical", role: "attack", type: "shadow", target: "single", power: 26, description: "後攻のとき威力が上がる", effectType: "late-power-up", special: { kind: "power-up-if-target-acted", ratio: 1.5 }, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    kageuchi: { id: "kageuchi", name: "かげうち", category: "physical", role: "attack", type: "shadow", target: "single", power: 20, description: "すばやく攻撃する", effectType: "priority", special: null, priority: 1, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    katakiuchi: { id: "katakiuchi", name: "かたきうち", category: "physical", role: "attack", type: "earth", target: "single", power: 42, description: "なかまが倒されたあと威力が上がる", effectType: "power-up-if-ally-defeated", special: { kind: "power-up-if-ally-defeated", ratio: 1.35 }, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    tameuchi: { id: "tameuchi", name: "ためうち", category: "physical", role: "attack", type: "earth", target: "single", power: 46, description: "ためてから強く攻撃する", effectType: "charged-attack", special: { kind: "high-power-drawback" }, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [{ type: "recoil", ratio: 0.25 }] },
+    midareuchi: { id: "midareuchi", name: "みだれうち", category: "physical", role: "attack", type: "earth", target: "single", power: 14, description: "連続で攻撃する", effectType: "multi-hit-fixed", special: { kind: "fixed-hit", count: 2 }, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    hayauchi: { id: "hayauchi", name: "はやうち", category: "physical", role: "attack", type: "earth", target: "single", power: 18, description: "先に攻撃する", effectType: "priority", special: null, priority: 1, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    fuiuchi: { id: "fuiuchi", name: "ふいうち", category: "physical", role: "attack", type: "shadow", target: "single", power: 28, description: "相手が攻撃するとき強い", effectType: "counter-attack-power-up", special: { kind: "power-up-if-target-attacking", ratio: 1.5 }, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    damashiuchi: { id: "damashiuchi", name: "だましうち", category: "physical", role: "attack", type: "shadow", target: "single", power: 18, description: "必ず当たる", effectType: "sure-hit", special: { kind: "sure-hit" }, guaranteedHit: true, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
     ironGuard: { id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }], afterDamage: [] },
     rallyHowl: { id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0, patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
     shellStance: { id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }], afterDamage: [] },
@@ -384,14 +392,16 @@
     venomTouch: { key: "venomTouch", name: "ベノムタッチ", description: "攻撃を当てた後、相手をどくにする。", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
     battleRhythm: { key: "battleRhythm", name: "バトルリズム", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
     openingSurge: { key: "openingSurge", name: "オープニングサージ", description: "登場時、こうげき段階が2上がる。", onSwitchIn: [{ type: "addAtkStage", amount: 2, target: "self" }] },
+    gyakkyo_maru: { key: "gyakkyo_maru", name: "ぎゃっきょう○", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
     intimidate: { key: "intimidate", name: "いあつかん", description: "登場時、正面の相手のこうげきを1段階さげる" },
     wonder_guard: { key: "wonder_guard", name: "ふしぎなまもり", description: "弱点以外の攻撃を受けない" },
+    koukakudahou: { key: "koukakudahou", name: "こうかくだほう", description: "自分以外のタイプのわざも一致威力になる" },
     no_guard: { key: "no_guard", name: "ノーガード", description: "お互いのすべての技が必中になる" }
   };
 
   const UNIT_LIBRARY = {
     emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, weaknessTypes: ["water", "earth"], traits: ["venomTouch", "battleRhythm", "openingSurge"], selectedTraitKey: "venomTouch", moves: ["shippu_jinrai", "drainBite", "rallyHowl", "shellStance"] },
-    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, weaknessTypes: ["water", "earth"], traits: ["intimidate", "venomTouch", "openingSurge"], selectedTraitKey: "intimidate", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
+    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, weaknessTypes: ["water", "earth"], traits: ["intimidate", "gyakkyo_maru", "koukakudahou"], selectedTraitKey: "intimidate", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
     maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, weaknessTypes: ["water", "earth"], traits: ["openingSurge", "battleRhythm", "intimidate"], selectedTraitKey: "openingSurge", moves: ["iwana_nadare", "shudan_bokoboko", "ironGuard", "rallyHowl"] },
     mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 95, atk: 65, mag: 75, def: 90, res: 85, spd: 70, weaknessTypes: ["fire", "shadow"], traits: ["battleRhythm", "venomTouch", "openingSurge"], selectedTraitKey: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
     frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, weaknessTypes: ["nature", "light"], traits: ["battleRhythm", "intimidate", "openingSurge"], selectedTraitKey: "battleRhythm", moves: ["mukoumizu", "thunder_judgment", "rallyHowl", "shellStance"] },
@@ -451,6 +461,9 @@
   const getMoveEffectText = (move) => {
     if (!move) return "-";
     if (move.effectType === "multi-hit-scaling" && move.special?.kind === "hit-per-alive-ally") return "生存味方数ぶん多段攻撃";
+    if (move.effectType === "multi-hit-fixed" && move.special?.kind === "fixed-hit") return `${Math.max(1, Number(move.special.count) || 1)}回攻撃`;
+    if (move.effectType === "priority") return "先制攻撃";
+    if (move.effectType === "sure-hit") return "必中";
     if ((Number(move.power) || 0) > 0) return `威力 ${move.power}`;
     const effects = Array.isArray(move.beforeDamage) ? move.beforeDamage : [];
     if (effects.some((e) => e?.type === "applyStatus")) return "状態異常を付与";
@@ -1648,6 +1661,7 @@
   const doesMoveHit = ({ actor, target, move }) => {
     const traitResult = applyTraitEffects("beforeHitCheck", { actor, target, move });
     if (traitResult.forceHit) return true;
+    if (move?.guaranteedHit || move?.alwaysHit) return true;
     return true;
   };
 
@@ -1931,7 +1945,46 @@
     if (move.effectType === "multi-hit-scaling" && move.special?.kind === "hit-per-alive-ally") {
       return getAliveAlliesCount(state, actor.team);
     }
+    if (move.effectType === "multi-hit-fixed" && move.special?.kind === "fixed-hit") {
+      return Math.max(1, Number(move.special.count) || 1);
+    }
     return 1;
+  };
+
+  const getActionPriority = (action, state) => {
+    if (!action || action.type !== "fight") return 0;
+    const move = MOVES[action.moveId];
+    if (!move) return 0;
+    const actor = state?.teams?.[action.team]?.active?.[action.slot];
+    if (!actor || !isAlive(actor)) return 0;
+    return Number(move.priority) || 0;
+  };
+
+  const hasDefeatedAlly = (state, actor) => {
+    if (!state || !actor) return false;
+    const units = [
+      ...(Array.isArray(state?.teams?.[actor.team]?.active) ? state.teams[actor.team].active : []),
+      ...(Array.isArray(state?.teams?.[actor.team]?.reserve) ? state.teams[actor.team].reserve : [])
+    ];
+    return units.some((unit) => unit && unit.uid !== actor.uid && isDefeated(unit));
+  };
+
+  const applyMoveDamageModifier = ({ damage, move, actor, target, actedThisTurn = null, attackingActorUids = null, state = null }) => {
+    let nextDamage = Math.max(0, Number(damage) || 0);
+    if (nextDamage <= 0 || !move || !actor || !target) return nextDamage;
+    if (move.special?.kind === "power-up-if-target-acted" && actedThisTurn?.has(target.uid)) {
+      const ratio = Math.max(1, Number(move.special?.ratio) || 1);
+      nextDamage = Math.max(1, Math.floor(nextDamage * ratio));
+    }
+    if (move.special?.kind === "power-up-if-target-attacking" && attackingActorUids?.has(target.uid)) {
+      const ratio = Math.max(1, Number(move.special?.ratio) || 1);
+      nextDamage = Math.max(1, Math.floor(nextDamage * ratio));
+    }
+    if (move.special?.kind === "power-up-if-ally-defeated" && hasDefeatedAlly(state, actor)) {
+      const ratio = Math.max(1, Number(move.special?.ratio) || 1);
+      nextDamage = Math.max(1, Math.floor(nextDamage * ratio));
+    }
+    return nextDamage;
   };
 
   const getPatternPositionsForMove = (actor, move) => {
@@ -2020,6 +2073,9 @@
     const speedSort = (a, b) => {
       const ua = sim.teams[a.team].active[a.slot];
       const ub = sim.teams[b.team].active[b.slot];
+      const pa = getActionPriority(a, sim);
+      const pb = getActionPriority(b, sim);
+      if (pa !== pb) return pb - pa;
       const sa = ua ? ua.spd : -1;
       const sb = ub ? ub.spd : -1;
       if (sa !== sb) return sb - sa;
@@ -2143,6 +2199,18 @@
     processSwitchInEffects();
     processTurnStartPassives();
 
+    const actedThisTurn = new Set();
+    const attackingActorUids = new Set(
+      otherActions
+        .filter((queuedAction) => queuedAction?.type === "fight")
+        .map((queuedAction) => {
+          const queuedMove = MOVES[queuedAction.moveId];
+          if (!queuedMove || !isDamageMoveCategory(queuedMove.category)) return null;
+          return sim?.teams?.[queuedAction.team]?.active?.[queuedAction.slot]?.uid || null;
+        })
+        .filter(Boolean)
+    );
+
     otherActions.forEach((action) => {
       const actor = sim.teams[action.team].active[action.slot];
       if (!actor || !isAlive(actor)) {
@@ -2191,7 +2259,16 @@
           for (let hit = 0; hit < hitCount; hit += 1) {
             if (!isAlive(target)) break;
             if (!doesMoveHit({ actor, target, move })) continue;
-            const damage = calcDamage(actor, target, move, { isCritical });
+            const baseDamage = calcDamage(actor, target, move, { isCritical });
+            const damage = applyMoveDamageModifier({
+              damage: baseDamage,
+              move,
+              actor,
+              target,
+              actedThisTurn,
+              attackingActorUids,
+              state: sim
+            });
             target.hp = clamp(target.hp - damage, 0, target.maxHp);
             targetResult.damage += damage;
             targetResult.hpAfter = target.hp;
@@ -2210,6 +2287,12 @@
           if (effect.type === "applyStatus") {
             addStatus(target, effect.status, effect.duration);
             targetResult.appliedStatuses.push({ statusId: effect.status, duration: effect.duration, sourceType: "move" });
+          }
+          if (effect.type === "recoil" && targetResult.damage > 0) {
+            const recoil = Math.max(1, Math.floor(targetResult.damage * (Number(effect.ratio) || 0)));
+            const before = actor.hp;
+            actor.hp = clamp(actor.hp - recoil, 0, actor.maxHp);
+            actionResult.selfHeal -= (before - actor.hp);
           }
         });
 
@@ -2234,6 +2317,7 @@
 
       actionResult.selfHpAfter = actor.hp;
       turnResult.actionResults.push(actionResult);
+      actedThisTurn.add(actor.uid);
     });
 
     [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
