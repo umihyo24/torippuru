@@ -140,6 +140,14 @@
         MOVE_CARD_TITLE_SIZE_PX: 14,
         MOVE_CARD_META_SIZE_PX: 10,
         MOVE_CARD_DESC_SIZE_PX: 11,
+        EQUIPPED_CARD_HEIGHT_PX: 52,
+        EQUIPPED_CARD_PADDING_PX: 5,
+        EQUIPPED_CARD_ICON_SIZE_PX: 30,
+        EQUIPPED_CARD_POWER_WIDTH_PX: 54,
+        EQUIPPED_CARD_TITLE_SIZE_PX: 13,
+        EQUIPPED_SECTION_PADDING_PX: 6,
+        EQUIPPED_SECTION_GAP_PX: 4,
+        EQUIPPED_SLOT_GAP_PX: 3,
         ACTION_PANEL_MIN_HEIGHT_PX: 78,
         ACTION_BUTTON_HEIGHT_PX: 34,
         FONT_SIZE_BODY_PX: 12,
@@ -3759,7 +3767,8 @@
     removeAction = null,
     stateLabel = "",
     stateClassName = "",
-    isSelectable = false
+    isSelectable = false,
+    variant = "list"
   } = {}) => {
     const card = createEl("div", className);
     const typeKey = typeof move?.type === "string" ? move.type : "";
@@ -3789,7 +3798,9 @@
       createEl("span", "move-meta-badge target", getMoveTargetLabel(move)),
       createEl("span", "move-meta-badge type", meta?.label || typeKey || "不明")
     );
-    info.append(top, metaRow, createEl("div", "move-info-desc", move?.description || getMoveEffectText(move)));
+    const shouldShowDesc = variant !== "equipped" || !isAttack;
+    info.append(top, metaRow);
+    if (shouldShowDesc) info.appendChild(createEl("div", "move-info-desc", move?.description || getMoveEffectText(move)));
 
     const right = createEl("div", "move-card-right");
     if (isAttack) {
@@ -3869,6 +3880,14 @@
     wrap.style.setProperty("--mb-move-title-size", `${Math.max(12, Number(layout.MOVE_CARD_TITLE_SIZE_PX) || 14)}px`);
     wrap.style.setProperty("--mb-move-meta-size", `${Math.max(9, Number(layout.MOVE_CARD_META_SIZE_PX) || 10)}px`);
     wrap.style.setProperty("--mb-move-desc-size", `${Math.max(10, Number(layout.MOVE_CARD_DESC_SIZE_PX) || 11)}px`);
+    wrap.style.setProperty("--mb-equipped-card-h", `${Math.max(42, Number(layout.EQUIPPED_CARD_HEIGHT_PX) || 52)}px`);
+    wrap.style.setProperty("--mb-equipped-card-p", `${Math.max(3, Number(layout.EQUIPPED_CARD_PADDING_PX) || 5)}px`);
+    wrap.style.setProperty("--mb-equipped-icon-size", `${Math.max(24, Number(layout.EQUIPPED_CARD_ICON_SIZE_PX) || 30)}px`);
+    wrap.style.setProperty("--mb-equipped-power-w", `${Math.max(42, Number(layout.EQUIPPED_CARD_POWER_WIDTH_PX) || 54)}px`);
+    wrap.style.setProperty("--mb-equipped-title-size", `${Math.max(11, Number(layout.EQUIPPED_CARD_TITLE_SIZE_PX) || 13)}px`);
+    wrap.style.setProperty("--mb-equipped-section-p", `${Math.max(4, Number(layout.EQUIPPED_SECTION_PADDING_PX) || 6)}px`);
+    wrap.style.setProperty("--mb-equipped-section-gap", `${Math.max(2, Number(layout.EQUIPPED_SECTION_GAP_PX) || 4)}px`);
+    wrap.style.setProperty("--mb-equipped-slot-gap", `${Math.max(2, Number(layout.EQUIPPED_SLOT_GAP_PX) || 3)}px`);
     wrap.style.setProperty("--mb-action-panel-min-h", `${Math.max(64, Number(layout.ACTION_PANEL_MIN_HEIGHT_PX) || 78)}px`);
     wrap.style.setProperty("--mb-action-btn-h", `${Math.max(30, Number(layout.ACTION_BUTTON_HEIGHT_PX) || 34)}px`);
     wrap.style.setProperty("--mb-font-body", `${Math.max(11, Number(layout.FONT_SIZE_BODY_PX) || 12)}px`);
@@ -3913,6 +3932,7 @@
       row.appendChild(renderMoveCard(MOVES[moveId], {
         className: "move-info-card compact equipped",
         slotLabel: `SLOT ${index + 1}`,
+        variant: "equipped",
         removeAction: {
           action: "monster-remove-selected-move",
           slotIndex: index,
@@ -3928,7 +3948,8 @@
     body.appendChild(leftPanel);
 
     const movePanel = createEl("section", "monster-moves-panel");
-    movePanel.appendChild(createEl("h3", "monster-move-list-title", "わざリスト"));
+    const movePanelHeader = createEl("div", "monster-moves-header");
+    movePanelHeader.appendChild(createEl("h3", "monster-move-list-title", "わざリスト"));
     const filters = getMoveListFilters(gameState.moves?.moveList || []);
     const activeFilter = filters.includes(gameState.moves?.activeTypeFilter || "") ? gameState.moves.activeTypeFilter : "all";
     const filterRow = createEl("div", "type-filter-row");
@@ -3945,7 +3966,9 @@
       );
       filterRow.appendChild(btn);
     });
-    movePanel.appendChild(filterRow);
+    movePanelHeader.appendChild(filterRow);
+    movePanel.appendChild(movePanelHeader);
+    const moveListBody = createEl("div", "monster-moves-scroll-body");
     const moveList = createEl("div", "move-pool-grid");
     (gameState.moves?.moveList || []).forEach((moveId) => {
       const move = MOVES[moveId];
@@ -3959,6 +3982,7 @@
       row.classList.toggle("disabled-picked", alreadySelected);
       row.appendChild(renderMoveCard(move, {
         className: "move-info-card compact list",
+        variant: "list",
         isSelectable: true,
         stateLabel: alreadySelected ? "選択済" : (unlocks.moveCustomizationUnlocked ? "選択可" : "ロック"),
         stateClassName: alreadySelected ? "is-disabled" : ""
@@ -3966,7 +3990,8 @@
       moveList.appendChild(row);
     });
     if (!moveList.childElementCount) moveList.appendChild(renderMoveCard(null, { className: "move-info-card compact list is-disabled" }));
-    movePanel.appendChild(moveList);
+    moveListBody.appendChild(moveList);
+    movePanel.appendChild(moveListBody);
     const actions = createEl("div", "monster-detail-actions action-panel-bottom-right");
     const save = createEl("button", "screen-nav-btn", "保存");
     save.dataset.action = "monster-detail-save";
