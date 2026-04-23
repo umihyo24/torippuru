@@ -186,6 +186,13 @@
     { key: "gacha", label: "Gacha", icon: "✦" },
     { key: "settings", label: "Settings", icon: "⚙" }
   ];
+  const SAVE_VERSION = 1;
+  const STORAGE_KEYS = {
+    mainSave: "game_main_save",
+    autosaveSlots: "game_autosave_slots",
+    sessionSave: "game_session_save"
+  };
+  const AUTOSAVE_LABELS = ["最新", "1つ前", "2つ前"];
 
   const ASSETS = {
     backgrounds: { battle: "assets/backgrounds/background_battle.png" },
@@ -692,7 +699,7 @@
     return { active, reserve };
   };
 
-  const createInitialState = (seed = {}) => {
+  const createDefaultGameState = (seed = {}) => {
     const seedFormations = Array.isArray(seed.formations) ? seed.formations.slice(0, FORMATION_SLOT_COUNT) : createDefaultFormations();
     while (seedFormations.length < FORMATION_SLOT_COUNT) seedFormations.push(null);
     const seedAvailableMonsters = Array.isArray(seed.availableMonsters) && seed.availableMonsters.length
@@ -708,8 +715,11 @@
       phase: PHASE.HOME,
       turn: 1,
       winner: null,
+      systemMessage: "",
       formations: seedFormations,
       availableMonsters: seedAvailableMonsters,
+      autosaveSlots: [],
+      settings: (seed?.settings && typeof seed.settings === "object") ? { ...seed.settings } : {},
       currentEditIndex: null,
       battlePrepareIndex: -1,
       selectedMonsterId: null,
@@ -835,6 +845,216 @@
       temp: { renderCells: [] }
     });
   };
+  const createInitialState = (seed = {}) => createDefaultGameState(seed);
+
+  const hasLocalStorage = () => {
+    try {
+      return typeof window !== "undefined" && !!window.localStorage;
+    } catch (error) {
+      return false;
+    }
+  };
+  const safeJsonParse = (raw) => {
+    if (typeof raw !== "string" || !raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      return null;
+    }
+  };
+  const safeStorageGet = (key) => {
+    if (!hasLocalStorage()) return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch (error) {
+      return null;
+    }
+  };
+  const safeStorageSet = (key, value) => {
+    if (!hasLocalStorage()) return false;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+  const safeStorageRemove = (key) => {
+    if (!hasLocalStorage()) return false;
+    try {
+      window.localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+  const validateFormationForSave = (formation) => {
+    if (!Array.isArray(formation)) return false;
+    if (formation.length !== FORMATION_MEMBER_COUNT) return false;
+    return formation.every((unitId) => unitId === null || (typeof unitId === "string" && !!UNIT_LIBRARY[unitId]));
+  };
+  const validateMonsterEntryForSave = (entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const allocation = entry.statAllocation;
+    if (!allocation || typeof allocation !== "object") return false;
+    const keys = ["hp", "atk", "def", "spatk", "spdef", "spd"];
+    if (!keys.every((key) => Number.isFinite(Number(allocation[key])))) return false;
+    if (!Array.isArray(entry.selectedMoves)) return false;
+    if (entry.selectedMoves.length > CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) return false;
+    return true;
+  };
+  const validateMainSaveData = (saveData) => {
+    if (!saveData || typeof saveData !== "object") return false;
+    if (saveData.version !== SAVE_VERSION) return false;
+    if (!Number.isFinite(Number(saveData.savedAt))) return false;
+    if (!saveData.monsters || typeof saveData.monsters !== "object") return false;
+    if (!Array.isArray(saveData.formations)) return false;
+    if (!saveData.settings || typeof saveData.settings !== "object") return false;
+    if (!saveData.formations.every((formation) => formation === null || validateFormationForSave(formation))) return false;
+    return Object.values(saveData.monsters).every(validateMonsterEntryForSave);
+  };
+  const validateAndMigrateMainSaveData = (rawSave) => {
+    if (!rawSave || typeof rawSave !== "object") return null;
+    if (rawSave.version !== SAVE_VERSION) return null;
+    if (!validateMainSaveData(rawSave)) return null;
+    return rawSave;
+  };
+  const validateSessionSaveData = (sessionData) => {
+    if (!sessionData || typeof sessionData !== "object") return false;
+    if (sessionData.version !== SAVE_VERSION) return false;
+    if (!Number.isFinite(Number(sessionData.startedAt))) return false;
+    if (!["battlePrepare", "home"].includes(sessionData.lastSafeScreen)) return false;
+    if (!(sessionData.selectedFormationId === null || typeof sessionData.selectedFormationId === "string")) return false;
+    if (!["in_battle", "interrupted"].includes(sessionData.status)) return false;
+    return true;
+  };
+  const createSaveDataFromGameState = (state) => {
+    const monsters = {};
+    Object.keys(UNIT_LIBRARY).forEach((monsterId) => {
+      const draftStats = state?.monsterTrainingDrafts?.[monsterId] || createDefaultStatAllocation();
+      const selectedMoves = Array.isArray(state?.monsterMoveDrafts?.[monsterId]) ? state.monsterMoveDrafts[monsterId] : [];
+      monsters[monsterId] = {
+        statAllocation: {
+          hp: Number(draftStats.hp) || 0,
+          atk: Number(draftStats.atk) || 0,
+          def: Number(draftStats.def) || 0,
+          spatk: Number(draftStats.spatk) || 0,
+          spdef: Number(draftStats.spdef) || 0,
+          spd: Number(draftStats.spd) || 0
+        },
+        selectedMoves: selectedMoves.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES),
+        selectedTraitKey: state?.monsterTraitDrafts?.[monsterId] || null,
+        natureKey: state?.monsterNatureDrafts?.[monsterId] || "no_modifier"
+      };
+    });
+    return {
+      version: SAVE_VERSION,
+      savedAt: Date.now(),
+      monsters,
+      formations: (state?.formations || []).map((formation) => (Array.isArray(formation) ? cloneFormation(formation) : null)),
+      settings: (state?.settings && typeof state.settings === "object") ? { ...state.settings } : {}
+    };
+  };
+  const applySaveDataToGameState = (state, saveData) => {
+    const valid = validateAndMigrateMainSaveData(saveData);
+    if (!valid) return false;
+    const nextFormations = Array.isArray(valid.formations) ? valid.formations.slice(0, FORMATION_SLOT_COUNT) : [];
+    while (nextFormations.length < FORMATION_SLOT_COUNT) nextFormations.push(null);
+    state.formations = nextFormations.map((formation) => (Array.isArray(formation) ? cloneFormation(formation) : null));
+    state.settings = { ...(valid.settings || {}) };
+    state.monsterTrainingDrafts = {};
+    state.monsterMoveDrafts = {};
+    state.monsterTraitDrafts = {};
+    state.monsterNatureDrafts = {};
+    Object.entries(valid.monsters || {}).forEach(([monsterId, entry]) => {
+      if (!UNIT_LIBRARY[monsterId] || !validateMonsterEntryForSave(entry)) return;
+      state.monsterTrainingDrafts[monsterId] = {
+        hp: Number(entry.statAllocation.hp) || 0,
+        atk: Number(entry.statAllocation.atk) || 0,
+        def: Number(entry.statAllocation.def) || 0,
+        spatk: Number(entry.statAllocation.spatk) || 0,
+        spdef: Number(entry.statAllocation.spdef) || 0,
+        spd: Number(entry.statAllocation.spd) || 0
+      };
+      state.monsterMoveDrafts[monsterId] = entry.selectedMoves
+        .filter((moveId) => moveId === null || !!MOVES[moveId])
+        .slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
+      state.monsterTraitDrafts[monsterId] = typeof entry.selectedTraitKey === "string" ? entry.selectedTraitKey : null;
+      state.monsterNatureDrafts[monsterId] = typeof entry.natureKey === "string" ? entry.natureKey : "no_modifier";
+    });
+    return true;
+  };
+  const loadMainSave = () => {
+    const parsed = safeJsonParse(safeStorageGet(STORAGE_KEYS.mainSave));
+    const migrated = validateAndMigrateMainSaveData(parsed);
+    return migrated || null;
+  };
+  const loadAutosaveSlots = () => {
+    const parsed = safeJsonParse(safeStorageGet(STORAGE_KEYS.autosaveSlots));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((slot) => slot && typeof slot === "object" && Number.isInteger(slot.slot) && validateMainSaveData(slot.data))
+      .slice(0, 3);
+  };
+  const writeAutosave = () => {
+    const currentMainShape = createSaveDataFromGameState(gameState);
+    const existing = loadAutosaveSlots();
+    const next = [
+      { slot: 0, label: AUTOSAVE_LABELS[0], savedAt: Date.now(), data: currentMainShape },
+      existing[0] ? { ...existing[0], slot: 1, label: AUTOSAVE_LABELS[1] } : null,
+      existing[1] ? { ...existing[1], slot: 2, label: AUTOSAVE_LABELS[2] } : null
+    ].filter(Boolean);
+    safeStorageSet(STORAGE_KEYS.autosaveSlots, next);
+    gameState.autosaveSlots = next;
+    return next;
+  };
+  const restoreAutosaveSlot = (index) => {
+    const slots = loadAutosaveSlots();
+    const target = slots.find((slot) => slot.slot === index);
+    if (!target || !validateMainSaveData(target.data)) return false;
+    const applied = applySaveDataToGameState(gameState, target.data);
+    if (applied) ensureUiSafety();
+    return applied;
+  };
+  const saveMainGame = () => {
+    const payload = createSaveDataFromGameState(gameState);
+    const success = safeStorageSet(STORAGE_KEYS.mainSave, payload);
+    if (success) gameState.systemMessage = "メインセーブを保存しました。";
+    return success;
+  };
+  const writeSessionSave = (data) => {
+    const payload = {
+      version: SAVE_VERSION,
+      startedAt: Number(data?.startedAt) || Date.now(),
+      lastSafeScreen: data?.lastSafeScreen === "battlePrepare" ? "battlePrepare" : "home",
+      selectedFormationId: data?.selectedFormationId ?? null,
+      status: data?.status === "interrupted" ? "interrupted" : "in_battle"
+    };
+    safeStorageSet(STORAGE_KEYS.sessionSave, payload);
+    return payload;
+  };
+  const clearSessionSave = () => safeStorageRemove(STORAGE_KEYS.sessionSave);
+  const bootGame = () => {
+    const bootState = createDefaultGameState();
+    bootState.autosaveSlots = loadAutosaveSlots();
+    const mainSave = loadMainSave();
+    if (mainSave) {
+      applySaveDataToGameState(bootState, mainSave);
+    } else if (safeStorageGet(STORAGE_KEYS.mainSave)) {
+      bootState.systemMessage = "セーブデータが破損していたため、初期状態で復旧しました。";
+    }
+    const sessionRaw = safeJsonParse(safeStorageGet(STORAGE_KEYS.sessionSave));
+    if (validateSessionSaveData(sessionRaw) && (sessionRaw.status === "in_battle" || sessionRaw.status === "interrupted")) {
+      if (sessionRaw.lastSafeScreen === "battlePrepare") {
+        bootState.phase = PHASE.BATTLE_PREPARE;
+      } else {
+        bootState.phase = PHASE.HOME;
+      }
+      bootState.systemMessage = "前回のバトルは安全に中断されました。準備画面から再開してください。";
+      clearSessionSave();
+    }
+    return bootState;
+  };
 
   const TRAINING_TOTAL_CAP = CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS;
   const TRAINING_PER_STAT_CAP = CONFIG.MONSTER_BUILD.PER_STAT_MAX;
@@ -864,7 +1084,7 @@
     console.log("[Debug] maguma using physical move quakeWave:", calcDamage(sampleAttackerPhysical, sampleDefender, MOVES.quakeWave, { isCritical: false }));
   };
 
-  let gameState = createInitialState();
+  let gameState = bootGame();
   let statAdjustHoldTimer = null;
 
   const getFormationAt = (state, index) => {
@@ -1218,6 +1438,7 @@
 
   const setPhase = (phase) => {
     gameState.phase = phase;
+    if (phase === PHASE.GAMEOVER || phase === PHASE.HOME || phase === PHASE.BATTLE_PREPARE) clearSessionSave();
     ensureUiSafety();
   };
 
@@ -1386,6 +1607,7 @@
     while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
     gameState.monsterMoveDrafts[monsterId] = selected;
     gameState.ui.monsterDetailSnapshot = captureMonsterDetailSnapshot(monsterId, gameState);
+    writeAutosave();
     enterMonsterList();
   };
 
@@ -1426,6 +1648,7 @@
     const isEmpty = draft.every((unitId) => !unitId);
     gameState.formations[index] = isEmpty ? null : draft;
     gameState.currentEditIndex = null;
+    writeAutosave();
     enterFormation();
   };
 
@@ -2757,7 +2980,7 @@
 
     if (!event) {
       if (flow.pendingTurnResult?.nextState?.winner) {
-        gameState.phase = PHASE.GAMEOVER;
+        setPhase(PHASE.GAMEOVER);
         gameState.winner = flow.pendingTurnResult.nextState.winner;
       } else {
         finalizeTurnAndProceed();
@@ -2919,7 +3142,7 @@
     }
     const winner = getWinnerFromRemainingUnits(gameState);
     if (winner) {
-      gameState.phase = PHASE.GAMEOVER;
+      setPhase(PHASE.GAMEOVER);
       gameState.winner = winner;
       return;
     }
@@ -2931,7 +3154,7 @@
     if (gameState.playing.turnCount >= 1) gameState.playing.hasCompletedFirstTurn = true;
     initializePlanningTurn();
     if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
-      gameState.phase = PHASE.GAMEOVER;
+      setPhase(PHASE.GAMEOVER);
       gameState.winner = "draw";
     }
   };
@@ -3107,7 +3330,7 @@
       if (!gameState.battleFlow.koReplacement.pendingSlots.length) {
         const winner = getWinnerFromRemainingUnits(gameState);
         if (winner) {
-          gameState.phase = PHASE.GAMEOVER;
+          setPhase(PHASE.GAMEOVER);
           gameState.winner = winner;
           return;
         }
@@ -3273,6 +3496,13 @@
       .filter((unitId) => UNIT_LIBRARY[unitId])
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: UNIT_LIBRARY[unitId].hp, hp: UNIT_LIBRARY[unitId].hp, statuses: [] }));
     nextState.battle.enemy.activeIndex = 0;
+    const selectedFormationId = `formation_${safeIndex}`;
+    writeSessionSave({
+      startedAt: Date.now(),
+      lastSafeScreen: "battlePrepare",
+      selectedFormationId,
+      status: "in_battle"
+    });
     gameState = nextState;
     debugLogBattleTeams(gameState, "battle-start");
     setPhase(PHASE.PLAYING);
@@ -4320,10 +4550,25 @@
   const renderSettingsScreen = () => {
     const wrap = createEl("section", "trainer-card-screen");
     wrap.appendChild(createEl("h2", "formation-title", "Settings"));
-    wrap.appendChild(createEl("div", "formation-help", "ゲーム設定は準備中です。今後ここに音量や表示設定を追加します。"));
+    wrap.appendChild(createEl("div", "formation-help", "セーブ/ロード管理"));
+    const saveBtn = createEl("button", "screen-nav-btn", "メインセーブ");
+    saveBtn.dataset.action = "main-save";
+    const recoverLatest = createEl("button", "screen-nav-btn", "最新オートセーブ復元");
+    recoverLatest.dataset.action = "restore-autosave";
+    recoverLatest.dataset.slot = "0";
+    const recoverPrev = createEl("button", "screen-nav-btn", "1つ前を復元");
+    recoverPrev.dataset.action = "restore-autosave";
+    recoverPrev.dataset.slot = "1";
+    const recoverOld = createEl("button", "screen-nav-btn", "2つ前を復元");
+    recoverOld.dataset.action = "restore-autosave";
+    recoverOld.dataset.slot = "2";
+    const autosaves = Array.isArray(gameState.autosaveSlots) ? gameState.autosaveSlots : [];
+    const info = createEl("div", "formation-help", autosaves.length
+      ? autosaves.map((slot) => `${slot.label}: ${new Date(slot.savedAt).toLocaleString()}`).join(" / ")
+      : "オートセーブなし");
     const back = createEl("button", "screen-nav-btn", "Back HOME");
     back.dataset.action = "go-home";
-    wrap.appendChild(back);
+    wrap.append(saveBtn, recoverLatest, recoverPrev, recoverOld, info, back);
     return wrap;
   };
 
@@ -4495,6 +4740,10 @@
     app.style.setProperty("--hl-status-remove", CONFIG.HIGHLIGHT_COLORS.statusRemove);
     app.style.setProperty("--hl-trait-source", CONFIG.HIGHLIGHT_COLORS.traitSource);
     app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
+    if (gameState.systemMessage) {
+      const message = createEl("div", "formation-help", gameState.systemMessage);
+      app.appendChild(message);
+    }
 
     const main = createEl("div", "main");
     if (gameState.phase === PHASE.HOME) {
@@ -4726,6 +4975,26 @@
     }
     if (a === "battle-start") {
       if (gameState.ui.battlePrepareIndex >= 0) startBattleFromFormation(gameState.ui.battlePrepareIndex);
+      render();
+      return;
+    }
+    if (a === "main-save") {
+      const confirmed = window.confirm("現在の状態をメインセーブに保存しますか？");
+      if (confirmed) {
+        saveMainGame();
+        writeAutosave();
+      }
+      render();
+      return;
+    }
+    if (a === "restore-autosave") {
+      const slot = clamp(Number(target.dataset.slot), 0, 2);
+      const confirmed = window.confirm(`オートセーブ(slot:${slot})を復元しますか？`);
+      if (confirmed && restoreAutosaveSlot(slot)) {
+        gameState.systemMessage = `オートセーブ ${AUTOSAVE_LABELS[slot]} を復元しました。`;
+      } else if (confirmed) {
+        gameState.systemMessage = "復元可能なオートセーブがありません。";
+      }
       render();
       return;
     }
