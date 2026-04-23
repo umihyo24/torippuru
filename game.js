@@ -131,9 +131,15 @@
         STAT_LABEL_WIDTH_PX: 46,
         STAT_CONTROL_WIDTH_PX: 142,
         STAT_VALUE_WIDTH_PX: 44,
-        MOVE_CARD_HEIGHT_PX: 56,
-        MOVE_CARD_PADDING_PX: 6,
+        MOVE_CARD_HEIGHT_PX: 78,
+        MOVE_CARD_PADDING_PX: 8,
         MOVE_CARD_BORDER_PX: 1,
+        MOVE_CARD_RADIUS_PX: 11,
+        MOVE_CARD_ICON_SIZE_PX: 38,
+        MOVE_CARD_POWER_WIDTH_PX: 68,
+        MOVE_CARD_TITLE_SIZE_PX: 14,
+        MOVE_CARD_META_SIZE_PX: 10,
+        MOVE_CARD_DESC_SIZE_PX: 11,
         ACTION_PANEL_MIN_HEIGHT_PX: 78,
         ACTION_BUTTON_HEIGHT_PX: 34,
         FONT_SIZE_BODY_PX: 12,
@@ -3747,24 +3753,64 @@
     return section;
   };
 
-  const renderMoveCard = (move, className = "move-info-card") => {
+  const renderMoveCard = (move, {
+    className = "move-info-card",
+    slotLabel = "",
+    removeAction = null,
+    stateLabel = "",
+    stateClassName = "",
+    isSelectable = false
+  } = {}) => {
     const card = createEl("div", className);
     const typeKey = typeof move?.type === "string" ? move.type : "";
     const meta = TYPE_META[typeKey] || null;
     const typeIcon = meta?.icon && TYPE_ICON_GLYPHS[meta.icon] ? TYPE_ICON_GLYPHS[meta.icon] : "◈";
-    const typeBadge = createEl("span", "type-badge");
-    if (meta) typeBadge.style.setProperty("--type-color", meta.color);
-    typeBadge.append(
-      createEl("span", "type-badge-icon", typeIcon),
-      createEl("span", "type-badge-label", meta?.label || typeKey || "不明")
+    const role = getMoveRole(move);
+    const isAttack = role === "attack";
+    const typeColor = meta?.color || "#6d80a8";
+    card.style.setProperty("--type-color", typeColor);
+    if (isSelectable) card.classList.add("is-selectable");
+    if (stateClassName) card.classList.add(stateClassName);
+
+    const icon = createEl("div", "move-card-icon");
+    icon.append(
+      createEl("span", "move-card-icon-glyph", typeIcon),
+      createEl("span", "move-card-icon-type", meta?.label || typeKey || "不明")
     );
-    card.append(
+    const info = createEl("div", "move-card-main");
+    const top = createEl("div", "move-card-topline");
+    top.append(
       createEl("div", "move-info-name", move?.name || "未設定"),
-      createEl("div", "move-info-meta", `Role: ${MOVE_ROLE_LABELS[getMoveRole(move)] || "-"} / Target: ${getMoveTargetLabel(move)}`),
-      typeBadge,
-      createEl("div", "move-info-power", getMoveEffectText(move)),
-      createEl("div", "mini", move?.description || "-")
+      slotLabel ? createEl("span", "move-slot-chip", slotLabel) : createEl("span", "move-slot-chip hidden", "")
     );
+    const metaRow = createEl("div", "move-card-meta-row");
+    metaRow.append(
+      createEl("span", "move-meta-badge role", MOVE_ROLE_LABELS[role] || "不明"),
+      createEl("span", "move-meta-badge target", getMoveTargetLabel(move)),
+      createEl("span", "move-meta-badge type", meta?.label || typeKey || "不明")
+    );
+    info.append(top, metaRow, createEl("div", "move-info-desc", move?.description || getMoveEffectText(move)));
+
+    const right = createEl("div", "move-card-right");
+    if (isAttack) {
+      right.append(createEl("div", "move-power-label", "威力"), createEl("div", "move-power-value", String(Number(move?.power) || 0)));
+    } else {
+      right.append(createEl("div", "move-power-label", "補助"), createEl("div", "move-power-value support", "支援"));
+    }
+    right.appendChild(createEl("div", "move-effect-mini", getMoveEffectText(move)));
+
+    if (stateLabel) {
+      const state = createEl("span", "move-card-state-chip", stateLabel);
+      card.appendChild(state);
+    }
+    if (removeAction) {
+      const remove = createEl("button", "move-card-action-btn", "✕");
+      remove.dataset.action = removeAction.action;
+      if (Number.isInteger(removeAction.slotIndex)) remove.dataset.slotIndex = String(removeAction.slotIndex);
+      remove.disabled = !!removeAction.disabled;
+      card.appendChild(remove);
+    }
+    card.append(icon, info, right);
     return card;
   };
 
@@ -3817,6 +3863,12 @@
     wrap.style.setProperty("--mb-move-card-h", `${Math.max(44, Number(layout.MOVE_CARD_HEIGHT_PX) || 56)}px`);
     wrap.style.setProperty("--mb-move-card-p", `${Math.max(4, Number(layout.MOVE_CARD_PADDING_PX) || 6)}px`);
     wrap.style.setProperty("--mb-move-card-border", `${Math.max(1, Number(layout.MOVE_CARD_BORDER_PX) || 1)}px`);
+    wrap.style.setProperty("--mb-move-card-radius", `${Math.max(8, Number(layout.MOVE_CARD_RADIUS_PX) || 11)}px`);
+    wrap.style.setProperty("--mb-move-icon-size", `${Math.max(30, Number(layout.MOVE_CARD_ICON_SIZE_PX) || 38)}px`);
+    wrap.style.setProperty("--mb-move-power-w", `${Math.max(56, Number(layout.MOVE_CARD_POWER_WIDTH_PX) || 68)}px`);
+    wrap.style.setProperty("--mb-move-title-size", `${Math.max(12, Number(layout.MOVE_CARD_TITLE_SIZE_PX) || 14)}px`);
+    wrap.style.setProperty("--mb-move-meta-size", `${Math.max(9, Number(layout.MOVE_CARD_META_SIZE_PX) || 10)}px`);
+    wrap.style.setProperty("--mb-move-desc-size", `${Math.max(10, Number(layout.MOVE_CARD_DESC_SIZE_PX) || 11)}px`);
     wrap.style.setProperty("--mb-action-panel-min-h", `${Math.max(64, Number(layout.ACTION_PANEL_MIN_HEIGHT_PX) || 78)}px`);
     wrap.style.setProperty("--mb-action-btn-h", `${Math.max(30, Number(layout.ACTION_BUTTON_HEIGHT_PX) || 34)}px`);
     wrap.style.setProperty("--mb-font-body", `${Math.max(11, Number(layout.FONT_SIZE_BODY_PX) || 12)}px`);
@@ -3853,18 +3905,20 @@
     const selectedList = createEl("div", "move-list");
     (gameState.moves?.selected || []).forEach((moveId, index) => {
       const row = createEl("div", `move-slot-row${gameState.ui.selectedMoveIndex === index ? " active" : ""}`);
-      row.appendChild(createEl("span", "move-slot-index", `Slot ${index + 1}`));
-      const picker = createEl("button", "move-slot-picker");
-      picker.dataset.action = "monster-select-move-slot";
-      picker.dataset.slotIndex = String(index);
-      picker.disabled = !unlocks.moveCustomizationUnlocked;
-      picker.appendChild(renderMoveCard(MOVES[moveId], "move-info-card compact"));
-      row.appendChild(picker);
-      const remove = createEl("button", "move-remove-btn", "削除");
-      remove.dataset.action = "monster-remove-selected-move";
-      remove.dataset.slotIndex = String(index);
-      remove.disabled = !unlocks.moveCustomizationUnlocked || !moveId;
-      row.appendChild(remove);
+      if (unlocks.moveCustomizationUnlocked) {
+        row.dataset.action = "monster-select-move-slot";
+        row.dataset.slotIndex = String(index);
+      }
+      row.classList.toggle("disabled", !unlocks.moveCustomizationUnlocked);
+      row.appendChild(renderMoveCard(MOVES[moveId], {
+        className: "move-info-card compact equipped",
+        slotLabel: `SLOT ${index + 1}`,
+        removeAction: {
+          action: "monster-remove-selected-move",
+          slotIndex: index,
+          disabled: !unlocks.moveCustomizationUnlocked || !moveId
+        }
+      }));
       selectedList.appendChild(row);
     });
     selectedSection.appendChild(selectedList);
@@ -3903,10 +3957,15 @@
       const alreadySelected = (gameState.moves?.selected || []).includes(moveId);
       row.disabled = !unlocks.moveCustomizationUnlocked || alreadySelected;
       row.classList.toggle("disabled-picked", alreadySelected);
-      row.appendChild(renderMoveCard(move, "move-info-card compact"));
+      row.appendChild(renderMoveCard(move, {
+        className: "move-info-card compact list",
+        isSelectable: true,
+        stateLabel: alreadySelected ? "選択済" : (unlocks.moveCustomizationUnlocked ? "選択可" : "ロック"),
+        stateClassName: alreadySelected ? "is-disabled" : ""
+      }));
       moveList.appendChild(row);
     });
-    if (!moveList.childElementCount) moveList.appendChild(renderMoveCard(null, "move-info-card compact"));
+    if (!moveList.childElementCount) moveList.appendChild(renderMoveCard(null, { className: "move-info-card compact list is-disabled" }));
     movePanel.appendChild(moveList);
     const actions = createEl("div", "monster-detail-actions action-panel-bottom-right");
     const save = createEl("button", "screen-nav-btn", "保存");
