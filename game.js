@@ -113,7 +113,20 @@
       PER_STAT_MAX: 32,
       MAX_SELECTABLE_MOVES: 4,
       HOLD_REPEAT_INITIAL_MS: 260,
-      HOLD_REPEAT_INTERVAL_MS: 90
+      HOLD_REPEAT_INTERVAL_MS: 90,
+      LAYOUT: {
+        LEFT_PANEL_WIDTH_PX: 540,
+        COLUMN_GAP_PX: 10,
+        PANEL_PADDING_PX: 10,
+        SECTION_GAP_PX: 8,
+        STAT_ROW_GAP_PX: 4,
+        STAT_BAR_HEIGHT_PX: 14,
+        MOVE_CARD_HEIGHT_PX: 56,
+        MOVE_CARD_PADDING_PX: 6,
+        MOVE_CARD_BORDER_PX: 1,
+        FONT_SIZE_BODY_PX: 12,
+        FONT_SIZE_TITLE_PX: 22
+      }
     }
   };
 
@@ -3311,7 +3324,7 @@
       minus.dataset.action = "monster-training-adjust";
       minus.dataset.statKey = row.key;
       minus.dataset.delta = "-1";
-      const valueBtn = createEl("div", "training-stat-alloc", `${value}`);
+      const valueBtn = createEl("div", "training-stat-alloc", `${Math.max(0, delta)}`);
       const plus = createEl("button", "tiny-adjust-btn", "+");
       plus.dataset.action = "monster-training-adjust";
       plus.dataset.statKey = row.key;
@@ -3325,7 +3338,7 @@
       plus.disabled = !canEdit || !canAdjustTrainingStat({ allocation: draft, statKey: row.key, delta: 1 });
       plus5.disabled = !canEdit || !canAdjustTrainingStat({ allocation: draft, statKey: row.key, delta: 1 });
       controls.append(minus, valueBtn, plus, plus5);
-      line.append(createEl("div", "training-stat-label", row.label), bar, controls, createEl("div", "training-stat-value", `${base} +${Math.max(0, delta)}`));
+      line.append(createEl("div", "training-stat-label", row.label), bar, controls, createEl("div", "training-stat-value", `${value}`));
       panel.appendChild(line);
     });
     panel.appendChild(createEl("div", "monster-detail-note", `Shift+クリック/長押しで +5。1 point = +1 stat。上限: stat ${TRAINING_PER_STAT_CAP}, total ${TRAINING_TOTAL_CAP}`));
@@ -3345,6 +3358,18 @@
 
   const renderMonsterDetailScreen = () => {
     const wrap = createEl("section", "monster-detail-screen");
+    const layout = CONFIG.MONSTER_BUILD.LAYOUT || {};
+    wrap.style.setProperty("--mb-left-width", `${Math.max(320, Number(layout.LEFT_PANEL_WIDTH_PX) || 540)}px`);
+    wrap.style.setProperty("--mb-column-gap", `${Math.max(4, Number(layout.COLUMN_GAP_PX) || 10)}px`);
+    wrap.style.setProperty("--mb-panel-padding", `${Math.max(4, Number(layout.PANEL_PADDING_PX) || 10)}px`);
+    wrap.style.setProperty("--mb-section-gap", `${Math.max(4, Number(layout.SECTION_GAP_PX) || 8)}px`);
+    wrap.style.setProperty("--mb-stat-row-gap", `${Math.max(2, Number(layout.STAT_ROW_GAP_PX) || 4)}px`);
+    wrap.style.setProperty("--mb-stat-bar-h", `${Math.max(10, Number(layout.STAT_BAR_HEIGHT_PX) || 14)}px`);
+    wrap.style.setProperty("--mb-move-card-h", `${Math.max(44, Number(layout.MOVE_CARD_HEIGHT_PX) || 56)}px`);
+    wrap.style.setProperty("--mb-move-card-p", `${Math.max(4, Number(layout.MOVE_CARD_PADDING_PX) || 6)}px`);
+    wrap.style.setProperty("--mb-move-card-border", `${Math.max(1, Number(layout.MOVE_CARD_BORDER_PX) || 1)}px`);
+    wrap.style.setProperty("--mb-font-body", `${Math.max(11, Number(layout.FONT_SIZE_BODY_PX) || 12)}px`);
+    wrap.style.setProperty("--mb-font-title", `${Math.max(18, Number(layout.FONT_SIZE_TITLE_PX) || 22)}px`);
     const monster = getSelectedMonster(gameState);
     if (!monster) {
       wrap.appendChild(createEl("div", "formation-help", "モンスターが存在しません。"));
@@ -3352,7 +3377,9 @@
     }
     const unlocks = gameState.trainerCard?.unlocks || createDefaultTrainerCardUnlocks();
     const draft = getMonsterTrainingDraft(monster.id, gameState);
-    const head = createEl("div", "monster-detail-head");
+    const body = createEl("div", "monster-build-layout");
+    const leftPanel = createEl("aside", "monster-build-left-panel");
+    const summary = createEl("div", "monster-summary-card");
     const portrait = createImageWithFallback({
       src: getAssetPath("portraits", monster.portrait),
       alt: monster.name,
@@ -3361,22 +3388,22 @@
       placeholderSubLabel: "NO IMAGE"
     });
     const title = createEl("div", "monster-detail-title-block");
-    title.append(createEl("h2", "formation-title", monster.name), createEl("div", "monster-list-sub", `ID: ${monster.id}`));
-    head.append(portrait, title);
-    wrap.append(head);
-    const body = createEl("div", "monster-build-layout");
-    body.appendChild(renderMonsterDetailBuildPanel(monster, draft, unlocks));
-    const movePanel = createEl("div", "monster-moves-panel");
+    title.append(createEl("h2", "monster-detail-name", monster.name), createEl("div", "monster-list-sub", `ID: ${monster.id}`));
+    summary.append(portrait, title);
+    leftPanel.append(summary, renderMonsterDetailBuildPanel(monster, draft, unlocks));
+    body.appendChild(leftPanel);
+    const movePanel = createEl("section", "monster-moves-panel");
     const innateSection = createEl("div", "move-section");
     innateSection.appendChild(createEl("h3", "mini-heading", "Innate Moves"));
     const innateList = createEl("div", "move-list");
     (gameState.moves?.innate || []).forEach((moveId) => {
       const move = MOVES[moveId];
-      if (!move) return;
       innateList.appendChild(renderMoveCard(move));
     });
+    if (!innateList.childElementCount) innateList.appendChild(renderMoveCard(null));
     innateSection.appendChild(innateList);
     const selectedSection = createEl("div", "move-section");
+    selectedSection.classList.add("move-section-primary");
     selectedSection.appendChild(createEl("h3", "mini-heading", "Selectable Moves (up to 4)"));
     const selectedList = createEl("div", "move-list");
     (gameState.moves?.selected || []).forEach((moveId, index) => {
@@ -3397,11 +3424,11 @@
     });
     selectedSection.appendChild(selectedList);
     const poolSection = createEl("div", "move-section");
+    poolSection.classList.add("move-section-secondary");
     poolSection.appendChild(createEl("h3", "mini-heading", "Move Pool"));
     const poolList = createEl("div", "move-pool-grid");
     (gameState.moves?.pool || []).forEach((moveId) => {
       const move = MOVES[moveId];
-      if (!move) return;
       const row = createEl("button", "move-candidate-row");
       row.dataset.action = "monster-pool-pick";
       row.dataset.moveId = moveId;
@@ -3411,6 +3438,7 @@
       row.appendChild(renderMoveCard(move, "move-info-card compact"));
       poolList.appendChild(row);
     });
+    if (!poolList.childElementCount) poolList.appendChild(renderMoveCard(null, "move-info-card compact"));
     poolSection.appendChild(poolList);
     movePanel.append(innateSection, selectedSection, poolSection);
     body.appendChild(movePanel);
