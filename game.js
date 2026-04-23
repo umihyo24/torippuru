@@ -392,6 +392,7 @@
     venomTouch: { key: "venomTouch", name: "ベノムタッチ", description: "攻撃を当てた後、相手をどくにする。", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
     battleRhythm: { key: "battleRhythm", name: "バトルリズム", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
     openingSurge: { key: "openingSurge", name: "オープニングサージ", description: "登場時、こうげき段階が2上がる。", onSwitchIn: [{ type: "addAtkStage", amount: 2, target: "self" }] },
+    gyakkyo_maru: { key: "gyakkyo_maru", name: "ぎゃっきょう○", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
     intimidate: { key: "intimidate", name: "いあつかん", description: "登場時、正面の相手のこうげきを1段階さげる" },
     wonder_guard: { key: "wonder_guard", name: "ふしぎなまもり", description: "弱点以外の攻撃を受けない" },
     koukakudahou: { key: "koukakudahou", name: "こうかくだほう", description: "自分以外のタイプのわざも一致威力になる" },
@@ -400,7 +401,7 @@
 
   const UNIT_LIBRARY = {
     emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, weaknessTypes: ["water", "earth"], traits: ["venomTouch", "battleRhythm", "openingSurge"], selectedTraitKey: "venomTouch", moves: ["shippu_jinrai", "drainBite", "rallyHowl", "shellStance"] },
-    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, weaknessTypes: ["water", "earth"], traits: ["intimidate", "venomTouch", "openingSurge"], selectedTraitKey: "intimidate", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
+    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, weaknessTypes: ["water", "earth"], traits: ["intimidate", "gyakkyo_maru", "koukakudahou"], selectedTraitKey: "intimidate", moves: ["kenkon_itteki", "drainBite", "rallyHowl", "shellStance"] },
     maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, weaknessTypes: ["water", "earth"], traits: ["openingSurge", "battleRhythm", "intimidate"], selectedTraitKey: "openingSurge", moves: ["iwana_nadare", "shudan_bokoboko", "ironGuard", "rallyHowl"] },
     mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 95, atk: 65, mag: 75, def: 90, res: 85, spd: 70, weaknessTypes: ["fire", "shadow"], traits: ["battleRhythm", "venomTouch", "openingSurge"], selectedTraitKey: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
     frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, weaknessTypes: ["nature", "light"], traits: ["battleRhythm", "intimidate", "openingSurge"], selectedTraitKey: "battleRhythm", moves: ["mukoumizu", "thunder_judgment", "rallyHowl", "shellStance"] },
