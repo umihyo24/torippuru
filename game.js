@@ -120,6 +120,7 @@
     MONSTER_LIST: "monster_list",
     MONSTER_DETAIL: "monster_detail",
     TRAINER_CARD: "trainer_card",
+    SETTINGS: "settings",
     BATTLE_PREPARE: "battle_prepare",
     PLAYING: "playing",
     GAMEOVER: "gameover"
@@ -127,6 +128,7 @@
   const HOME_MENU_ITEMS = [
     { key: "battle", label: "Battle", icon: "⚔" },
     { key: "formation", label: "Formation", icon: "☷" },
+    { key: "monsters", label: "Monster List", icon: "🐾" },
     { key: "story", label: "Story", icon: "📖" },
     { key: "gacha", label: "Gacha", icon: "✦" },
     { key: "settings", label: "Settings", icon: "⚙" }
@@ -325,7 +327,7 @@
   };
 
   const getSafeHomeIndex = (value) => {
-    const max = Math.max(0, HOME_MENU_ITEMS.length - 1);
+    const max = Math.max(0, getHubMenuItems(gameState).length - 1);
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
   };
 
@@ -465,6 +467,8 @@
       ui: {
         homeIndex: 0,
         homeHoverIndex: -1,
+        currentHubSection: HOME_MENU_ITEMS[0]?.key || "battle",
+        hubMenuItems: HOME_MENU_ITEMS.map((item) => item.key),
         formationIndex: -1,
         battlePrepareIndex: -1,
         monsterListIndex: -1,
@@ -638,11 +642,12 @@
   };
 
   const getHomeInfo = (index, state) => {
-    const safeIndex = getSelectableIndex(index, HOME_MENU_ITEMS.length - 1);
+    const menuItems = getHubMenuItems(state);
+    const safeIndex = getSelectableIndex(index, menuItems.length - 1);
     if (safeIndex < 0) {
       return { title: "HOME", description: "メニューを選択してください。" };
     }
-    const menuKey = HOME_MENU_ITEMS[safeIndex]?.key || "";
+    const menuKey = menuItems[safeIndex]?.key || "";
     if (menuKey === "battle") {
       return {
         title: "Battle",
@@ -659,6 +664,14 @@
         extra: { lines: [`Saved: ${savedCount}/${FORMATION_SLOT_COUNT}`] }
       };
     }
+    if (menuKey === "monsters") {
+      const unlockedCount = getMonsterLibraryIds(state).length;
+      return {
+        title: "Monster List",
+        description: "モンスター一覧を確認し、育成詳細を開きます。",
+        extra: { lines: [`Monsters: ${unlockedCount}`] }
+      };
+    }
     if (menuKey === "story") return { title: "Story", description: "ストーリーモードは準備中です。今後の拡張をお待ちください。" };
     if (menuKey === "gacha") return { title: "Gacha", description: "モンスター勧誘機能は準備中です。実装後はここから利用できます。" };
     if (menuKey === "settings") return { title: "Settings", description: "ゲーム設定は準備中です。音量や表示設定を追加予定です。" };
@@ -666,15 +679,24 @@
   };
 
   const getHomeInfoIndex = (state = gameState) => {
-    const hoverIndex = getSelectableIndex(state?.ui?.homeHoverIndex, HOME_MENU_ITEMS.length - 1);
+    const menuItems = getHubMenuItems(state);
+    const hoverIndex = getSelectableIndex(state?.ui?.homeHoverIndex, menuItems.length - 1);
     if (hoverIndex >= 0) return hoverIndex;
-    return getSelectableIndex(state?.ui?.homeIndex, HOME_MENU_ITEMS.length - 1);
+    return getSelectableIndex(state?.ui?.homeIndex, menuItems.length - 1);
   };
 
-  const getHomeMenuCardRects = () => {
+  const getHubMenuItems = (state = gameState) => {
+    const keys = Array.isArray(state?.ui?.hubMenuItems) && state.ui.hubMenuItems.length
+      ? state.ui.hubMenuItems
+      : HOME_MENU_ITEMS.map((item) => item.key);
+    return keys.map((key) => HOME_MENU_ITEMS.find((item) => item.key === key)).filter(Boolean);
+  };
+
+  const getHomeMenuCardRects = (state = gameState) => {
+    const menuItems = getHubMenuItems(state);
     const rects = [];
     const cols = Math.max(1, Math.trunc(CONFIG.UI.HOME_MENU_COLS));
-    for (let i = 0; i < HOME_MENU_ITEMS.length; i += 1) {
+    for (let i = 0; i < menuItems.length; i += 1) {
       const col = i % cols;
       const row = Math.floor(i / cols);
       rects.push({
@@ -689,8 +711,14 @@
   };
 
   const ensureUiSafety = () => {
-    gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, HOME_MENU_ITEMS.length - 1);
-    gameState.ui.homeHoverIndex = getSelectableIndex(gameState.ui.homeHoverIndex, HOME_MENU_ITEMS.length - 1);
+    gameState.ui.hubMenuItems = HOME_MENU_ITEMS.map((item) => item.key);
+    const menuItems = getHubMenuItems(gameState);
+    gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, menuItems.length - 1);
+    gameState.ui.homeHoverIndex = getSelectableIndex(gameState.ui.homeHoverIndex, menuItems.length - 1);
+    const safeHubKey = menuItems[gameState.ui.homeIndex]?.key || menuItems[0]?.key || "battle";
+    if (!gameState.ui.hubMenuItems.includes(gameState.ui.currentHubSection)) {
+      gameState.ui.currentHubSection = safeHubKey;
+    }
     gameState.ui.formationIndex = getSelectableIndex(gameState.ui.formationIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.battlePrepareIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.monsterListIndex = getSafeMonsterListIndex(gameState, gameState.ui.monsterListIndex);
@@ -721,6 +749,8 @@
   const enterHome = () => {
     gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
     gameState.ui.homeHoverIndex = -1;
+    const hubItems = getHubMenuItems(gameState);
+    gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
     gameState.ui.formationIndex = -1;
     gameState.ui.battlePrepareIndex = -1;
     setPhase(PHASE.HOME);
@@ -770,6 +800,10 @@
     setPhase(PHASE.TRAINER_CARD);
   };
 
+  const enterSettings = () => {
+    setPhase(PHASE.SETTINGS);
+  };
+
   const setMonsterDetailTab = (tab) => {
     gameState.ui.monsterDetailTab = tab === "moves" ? "moves" : "status";
     if (gameState.ui.monsterDetailTab !== "moves") gameState.ui.selectedMoveSlot = null;
@@ -816,8 +850,12 @@
 
   const handleHomeMenuConfirm = (index) => {
     if (!Number.isFinite(index) || index < 0) return;
-    gameState.ui.homeIndex = getSafeHomeIndex(index);
-    const selectedKey = HOME_MENU_ITEMS[gameState.ui.homeIndex]?.key;
+    const hubItems = getHubMenuItems(gameState);
+    const safeIndex = getSelectableIndex(index, hubItems.length - 1);
+    if (safeIndex < 0) return;
+    gameState.ui.homeIndex = safeIndex;
+    const selectedKey = hubItems[safeIndex]?.key;
+    gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
     if (selectedKey === "battle") {
       enterBattlePrepare();
       return;
@@ -825,6 +863,13 @@
     if (selectedKey === "formation") {
       enterFormation();
       return;
+    }
+    if (selectedKey === "monsters") {
+      enterMonsterList();
+      return;
+    }
+    if (selectedKey === "settings") {
+      enterSettings();
     }
   };
 
@@ -3016,6 +3061,7 @@
 
   const renderHomeScreen = () => {
     const wrap = createEl("section", "home-screen");
+    const hubItems = getHubMenuItems(gameState);
     const left = createEl("div", "home-left-panel");
     left.style.left = `${CONFIG.UI.HOME_LEFT_X}px`;
     left.style.top = `${CONFIG.UI.HOME_LEFT_Y}px`;
@@ -3036,10 +3082,10 @@
     left.append(mascotWrap, createEl("div", "home-mascot-name", mascot?.name || "No Monster"));
 
     const menu = createEl("div", "home-menu-grid");
-    const cardRects = getHomeMenuCardRects();
-    const hoverIndex = getSelectableIndex(gameState.ui.homeHoverIndex, HOME_MENU_ITEMS.length - 1);
+    const cardRects = getHomeMenuCardRects(gameState);
+    const hoverIndex = getSelectableIndex(gameState.ui.homeHoverIndex, hubItems.length - 1);
     cardRects.forEach((rect) => {
-      const menuItem = HOME_MENU_ITEMS[rect.index];
+      const menuItem = hubItems[rect.index];
       const isSelected = rect.index === gameState.ui.homeIndex;
       const isHovered = rect.index === hoverIndex;
       const card = createEl("button", `home-menu-card${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
@@ -3269,6 +3315,16 @@
     return wrap;
   };
 
+  const renderSettingsScreen = () => {
+    const wrap = createEl("section", "trainer-card-screen");
+    wrap.appendChild(createEl("h2", "formation-title", "Settings"));
+    wrap.appendChild(createEl("div", "formation-help", "ゲーム設定は準備中です。今後ここに音量や表示設定を追加します。"));
+    const back = createEl("button", "screen-nav-btn", "Back HOME");
+    back.dataset.action = "go-home";
+    wrap.appendChild(back);
+    return wrap;
+  };
+
   const renderFormationEditScreen = () => {
     const wrap = createEl("section", "formation-edit-screen");
     const edit = gameState.ui.formationEdit;
@@ -3443,6 +3499,8 @@
       main.appendChild(renderMonsterDetailScreen());
     } else if (gameState.phase === PHASE.TRAINER_CARD) {
       main.appendChild(renderTrainerCardScreen());
+    } else if (gameState.phase === PHASE.SETTINGS) {
+      main.appendChild(renderSettingsScreen());
     } else if (gameState.phase === PHASE.BATTLE_PREPARE) {
       main.appendChild(renderBattlePrepareScreen());
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
@@ -3680,6 +3738,8 @@
       if (event.key === "ArrowRight") gameState.ui.homeIndex = current + 1;
       if (event.key === "Enter") handleHomeMenuConfirm(gameState.ui.homeIndex);
       ensureUiSafety();
+      const hubItems = getHubMenuItems(gameState);
+      gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
       render();
       return;
     }
@@ -3719,6 +3779,12 @@
     }
 
     if (gameState.phase === PHASE.TRAINER_CARD) {
+      if (event.key === "Escape") enterHome();
+      render();
+      return;
+    }
+
+    if (gameState.phase === PHASE.SETTINGS) {
       if (event.key === "Escape") enterHome();
       render();
       return;
