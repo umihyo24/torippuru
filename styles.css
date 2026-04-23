@@ -1319,6 +1319,14 @@ button:disabled {
   overflow: hidden;
 }
 
+.monster-detail-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(132, 154, 201, 0.4);
+  padding-top: 8px;
+}
+
 .monster-build-left-panel {
   display: grid;
   gap: var(--mb-section-gap, 8px);

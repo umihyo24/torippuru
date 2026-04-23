@@ -524,6 +524,7 @@
         monsterListIndex: -1,
         monsterDetailTab: "status",
         selectedMoveIndex: null,
+        monsterDetailSnapshot: null,
         formationEdit: {
           selectedSlotIndex: -1,
           draft: null,
@@ -668,13 +669,25 @@
   const getMonsterMoveDraft = (monsterId, state = gameState) => {
     const baseMoves = Array.isArray(UNIT_LIBRARY?.[monsterId]?.moves) ? UNIT_LIBRARY[monsterId].moves : [];
     const innate = baseMoves.slice(0, 1).filter((moveId) => !!MOVES[moveId]);
-    const selected = [];
+    const baseSelected = [];
     for (const moveId of baseMoves) {
-      if (!MOVES[moveId] || innate.includes(moveId) || selected.includes(moveId)) continue;
+      if (!MOVES[moveId] || innate.includes(moveId) || baseSelected.includes(moveId)) continue;
+      baseSelected.push(moveId);
+      if (baseSelected.length >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) break;
+    }
+    while (baseSelected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) baseSelected.push(null);
+    const storedSelected = Array.isArray(state?.monsterMoveDrafts?.[monsterId]) ? state.monsterMoveDrafts[monsterId] : [];
+    const selected = [];
+    for (let i = 0; i < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES; i += 1) {
+      const moveId = storedSelected[i] || null;
+      if (!moveId || !MOVES[moveId] || innate.includes(moveId) || selected.includes(moveId)) {
+        selected.push(baseSelected[i] || null);
+        continue;
+      }
       selected.push(moveId);
-      if (selected.length >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) break;
     }
     while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+    state.monsterMoveDrafts[monsterId] = selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
     const pool = Object.keys(MOVES).filter((moveId) => !innate.includes(moveId));
     state.moves = { innate, selected, pool };
     return selected;
@@ -699,6 +712,27 @@
       maxTotalPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS
     };
     getMonsterMoveDraft(monsterId, state);
+  };
+
+  const captureMonsterDetailSnapshot = (monsterId, state = gameState) => {
+    if (!monsterId || !UNIT_LIBRARY[monsterId]) return null;
+    return {
+      monsterId,
+      training: getMonsterTrainingDraft(monsterId, state),
+      selectedMoves: getMonsterMoveDraft(monsterId, state).slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES)
+    };
+  };
+
+  const restoreMonsterDetailSnapshot = (state = gameState) => {
+    const snapshot = state?.ui?.monsterDetailSnapshot;
+    if (!snapshot?.monsterId || !UNIT_LIBRARY[snapshot.monsterId]) return false;
+    state.monsterTrainingDrafts[snapshot.monsterId] = { ...createDefaultStatAllocation(), ...(snapshot.training || {}) };
+    const selected = Array.isArray(snapshot.selectedMoves) ? snapshot.selectedMoves.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
+    while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+    state.monsterMoveDrafts[snapshot.monsterId] = selected;
+    syncMonsterBuildState(snapshot.monsterId, state);
+    state.ui.selectedMoveIndex = null;
+    return true;
   };
 
   const formatFormationPreview = (formation) => {
@@ -865,6 +899,7 @@
     gameState.ui.selectedMoveIndex = null;
     getMonsterTrainingDraft(monsterId, gameState);
     syncMonsterBuildState(monsterId, gameState);
+    gameState.ui.monsterDetailSnapshot = captureMonsterDetailSnapshot(monsterId, gameState);
     setPhase(PHASE.MONSTER_DETAIL);
   };
 
@@ -919,6 +954,7 @@
     next[sourceIndex] = next[slotIndex] || null;
     next[slotIndex] = temp;
     gameState.moves.selected = next;
+    if (gameState.selectedMonsterId) gameState.monsterMoveDrafts[gameState.selectedMonsterId] = next.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
     gameState.ui.selectedMoveIndex = null;
   };
 
@@ -931,6 +967,7 @@
     if (emptyIndex < 0) return;
     selected[emptyIndex] = moveId;
     gameState.moves.selected = selected;
+    if (gameState.selectedMonsterId) gameState.monsterMoveDrafts[gameState.selectedMonsterId] = selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
   };
 
   const removeSelectedMove = (slotIndex) => {
@@ -939,7 +976,27 @@
     while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
     selected[slotIndex] = null;
     gameState.moves.selected = selected;
+    if (gameState.selectedMonsterId) gameState.monsterMoveDrafts[gameState.selectedMonsterId] = selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
     if (gameState.ui.selectedMoveIndex === slotIndex) gameState.ui.selectedMoveIndex = null;
+  };
+
+  const saveMonsterDetailAndExit = () => {
+    const monsterId = gameState.selectedMonsterId;
+    if (!monsterId || !UNIT_LIBRARY[monsterId]) {
+      enterMonsterList();
+      return;
+    }
+    const selected = Array.isArray(gameState.moves?.selected) ? gameState.moves.selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
+    while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+    gameState.monsterMoveDrafts[monsterId] = selected;
+    gameState.ui.monsterDetailSnapshot = captureMonsterDetailSnapshot(monsterId, gameState);
+    enterMonsterList();
+  };
+
+  const cancelMonsterDetailAndExit = () => {
+    restoreMonsterDetailSnapshot(gameState);
+    gameState.ui.monsterDetailSnapshot = null;
+    enterMonsterList();
   };
 
   const stopStatAdjustHold = () => {
@@ -3443,9 +3500,15 @@
     movePanel.append(innateSection, selectedSection, poolSection);
     body.appendChild(movePanel);
     wrap.appendChild(body);
+    const actions = createEl("div", "monster-detail-actions");
+    const save = createEl("button", "screen-nav-btn", "Save");
+    save.dataset.action = "monster-detail-save";
+    const cancel = createEl("button", "screen-nav-btn", "Cancel");
+    cancel.dataset.action = "monster-detail-cancel";
     const back = createEl("button", "screen-nav-btn", "Back Monster List");
     back.dataset.action = "back-monster-list";
-    wrap.appendChild(back);
+    actions.append(save, cancel, back);
+    wrap.appendChild(actions);
     return wrap;
   };
 
@@ -3815,7 +3878,17 @@
       return;
     }
     if (a === "back-monster-list") {
-      enterMonsterList();
+      saveMonsterDetailAndExit();
+      render();
+      return;
+    }
+    if (a === "monster-detail-save") {
+      saveMonsterDetailAndExit();
+      render();
+      return;
+    }
+    if (a === "monster-detail-cancel") {
+      cancelMonsterDetailAndExit();
       render();
       return;
     }
