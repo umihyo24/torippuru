@@ -1309,7 +1309,7 @@ button:disabled {
   display: grid;
   grid-template-columns: var(--mb-left-width, 540px) minmax(0, 1fr);
   gap: var(--mb-column-gap, 10px);
-  align-items: start;
+  align-items: stretch;
   min-height: 0;
   height: var(--mb-panel-min-h, 786px);
   max-height: 100%;
@@ -1458,7 +1458,9 @@ button:disabled {
 .monster-moves-scroll-body {
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
 }
 
 .type-filter-row {
@@ -1551,12 +1553,7 @@ button:disabled {
 .move-pool-grid { display: grid; gap: 4px; }
 .move-list { gap: var(--mb-equipped-slot-gap, 3px); }
 .move-pool-grid {
-  overflow-y: auto;
-  overflow-x: hidden;
   min-height: 0;
-  max-height: 100%;
-  height: 100%;
-  padding-right: 2px;
 }
 .mini-heading { margin: 0; font-size: 13px; }
 .move-slot-row,
@@ -1698,15 +1695,15 @@ button:disabled {
 
 .action-panel-bottom-right {
   border-top: 1px solid rgba(132, 154, 201, 0.5);
-  background: rgba(11, 18, 32, 0.9);
+  background: rgba(11, 18, 32, 0.95);
   border-radius: 8px;
-  padding: 8px;
-  margin-top: auto;
+  padding: 10px 8px 8px;
   min-height: var(--mb-action-panel-min-h, 78px);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  align-items: end;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .action-panel-bottom-right .screen-nav-btn {
