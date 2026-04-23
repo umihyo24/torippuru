@@ -106,6 +106,14 @@
       statusRemove: "#8ff5ff",
       traitSource: "#55e9ff",
       traitTarget: "#7bd8ff"
+    },
+    MONSTER_BUILD: {
+      MAX_TOTAL_POINTS: 66,
+      PER_STAT_MIN: 0,
+      PER_STAT_MAX: 32,
+      MAX_SELECTABLE_MOVES: 4,
+      HOLD_REPEAT_INITIAL_MS: 260,
+      HOLD_REPEAT_INTERVAL_MS: 90
     }
   };
 
@@ -278,6 +286,20 @@
     special: "SP",
     status: "ST"
   };
+  const MOVE_ROLE_LABELS = {
+    attack: "attack",
+    support: "support"
+  };
+
+  const getMoveRole = (move) => (move?.category === "status" ? "support" : "attack");
+  const getMoveEffectText = (move) => {
+    if (!move) return "-";
+    if ((Number(move.power) || 0) > 0) return `Power ${move.power}`;
+    const effects = Array.isArray(move.beforeDamage) ? move.beforeDamage : [];
+    if (effects.some((e) => e?.type === "applyStatus")) return "Applies status";
+    if (effects.some((e) => e?.type === "modifyCritStage")) return "Boosts critical chance";
+    return "Support effect";
+  };
 
   const createEmptyFormation = () => Array.from({ length: FORMATION_MEMBER_COUNT }, () => null);
 
@@ -306,6 +328,19 @@
     mag: 0,
     res: 0,
     spd: 0
+  });
+
+  const createDefaultMonsterBuildState = () => ({
+    stats: createDefaultStatAllocation(),
+    baseStats: createDefaultStatAllocation(),
+    remainingPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS,
+    maxTotalPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS
+  });
+
+  const createDefaultMovesBuildState = () => ({
+    innate: [],
+    selected: [],
+    pool: []
   });
 
   const createDefaultTrainerCardUnlocks = () => ({
@@ -464,6 +499,8 @@
     currentActorIndex: 0,
     selectedMoveId: null,
     selectedTargets: [],
+    monster: createDefaultMonsterBuildState(),
+    moves: createDefaultMovesBuildState(),
       ui: {
         homeIndex: 0,
         homeHoverIndex: -1,
@@ -473,7 +510,7 @@
         battlePrepareIndex: -1,
         monsterListIndex: -1,
         monsterDetailTab: "status",
-        selectedMoveSlot: null,
+        selectedMoveIndex: null,
         formationEdit: {
           selectedSlotIndex: -1,
           draft: null,
@@ -541,8 +578,8 @@
     });
   };
 
-  const TRAINING_TOTAL_CAP = 66;
-  const TRAINING_PER_STAT_CAP = 32;
+  const TRAINING_TOTAL_CAP = CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS;
+  const TRAINING_PER_STAT_CAP = CONFIG.MONSTER_BUILD.PER_STAT_MAX;
   const TRAINING_STAT_ROWS = [
     { key: "hp", label: "HP", baseKey: "hp" },
     { key: "atk", label: "攻撃", baseKey: "atk" },
@@ -570,6 +607,7 @@
   };
 
   let gameState = createInitialState();
+  let statAdjustHoldTimer = null;
 
   const getFormationAt = (state, index) => {
     const list = Array.isArray(state?.formations) ? state.formations : [];
@@ -606,7 +644,7 @@
   const calculateResultingStat = (monster, statRow, allocation) => {
     const base = Number(monster?.[statRow.baseKey]) || 0;
     const bonus = Number(allocation?.[statRow.key]) || 0;
-    return base + (bonus * 2);
+    return base + bonus;
   };
   const canAdjustTrainingStat = ({ allocation, statKey, delta }) => {
     const current = Number(allocation?.[statKey]) || 0;
@@ -615,20 +653,39 @@
     return getAllocatedTrainingPoints(allocation) < TRAINING_TOTAL_CAP;
   };
   const getMonsterMoveDraft = (monsterId, state = gameState) => {
-    const baseMoves = UNIT_LIBRARY?.[monsterId]?.moves;
-    if (!Array.isArray(baseMoves)) return [];
-    if (!Array.isArray(state.monsterMoveDrafts[monsterId])) state.monsterMoveDrafts[monsterId] = [...baseMoves];
-    const draft = state.monsterMoveDrafts[monsterId].slice(0, 4);
-    while (draft.length < 4) draft.push(baseMoves[draft.length] || null);
-    return draft;
+    const baseMoves = Array.isArray(UNIT_LIBRARY?.[monsterId]?.moves) ? UNIT_LIBRARY[monsterId].moves : [];
+    const innate = baseMoves.slice(0, 1).filter((moveId) => !!MOVES[moveId]);
+    const selected = [];
+    for (const moveId of baseMoves) {
+      if (!MOVES[moveId] || innate.includes(moveId) || selected.includes(moveId)) continue;
+      selected.push(moveId);
+      if (selected.length >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) break;
+    }
+    while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+    const pool = Object.keys(MOVES).filter((moveId) => !innate.includes(moveId));
+    state.moves = { innate, selected, pool };
+    return selected;
   };
-  const isFixedMoveSlot = (slotIndex) => slotIndex === 0;
-  const canReplaceMoveSlot = (slotIndex) => Number.isInteger(slotIndex) && slotIndex > 0 && slotIndex < 4;
-  const canReplaceMoveWithCandidate = ({ monster, slotIndex, moveId }) => {
-    if (!monster || !MOVES[moveId]) return false;
-    if (!canReplaceMoveSlot(slotIndex)) return false;
-    const baseMoves = Array.isArray(monster.moves) ? monster.moves : [];
-    return baseMoves.includes(moveId);
+
+  const syncMonsterBuildState = (monsterId, state = gameState) => {
+    const monster = UNIT_LIBRARY[monsterId];
+    if (!monster) return;
+    const draft = getMonsterTrainingDraft(monsterId, state);
+    const stats = createDefaultStatAllocation();
+    const baseStats = createDefaultStatAllocation();
+    TRAINING_STAT_ROWS.forEach((row) => {
+      const base = Number(monster[row.baseKey]) || 0;
+      const bonus = clamp(Number(draft[row.key]) || 0, CONFIG.MONSTER_BUILD.PER_STAT_MIN, CONFIG.MONSTER_BUILD.PER_STAT_MAX);
+      baseStats[row.key] = base;
+      stats[row.key] = base + bonus;
+    });
+    state.monster = {
+      stats,
+      baseStats,
+      remainingPoints: getRemainingTrainingPoints(draft),
+      maxTotalPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS
+    };
+    getMonsterMoveDraft(monsterId, state);
   };
 
   const formatFormationPreview = (formation) => {
@@ -723,7 +780,9 @@
     gameState.ui.battlePrepareIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.monsterListIndex = getSafeMonsterListIndex(gameState, gameState.ui.monsterListIndex);
     if (gameState.ui.monsterDetailTab !== "moves") gameState.ui.monsterDetailTab = "status";
-    gameState.ui.selectedMoveSlot = canReplaceMoveSlot(gameState.ui.selectedMoveSlot) ? gameState.ui.selectedMoveSlot : null;
+    gameState.ui.selectedMoveIndex = Number.isInteger(gameState.ui.selectedMoveIndex)
+      ? clamp(gameState.ui.selectedMoveIndex, 0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES - 1)
+      : null;
     const monsterIds = getMonsterLibraryIds(gameState);
     if (!UNIT_LIBRARY[gameState.selectedMonsterId]) {
       gameState.selectedMonsterId = monsterIds.length ? monsterIds[0] : null;
@@ -790,9 +849,9 @@
     if (!UNIT_LIBRARY[monsterId]) return;
     gameState.selectedMonsterId = monsterId;
     gameState.ui.monsterDetailTab = "status";
-    gameState.ui.selectedMoveSlot = null;
+    gameState.ui.selectedMoveIndex = null;
     getMonsterTrainingDraft(monsterId, gameState);
-    getMonsterMoveDraft(monsterId, gameState);
+    syncMonsterBuildState(monsterId, gameState);
     setPhase(PHASE.MONSTER_DETAIL);
   };
 
@@ -806,7 +865,7 @@
 
   const setMonsterDetailTab = (tab) => {
     gameState.ui.monsterDetailTab = tab === "moves" ? "moves" : "status";
-    if (gameState.ui.monsterDetailTab !== "moves") gameState.ui.selectedMoveSlot = null;
+    if (gameState.ui.monsterDetailTab !== "moves") gameState.ui.selectedMoveIndex = null;
   };
 
   const adjustMonsterTrainingStat = (monsterId, statKey, delta) => {
@@ -814,23 +873,77 @@
     const unlocks = gameState.trainerCard?.unlocks || createDefaultTrainerCardUnlocks();
     if (!unlocks.statAdjustmentUnlocked) return;
     const draft = getMonsterTrainingDraft(monsterId, gameState);
-    if (!canAdjustTrainingStat({ allocation: draft, statKey, delta })) return;
     const next = { ...draft };
-    next[statKey] = clamp((Number(next[statKey]) || 0) + delta, 0, TRAINING_PER_STAT_CAP);
+    const direction = delta >= 0 ? 1 : -1;
+    let remainingSteps = Math.abs(Math.trunc(delta));
+    while (remainingSteps > 0) {
+      if (!canAdjustTrainingStat({ allocation: next, statKey, delta: direction })) break;
+      next[statKey] = clamp((Number(next[statKey]) || 0) + direction, 0, TRAINING_PER_STAT_CAP);
+      remainingSteps -= 1;
+    }
     gameState.monsterTrainingDrafts[monsterId] = next;
+    syncMonsterBuildState(monsterId, gameState);
   };
 
-  const chooseMoveReplacementSlot = (slotIndex) => {
-    gameState.ui.selectedMoveSlot = canReplaceMoveSlot(slotIndex) ? slotIndex : null;
+  const chooseSelectableMoveSlot = (slotIndex) => {
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) return;
+    const selected = gameState.moves?.selected || [];
+    if (!selected[slotIndex]) {
+      gameState.ui.selectedMoveIndex = slotIndex;
+      return;
+    }
+    if (gameState.ui.selectedMoveIndex === null) {
+      gameState.ui.selectedMoveIndex = slotIndex;
+      return;
+    }
+    if (gameState.ui.selectedMoveIndex === slotIndex) {
+      gameState.ui.selectedMoveIndex = null;
+      return;
+    }
+    const next = selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
+    const sourceIndex = gameState.ui.selectedMoveIndex;
+    const temp = next[sourceIndex] || null;
+    next[sourceIndex] = next[slotIndex] || null;
+    next[slotIndex] = temp;
+    gameState.moves.selected = next;
+    gameState.ui.selectedMoveIndex = null;
   };
 
-  const applyMoveReplacement = (monsterId, moveId) => {
-    const monster = UNIT_LIBRARY[monsterId];
-    const slotIndex = gameState.ui.selectedMoveSlot;
-    if (!monster || !canReplaceMoveWithCandidate({ monster, slotIndex, moveId })) return;
-    const draft = getMonsterMoveDraft(monsterId, gameState);
-    draft[slotIndex] = moveId;
-    gameState.monsterMoveDrafts[monsterId] = draft;
+  const assignMoveFromPool = (moveId) => {
+    if (!MOVES[moveId]) return;
+    const selected = Array.isArray(gameState.moves?.selected) ? gameState.moves.selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
+    while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+    if (selected.includes(moveId)) return;
+    const emptyIndex = selected.findIndex((id) => !id);
+    if (emptyIndex < 0) return;
+    selected[emptyIndex] = moveId;
+    gameState.moves.selected = selected;
+  };
+
+  const removeSelectedMove = (slotIndex) => {
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) return;
+    const selected = Array.isArray(gameState.moves?.selected) ? gameState.moves.selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
+    while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+    selected[slotIndex] = null;
+    gameState.moves.selected = selected;
+    if (gameState.ui.selectedMoveIndex === slotIndex) gameState.ui.selectedMoveIndex = null;
+  };
+
+  const stopStatAdjustHold = () => {
+    if (!statAdjustHoldTimer) return;
+    clearInterval(statAdjustHoldTimer);
+    statAdjustHoldTimer = null;
+  };
+
+  const startStatAdjustHold = (statKey, delta, useShiftBoost = false) => {
+    stopStatAdjustHold();
+    const unitDelta = useShiftBoost && Math.abs(delta) === 1 ? delta * 5 : delta;
+    adjustMonsterTrainingStat(gameState.selectedMonsterId, statKey, unitDelta);
+    render();
+    statAdjustHoldTimer = setInterval(() => {
+      adjustMonsterTrainingStat(gameState.selectedMonsterId, statKey, unitDelta);
+      render();
+    }, CONFIG.MONSTER_BUILD.HOLD_REPEAT_INTERVAL_MS);
   };
 
   const saveFormationEdit = () => {
@@ -3179,77 +3292,55 @@
     return wrap;
   };
 
-  const renderMonsterDetailStatusTab = (monster, draft, unlocks) => {
-    const panel = createEl("div", "monster-detail-tab-panel");
-    const remaining = getRemainingTrainingPoints(draft);
-    panel.appendChild(createEl("div", "monster-detail-remaining", `Remaining: ${remaining} / ${TRAINING_TOTAL_CAP}`));
+  const renderMonsterDetailBuildPanel = (monster, draft, unlocks) => {
+    const panel = createEl("div", "monster-build-panel");
+    panel.appendChild(createEl("div", "monster-detail-remaining", `You can allocate ${gameState.monster.remainingPoints} more points`));
     TRAINING_STAT_ROWS.forEach((row) => {
       const line = createEl("div", "training-stat-row");
-      const base = Number(monster[row.baseKey]) || 0;
-      const result = calculateResultingStat(monster, row, draft);
-      const alloc = Number(draft[row.key]) || 0;
+      const base = Number(gameState.monster?.baseStats?.[row.key]) || Number(monster[row.baseKey]) || 0;
+      const value = Number(gameState.monster?.stats?.[row.key]) || calculateResultingStat(monster, row, draft);
+      const delta = value - base;
+      const maxValue = base + TRAINING_PER_STAT_CAP;
+      const fillPercent = maxValue > 0 ? clamp((value / maxValue) * 100, 0, 100) : 0;
+      const fill = createEl("div", `training-stat-fill ${delta > 0 ? "inc" : delta < 0 ? "dec" : ""}`);
+      fill.style.width = `${fillPercent}%`;
+      const bar = createEl("div", "training-stat-bar");
+      bar.appendChild(fill);
+      const controls = createEl("div", "training-stat-controls");
       const minus = createEl("button", "tiny-adjust-btn", "−");
       minus.dataset.action = "monster-training-adjust";
       minus.dataset.statKey = row.key;
       minus.dataset.delta = "-1";
+      const valueBtn = createEl("div", "training-stat-alloc", `${value}`);
       const plus = createEl("button", "tiny-adjust-btn", "+");
       plus.dataset.action = "monster-training-adjust";
       plus.dataset.statKey = row.key;
       plus.dataset.delta = "1";
+      const plus5 = createEl("button", "tiny-adjust-btn alt", "+5");
+      plus5.dataset.action = "monster-training-adjust";
+      plus5.dataset.statKey = row.key;
+      plus5.dataset.delta = "5";
       const canEdit = !!unlocks.statAdjustmentUnlocked;
       minus.disabled = !canEdit || !canAdjustTrainingStat({ allocation: draft, statKey: row.key, delta: -1 });
       plus.disabled = !canEdit || !canAdjustTrainingStat({ allocation: draft, statKey: row.key, delta: 1 });
-      line.append(
-        createEl("div", "training-stat-label", row.label),
-        createEl("div", "training-stat-value", `${base} → ${result}`),
-        minus,
-        createEl("div", "training-stat-alloc", String(alloc)),
-        plus
-      );
+      plus5.disabled = !canEdit || !canAdjustTrainingStat({ allocation: draft, statKey: row.key, delta: 1 });
+      controls.append(minus, valueBtn, plus, plus5);
+      line.append(createEl("div", "training-stat-label", row.label), bar, controls, createEl("div", "training-stat-value", `${base} +${Math.max(0, delta)}`));
       panel.appendChild(line);
     });
-    panel.appendChild(createEl("div", "monster-detail-note", `1能力あたり最大${TRAINING_PER_STAT_CAP} / 合計最大${TRAINING_TOTAL_CAP}`));
+    panel.appendChild(createEl("div", "monster-detail-note", `Shift+クリック/長押しで +5。1 point = +1 stat。上限: stat ${TRAINING_PER_STAT_CAP}, total ${TRAINING_TOTAL_CAP}`));
     if (!unlocks.statAdjustmentUnlocked) panel.appendChild(createEl("div", "lock-chip", "ステータス調整は未解放"));
     return panel;
   };
 
-  const renderMonsterDetailMovesTab = (monster, moveDraft, unlocks) => {
-    const panel = createEl("div", "monster-detail-tab-panel moves");
-    const slots = createEl("div", "move-slot-column");
-    slots.appendChild(createEl("h3", "mini-heading", "現在のわざ"));
-    moveDraft.forEach((moveId, index) => {
-      const move = MOVES[moveId];
-      const isFixed = isFixedMoveSlot(index);
-      const isSelected = gameState.ui.selectedMoveSlot === index;
-      const row = createEl("button", `move-slot-row${isSelected ? " active" : ""}${isFixed ? " fixed" : ""}`);
-      row.dataset.action = "monster-select-move-slot";
-      row.dataset.slotIndex = String(index);
-      row.disabled = isFixed || !unlocks.moveCustomizationUnlocked;
-      row.append(
-        createEl("span", "move-slot-index", `枠${index + 1}`),
-        createEl("span", "move-slot-name", move?.name || "未設定")
-      );
-      if (isFixed) row.appendChild(createEl("span", "fixed-tag", "固定"));
-      slots.appendChild(row);
-    });
-    const candidates = createEl("div", "move-candidate-column");
-    candidates.appendChild(createEl("h3", "mini-heading", "変更可能なわざ"));
-    monster.moves.forEach((moveId) => {
-      const move = MOVES[moveId];
-      if (!move) return;
-      const row = createEl("button", "move-candidate-row", move.name);
-      row.dataset.action = "monster-replace-move";
-      row.dataset.moveId = moveId;
-      row.disabled = !unlocks.moveCustomizationUnlocked || !canReplaceMoveWithCandidate({
-        monster,
-        slotIndex: gameState.ui.selectedMoveSlot,
-        moveId
-      });
-      candidates.appendChild(row);
-    });
-    if (!unlocks.moveCustomizationUnlocked) candidates.appendChild(createEl("div", "lock-chip", "わざカスタムは未解放"));
-    panel.append(slots, candidates);
-    return panel;
+  const renderMoveCard = (move, className = "move-info-card") => {
+    const card = createEl("div", className);
+    card.append(
+      createEl("div", "move-info-name", move?.name || "未設定"),
+      createEl("div", "move-info-meta", `Type: ${move?.type || "-"} / Role: ${MOVE_ROLE_LABELS[getMoveRole(move)] || "-"}`),
+      createEl("div", "move-info-power", getMoveEffectText(move))
+    );
+    return card;
   };
 
   const renderMonsterDetailScreen = () => {
@@ -3261,7 +3352,6 @@
     }
     const unlocks = gameState.trainerCard?.unlocks || createDefaultTrainerCardUnlocks();
     const draft = getMonsterTrainingDraft(monster.id, gameState);
-    const moveDraft = getMonsterMoveDraft(monster.id, gameState);
     const head = createEl("div", "monster-detail-head");
     const portrait = createImageWithFallback({
       src: getAssetPath("portraits", monster.portrait),
@@ -3273,20 +3363,58 @@
     const title = createEl("div", "monster-detail-title-block");
     title.append(createEl("h2", "formation-title", monster.name), createEl("div", "monster-list-sub", `ID: ${monster.id}`));
     head.append(portrait, title);
-    const tabs = createEl("div", "monster-detail-tabs");
-    const statusTab = createEl("button", `monster-tab${gameState.ui.monsterDetailTab === "status" ? " active" : ""}`, "Status");
-    statusTab.dataset.action = "monster-tab";
-    statusTab.dataset.tab = "status";
-    const movesTab = createEl("button", `monster-tab${gameState.ui.monsterDetailTab === "moves" ? " active" : ""}`, "Moves");
-    movesTab.dataset.action = "monster-tab";
-    movesTab.dataset.tab = "moves";
-    tabs.append(statusTab, movesTab);
-    wrap.append(head, tabs);
-    if (gameState.ui.monsterDetailTab === "moves") {
-      wrap.appendChild(renderMonsterDetailMovesTab(monster, moveDraft, unlocks));
-    } else {
-      wrap.appendChild(renderMonsterDetailStatusTab(monster, draft, unlocks));
-    }
+    wrap.append(head);
+    const body = createEl("div", "monster-build-layout");
+    body.appendChild(renderMonsterDetailBuildPanel(monster, draft, unlocks));
+    const movePanel = createEl("div", "monster-moves-panel");
+    const innateSection = createEl("div", "move-section");
+    innateSection.appendChild(createEl("h3", "mini-heading", "Innate Moves"));
+    const innateList = createEl("div", "move-list");
+    (gameState.moves?.innate || []).forEach((moveId) => {
+      const move = MOVES[moveId];
+      if (!move) return;
+      innateList.appendChild(renderMoveCard(move));
+    });
+    innateSection.appendChild(innateList);
+    const selectedSection = createEl("div", "move-section");
+    selectedSection.appendChild(createEl("h3", "mini-heading", "Selectable Moves (up to 4)"));
+    const selectedList = createEl("div", "move-list");
+    (gameState.moves?.selected || []).forEach((moveId, index) => {
+      const row = createEl("div", `move-slot-row${gameState.ui.selectedMoveIndex === index ? " active" : ""}`);
+      row.appendChild(createEl("span", "move-slot-index", `Slot ${index + 1}`));
+      const picker = createEl("button", "move-slot-picker");
+      picker.dataset.action = "monster-select-move-slot";
+      picker.dataset.slotIndex = String(index);
+      picker.disabled = !unlocks.moveCustomizationUnlocked;
+      picker.appendChild(renderMoveCard(MOVES[moveId], "move-info-card compact"));
+      row.appendChild(picker);
+      const remove = createEl("button", "move-remove-btn", "Remove");
+      remove.dataset.action = "monster-remove-selected-move";
+      remove.dataset.slotIndex = String(index);
+      remove.disabled = !unlocks.moveCustomizationUnlocked || !moveId;
+      row.appendChild(remove);
+      selectedList.appendChild(row);
+    });
+    selectedSection.appendChild(selectedList);
+    const poolSection = createEl("div", "move-section");
+    poolSection.appendChild(createEl("h3", "mini-heading", "Move Pool"));
+    const poolList = createEl("div", "move-pool-grid");
+    (gameState.moves?.pool || []).forEach((moveId) => {
+      const move = MOVES[moveId];
+      if (!move) return;
+      const row = createEl("button", "move-candidate-row");
+      row.dataset.action = "monster-pool-pick";
+      row.dataset.moveId = moveId;
+      const alreadySelected = (gameState.moves?.selected || []).includes(moveId);
+      row.disabled = !unlocks.moveCustomizationUnlocked || alreadySelected;
+      row.classList.toggle("disabled-picked", alreadySelected);
+      row.appendChild(renderMoveCard(move, "move-info-card compact"));
+      poolList.appendChild(row);
+    });
+    poolSection.appendChild(poolList);
+    movePanel.append(innateSection, selectedSection, poolSection);
+    body.appendChild(movePanel);
+    wrap.appendChild(body);
     const back = createEl("button", "screen-nav-btn", "Back Monster List");
     back.dataset.action = "back-monster-list";
     wrap.appendChild(back);
@@ -3663,23 +3791,25 @@
       render();
       return;
     }
-    if (a === "monster-tab") {
-      setMonsterDetailTab(target.dataset.tab);
-      render();
-      return;
-    }
     if (a === "monster-training-adjust") {
-      adjustMonsterTrainingStat(gameState.selectedMonsterId, target.dataset.statKey, Number(target.dataset.delta));
+      const baseDelta = Number(target.dataset.delta) || 0;
+      const delta = event.shiftKey && Math.abs(baseDelta) === 1 ? baseDelta * 5 : baseDelta;
+      adjustMonsterTrainingStat(gameState.selectedMonsterId, target.dataset.statKey, delta);
       render();
       return;
     }
     if (a === "monster-select-move-slot") {
-      chooseMoveReplacementSlot(Number(target.dataset.slotIndex));
+      chooseSelectableMoveSlot(Number(target.dataset.slotIndex));
       render();
       return;
     }
-    if (a === "monster-replace-move") {
-      applyMoveReplacement(gameState.selectedMonsterId, target.dataset.moveId);
+    if (a === "monster-pool-pick") {
+      assignMoveFromPool(target.dataset.moveId);
+      render();
+      return;
+    }
+    if (a === "monster-remove-selected-move") {
+      removeSelectedMove(Number(target.dataset.slotIndex));
       render();
       return;
     }
@@ -3719,6 +3849,18 @@
     const pointer = getHomeLocalPointerPosition(event);
     if (updateHomeHoverFromPoint(pointer.x, pointer.y)) render();
   });
+
+  document.addEventListener("mousedown", (event) => {
+    const target = event.target.closest("[data-action='monster-training-adjust']");
+    if (!target || gameState.phase !== PHASE.MONSTER_DETAIL) return;
+    const statKey = target.dataset.statKey;
+    const delta = Number(target.dataset.delta) || 0;
+    if (!statKey || !delta) return;
+    startStatAdjustHold(statKey, delta, event.shiftKey);
+  });
+
+  document.addEventListener("mouseup", stopStatAdjustHold);
+  document.addEventListener("mouseleave", stopStatAdjustHold);
 
   document.addEventListener("mouseleave", () => {
     if (gameState.phase !== PHASE.HOME) return;
@@ -3769,10 +3911,6 @@
     }
 
     if (gameState.phase === PHASE.MONSTER_DETAIL) {
-      if (event.key === "Tab") {
-        event.preventDefault();
-        setMonsterDetailTab(gameState.ui.monsterDetailTab === "status" ? "moves" : "status");
-      }
       if (event.key === "Escape") enterMonsterList();
       render();
       return;
