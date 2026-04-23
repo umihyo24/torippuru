@@ -109,7 +109,11 @@
 
   const ASSETS = {
     backgrounds: { battle: "./assets/backgrounds/background_battle.png" },
-    icons: { attack: "./assets/icons/icon_attack.png", status: "./assets/icons/icon_status.png" },
+    icons: {
+      physical: "./assets/icons/icon_physical.png",
+      special: "./assets/icons/icon_special.png",
+      status: "./assets/icons/icon_status.png"
+    },
     portraits: {
       emberlynx: "./assets/portraits/emberlynx.png",
       hittokage: "./assets/portraits/hittokage.png",
@@ -144,11 +148,11 @@
   };
 
   const MOVES = {
-    clawStrike: { id: "clawStrike", name: "クロー・ストライク", category: "attack", type: "fire", power: 32, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
-    drainBite: { id: "drainBite", name: "ドレインバイト", category: "attack", type: "nature", power: 28, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }] },
-    quakeWave: { id: "quakeWave", name: "クエイクウェーブ", category: "attack", type: "earth", power: 24, patternId: "front3", targetRule: "enemy", targetMode: "allPattern", beforeDamage: [], afterDamage: [] },
-    frostLance: { id: "frostLance", name: "フロストランス", category: "attack", type: "water", power: 34, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
-    toxicSpit: { id: "toxicSpit", name: "トキシックスピット", category: "attack", type: "shadow", power: 18, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    clawStrike: { id: "clawStrike", name: "クロー・ストライク", category: "physical", type: "fire", power: 32, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    drainBite: { id: "drainBite", name: "ドレインバイト", category: "physical", type: "nature", power: 28, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [{ type: "drain", ratio: 0.5 }] },
+    quakeWave: { id: "quakeWave", name: "クエイクウェーブ", category: "physical", type: "earth", power: 24, patternId: "front3", targetRule: "enemy", targetMode: "allPattern", beforeDamage: [], afterDamage: [] },
+    frostLance: { id: "frostLance", name: "フロストランス", category: "special", type: "water", power: 34, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+    toxicSpit: { id: "toxicSpit", name: "トキシックスピット", category: "special", type: "shadow", power: 18, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
     ironGuard: { id: "ironGuard", name: "アイアンガード", category: "status", type: "earth", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "barrier", duration: 2 }], afterDamage: [] },
     rallyHowl: { id: "rallyHowl", name: "ラリーハウル", category: "status", type: "light", power: 0, patternId: "allyAdjacent", targetRule: "allyOtherSingle", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "atkUp", duration: 2 }], afterDamage: [] },
     shellStance: { id: "shellStance", name: "シェルスタンス", category: "status", type: "water", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }], afterDamage: [] },
@@ -168,7 +172,7 @@
     precisionStrike: {
       id: "precisionStrike",
       name: "クリティカルテスト",
-      category: "attack",
+      category: "physical",
       type: "light",
       power: 26,
       patternId: "singleAttackReach",
@@ -195,17 +199,17 @@
   };
 
   const UNIT_LIBRARY = {
-    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 88, atk: 38, def: 22, spd: 35, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 94, atk: 34, def: 26, spd: 27, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 114, atk: 42, def: 33, spd: 18, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
-    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 96, atk: 28, def: 30, spd: 18, abilityId: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
-    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 82, atk: 34, def: 24, spd: 37, abilityId: null, moves: ["frostLance", "precisionStrike", "rallyHowl", "shellStance"] },
-    sandko: { id: "sandko", name: "サンドコ", portrait: "sandko", hp: 92, atk: 30, def: 24, spd: 40, abilityId: "battleRhythm", moves: ["frostLance", "precisionStrike", "focusMind", "shellStance"] },
-    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 70, atk: 30, def: 18, spd: 42, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
-    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 108, atk: 36, def: 34, spd: 15, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
-    wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 90, atk: 37, def: 23, spd: 33, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
-    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 35, def: 36, spd: 12, abilityId: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
-    shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 85, atk: 34, def: 21, spd: 39, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
+    emberlynx: { id: "emberlynx", name: "エンバーリンクス", portrait: "emberlynx", hp: 80, atk: 95, mag: 60, def: 60, res: 55, spd: 90, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    hittokage: { id: "hittokage", name: "ヒットカゲ", portrait: "hittokage", hp: 90, atk: 85, mag: 60, def: 70, res: 65, spd: 70, abilityId: "venomTouch", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    maguma: { id: "maguma", name: "マグマ", portrait: "maguma", hp: 110, atk: 110, mag: 55, def: 95, res: 65, spd: 45, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    mossblob: { id: "mossblob", name: "モスブロブ", portrait: "mossblob", hp: 95, atk: 65, mag: 75, def: 90, res: 85, spd: 70, abilityId: "battleRhythm", moves: ["quakeWave", "drainBite", "ironGuard", "shellStance"] },
+    frostfang: { id: "frostfang", name: "フロストファング", portrait: "frostfang", hp: 75, atk: 80, mag: 95, def: 60, res: 70, spd: 100, abilityId: null, moves: ["frostLance", "precisionStrike", "rallyHowl", "shellStance"] },
+    sandko: { id: "sandko", name: "サンドコ", portrait: "sandko", hp: 85, atk: 70, mag: 85, def: 65, res: 70, spd: 105, abilityId: "battleRhythm", moves: ["frostLance", "precisionStrike", "focusMind", "shellStance"] },
+    stormimp: { id: "stormimp", name: "ストームインプ", portrait: "stormimp", hp: 65, atk: 55, mag: 100, def: 45, res: 70, spd: 105, abilityId: null, moves: ["toxicSpit", "clawStrike", "focusMind", "precisionStrike"] },
+    ironboar: { id: "ironboar", name: "アイアンボア", portrait: "ironboar", hp: 105, atk: 100, mag: 40, def: 100, res: 65, spd: 70, abilityId: "openingSurge", moves: ["quakeWave", "clawStrike", "ironGuard", "rallyHowl"] },
+    wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 85, atk: 95, mag: 70, def: 65, res: 65, spd: 100, abilityId: null, moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
+    golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 90, mag: 40, def: 110, res: 50, spd: 40, abilityId: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
+    shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 80, atk: 55, mag: 100, def: 55, res: 70, spd: 120, abilityId: null, moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] }
   };
   const INITIAL_PARTY = {
     ally: ["maguma", "sandko", "frostfang", "emberlynx", "hittokage", "stormimp"],
@@ -233,6 +237,18 @@
     venomTouch: "ベノムタッチ",
     battleRhythm: "バトルリズム",
     openingSurge: "オープニングサージ"
+  };
+
+  const MOVE_CATEGORY_LABELS = {
+    physical: "物理",
+    special: "特殊",
+    status: "補助"
+  };
+
+  const MOVE_CATEGORY_FALLBACK_ICON = {
+    physical: "PH",
+    special: "SP",
+    status: "ST"
   };
 
   const createEmptyFormation = () => Array.from({ length: FORMATION_MEMBER_COUNT }, () => null);
@@ -306,7 +322,9 @@
       hp: base.hp,
       maxHp: base.hp,
       atk: base.atk,
+      mag: base.mag,
       def: base.def,
+      res: base.res,
       spd: base.spd,
       abilityId: base.abilityId,
       moveIds: [...base.moves],
@@ -461,6 +479,24 @@
     log: [],
       temp: { renderCells: [] }
     });
+  };
+
+  const MONSTER_STAT_KEYS = ["hp", "atk", "mag", "def", "res", "spd"];
+
+  const validateUnitLibraryStats = () => {
+    const rows = Object.values(UNIT_LIBRARY).map((unit) => {
+      const total = MONSTER_STAT_KEYS.reduce((sum, key) => sum + (Number(unit[key]) || 0), 0);
+      const allMultiplesOfFive = MONSTER_STAT_KEYS.every((key) => ((Number(unit[key]) || 0) % 5) === 0);
+      return { id: unit.id, total, allMultiplesOfFive };
+    });
+    console.table(rows);
+    const sampleAttackerPhysical = createUnit("maguma", TEAM.ALLY, "debug-phy");
+    const sampleAttackerSpecial = createUnit("stormimp", TEAM.ALLY, "debug-sp");
+    const sampleDefender = createUnit("golem", TEAM.ENEMY, "debug-def");
+    console.log("[Debug] golem receiving physical damage (maguma quakeWave):", calcDamage(sampleAttackerPhysical, sampleDefender, MOVES.quakeWave, { isCritical: false }));
+    console.log("[Debug] golem receiving special damage (stormimp toxicSpit):", calcDamage(sampleAttackerSpecial, sampleDefender, MOVES.toxicSpit, { isCritical: false }));
+    console.log("[Debug] stormimp using special move toxicSpit:", calcDamage(sampleAttackerSpecial, sampleDefender, MOVES.toxicSpit, { isCritical: false }));
+    console.log("[Debug] maguma using physical move quakeWave:", calcDamage(sampleAttackerPhysical, sampleDefender, MOVES.quakeWave, { isCritical: false }));
   };
 
   let gameState = createInitialState();
@@ -702,8 +738,24 @@
     return value;
   };
 
+  const isDamageMoveCategory = (category) => category === "physical" || category === "special";
+
+  const getAttackStatForMove = (attacker, move) => {
+    if (!attacker || !move) return 0;
+    if (move.category === "physical") return getEffectiveStat(attacker, "atk");
+    if (move.category === "special") return getEffectiveStat(attacker, "mag");
+    return 0;
+  };
+
+  const getDefenseStatForMove = (defender, move, options = {}) => {
+    if (!defender || !move) return 0;
+    if (move.category === "physical") return getEffectiveStat(defender, "def", options);
+    if (move.category === "special") return getEffectiveStat(defender, "res", options);
+    return 0;
+  };
+
   const isCriticalHit = (attacker, move) => {
-    if (!attacker || !move || move.category !== "attack") return false;
+    if (!attacker || !move || !isDamageMoveCategory(move.category)) return false;
     if (move.guaranteedCrit || move.alwaysCrit) return true;
     const critStage = clamp(Number(attacker?.buffs?.critStage) || 0, 0, CONFIG.CRIT_STAGE_MAX);
     const bonus = Number(move.critRateBonus) || 0;
@@ -713,13 +765,15 @@
 
   const calcDamage = (attacker, defender, move, options = {}) => {
     const { isCritical = false } = options;
-    const atk = getEffectiveStat(attacker, "atk") + Math.floor(move.power / 10);
-    const def = getEffectiveStat(defender, "def", { ignoreDefUp: isCritical });
+    const atk = getAttackStatForMove(attacker, move) + Math.floor(move.power / 10);
+    const def = getDefenseStatForMove(defender, move, { ignoreDefUp: isCritical });
     let dmg = Math.max(1, atk - def);
     if (!isCritical && findStatus(defender.statuses, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
     if (isCritical) dmg = Math.max(1, Math.floor(dmg * CONFIG.CRIT_MULTIPLIER));
     return Math.min(dmg, defender.hp);
   };
+
+  validateUnitLibraryStats();
 
   const addStatus = (unit, statusKind, duration) => {
     const next = cloneStatus(statusKind, duration);
@@ -935,7 +989,7 @@
     if (!attacker || !defender || !moveId) return null;
     const move = MOVES[moveId];
     if (!move) return null;
-    if (move.category !== "attack") return false;
+    if (!isDamageMoveCategory(move.category)) return false;
     if (!patterns[move.patternId]) return null;
     const reachable = getPatternPositionsForMove(attacker, move);
     const targetPos = toBoardPos(defender.team, defender.slot);
@@ -950,7 +1004,7 @@
     for (const moveId of moveIds) {
       const move = MOVES[moveId];
       if (!move) return true;
-      if (move.category !== "attack") continue;
+      if (!isDamageMoveCategory(move.category)) continue;
       checkedAnyAttackMove = true;
       const canReach = canMoveReachTarget(attacker, defender, moveId);
       if (canReach === null) return true;
@@ -1182,7 +1236,7 @@
           }
         });
 
-        if (move.category === "attack") {
+        if (isDamageMoveCategory(move.category)) {
           const damage = calcDamage(actor, target, move, { isCritical });
           target.hp = clamp(target.hp - damage, 0, target.maxHp);
           targetResult.damage = damage;
@@ -1782,7 +1836,7 @@
 
   const scoreAction = ({ actor, move, target }) => {
     if (!target) return { score: -1, dmg: 0 };
-    if (move.category !== "attack") return { score: 2, dmg: 0 };
+    if (!isDamageMoveCategory(move.category)) return { score: 2, dmg: 0 };
     const dmg = calcDamage(actor, target, move, { isCritical: isCriticalHit(actor, move) });
     return { score: dmg >= target.hp ? 999 + dmg : dmg, dmg };
   };
@@ -2177,6 +2231,20 @@
 
   const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
 
+  const getMoveCategoryIconPath = (category) => getAssetPath("icons", category);
+
+  const renderMoveTypeIcon = (move) => {
+    const category = move?.category || "status";
+    const wrapper = createImageWithFallback({
+      src: getMoveCategoryIconPath(category),
+      alt: `${MOVE_CATEGORY_LABELS[category] || category} icon`,
+      wrapperClass: "move-icon-asset",
+      placeholderLabel: MOVE_CATEGORY_FALLBACK_ICON[category] || "MV",
+      placeholderSubLabel: "TYPE"
+    });
+    return wrapper;
+  };
+
   const formatEnemyHpPercent = (unit, hp) => `${Math.round((hp / unit.maxHp) * 100)}%`;
   const formatAllyHp = (unit, hp) => `${hp} / ${unit.maxHp}`;
   const getHpRatio = (unit, hp) => {
@@ -2525,7 +2593,13 @@
         btn.dataset.action = "pick-move";
         btn.dataset.moveId = moveId;
         btn.disabled = isPlaybackBusy();
-        btn.appendChild(createEl("div", "move-name", move.name));
+        const iconBadge = createEl("div", `move-icon-badge move-icon-${move.category}`, MOVE_CATEGORY_FALLBACK_ICON[move.category] || "MV");
+        iconBadge.title = `分類: ${MOVE_CATEGORY_LABELS[move.category] || move.category}`;
+        iconBadge.appendChild(renderMoveTypeIcon(move));
+        const details = createEl("div", "move-detail");
+        details.appendChild(createEl("div", "move-name", move.name));
+        details.appendChild(createEl("div", "move-meta", `${MOVE_CATEGORY_LABELS[move.category] || move.category} / 威力 ${move.power}`));
+        btn.append(iconBadge, details);
         moves.appendChild(btn);
       });
       wrap.appendChild(moves);
