@@ -1311,10 +1311,11 @@ button:disabled {
   gap: var(--mb-column-gap, 10px);
   align-items: start;
   min-height: 0;
+  height: 100%;
 }
 
 .monster-detail-screen {
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
@@ -1322,14 +1323,19 @@ button:disabled {
 .monster-detail-actions {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: space-between;
+  padding-top: 6px;
+}
+
+.monster-detail-actions.in-panel {
   border-top: 1px solid rgba(132, 154, 201, 0.4);
-  padding-top: 8px;
+  margin-top: 4px;
 }
 
 .monster-build-left-panel {
   display: grid;
   gap: var(--mb-section-gap, 8px);
+  grid-template-rows: auto auto auto auto auto;
   min-height: 0;
 }
 
@@ -1364,17 +1370,52 @@ button:disabled {
   gap: var(--mb-stat-row-gap, 4px);
 }
 
+.monster-nature-panel {
+  border: 1px solid #667598;
+  border-radius: 10px;
+  background: rgba(16, 23, 38, 0.88);
+  padding: var(--mb-panel-padding, 10px);
+  display: grid;
+  gap: 6px;
+}
+
+.nature-option-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.nature-option-btn {
+  border: 1px solid #5f7097;
+  background: rgba(21, 32, 52, 0.9);
+  color: #e8f1ff;
+  border-radius: 7px;
+  padding: 6px;
+  font-weight: 700;
+}
+
+.nature-option-btn.active {
+  background: #e8cd54;
+  color: #172238;
+  border-color: #ffe163;
+}
+
 .monster-moves-panel {
   border: 1px solid #667598;
   border-radius: 10px;
   background: rgba(12, 19, 32, 0.82);
   padding: var(--mb-panel-padding, 10px);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--mb-section-gap, 8px);
-  overflow-y: auto;
   max-height: 100%;
   min-height: 0;
+}
+
+.monster-move-list-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
 }
 
 .monster-detail-remaining {
@@ -1434,6 +1475,11 @@ button:disabled {
 .move-section-secondary { opacity: 0.82; }
 .move-list,
 .move-pool-grid { display: grid; gap: 4px; }
+.move-pool-grid {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+}
 .mini-heading { margin: 0; font-size: 13px; }
 .move-slot-row,
 .move-candidate-row {
@@ -1475,6 +1521,11 @@ button:disabled {
 .move-candidate-row.disabled-picked {
   filter: grayscale(1);
   opacity: 0.45;
+}
+
+.screen-nav-btn.danger {
+  background: #8f2323;
+  border-color: #bf4f4f;
 }
 
 .lock-chip {
