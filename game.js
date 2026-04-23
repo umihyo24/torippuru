@@ -104,6 +104,9 @@
   };
 
   const TEAM = { ALLY: "ally", ENEMY: "enemy" };
+  const DEBUG_FLAGS = {
+    battleTargeting: true
+  };
   const PHASE = { HOME: "home", FORMATION: "formation", FORMATION_EDIT: "formation_edit", BATTLE_PREPARE: "battle_prepare", PLAYING: "playing", GAMEOVER: "gameover" };
   const HOME_MENU_ITEMS = ["Battle", "Formation", "Story", "Gacha", "Settings"];
 
@@ -666,11 +669,63 @@
   const getTeamState = (state, team) => state.teams[team];
   const toBoardPos = (team, slot) => ({ x: slot, y: team === TEAM.ENEMY ? 0 : 1 });
   const inBounds = (pos) => pos.x >= 0 && pos.x < CONFIG.BOARD_COLS && pos.y >= 0 && pos.y < CONFIG.BOARD_ROWS;
+  const isValidTeamValue = (team) => team === TEAM.ALLY || team === TEAM.ENEMY;
+
+  const debugBattleLog = (...args) => {
+    if (!DEBUG_FLAGS.battleTargeting) return;
+    console.debug("[battle-debug]", ...args);
+  };
+
+  const validateUnitTeam = (unit, expectedTeam = null, context = "") => {
+    if (!unit) return false;
+    if (!isValidTeamValue(unit.team)) {
+      console.warn("[battle-debug] Invalid team value", { context, uid: unit.uid, name: unit.name, team: unit.team, expectedTeam });
+      return false;
+    }
+    if (expectedTeam && unit.team !== expectedTeam) {
+      console.warn("[battle-debug] Team mismatch", { context, uid: unit.uid, name: unit.name, team: unit.team, expectedTeam });
+      return false;
+    }
+    return true;
+  };
+
+  const inferTeamFromBoardPosition = (pos) => (pos.y === 0 ? TEAM.ENEMY : TEAM.ALLY);
+
+  const debugLogBattleTeams = (state, context = "battle-start") => {
+    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+      const teamState = state?.teams?.[team];
+      if (!teamState) return;
+      const allUnits = [
+        ...(Array.isArray(teamState.active) ? teamState.active : []),
+        ...(Array.isArray(teamState.reserve) ? teamState.reserve : [])
+      ].filter(Boolean);
+      allUnits.forEach((unit) => validateUnitTeam(unit, team, context));
+      const activeSummary = (teamState.active || [])
+        .map((unit, slot) => (unit ? { name: unit.name, uid: unit.uid, team: unit.team, slot } : null))
+        .filter(Boolean);
+      const reserveSummary = (teamState.reserve || [])
+        .filter(Boolean)
+        .map((unit, index) => ({ name: unit.name, uid: unit.uid, team: unit.team, slot: `r${index}` }));
+      debugBattleLog(`${context}:${team}:active`, activeSummary);
+      debugBattleLog(`${context}:${team}:reserve`, reserveSummary);
+    });
+  };
 
   const getUnitAtFromState = (state, pos) => {
     if (!inBounds(pos)) return null;
-    const team = pos.y === 0 ? TEAM.ENEMY : TEAM.ALLY;
-    return state.teams[team].active[pos.x] || null;
+    const inferredTeam = inferTeamFromBoardPosition(pos);
+    const unit = state.teams[inferredTeam].active[pos.x] || null;
+    if (unit && unit.team !== inferredTeam) {
+      console.warn("[battle-debug] Board side/team mismatch", {
+        uid: unit.uid,
+        name: unit.name,
+        unitTeam: unit.team,
+        inferredTeam,
+        slot: unit.slot,
+        boardPos: pos
+      });
+    }
+    return unit;
   };
 
   const getLivingMonsters = (team, state = gameState) => {
@@ -873,6 +928,8 @@
 
     const incoming = teamState.reserve[reserveIndex];
     if (!incoming || !isAlive(incoming)) return null;
+    if (!validateUnitTeam(incoming, team, "replaceActiveUnitFromReserve:incoming")) return null;
+    if (!validateUnitTeam(outgoing, team, "replaceActiveUnitFromReserve:outgoing")) return null;
 
     teamState.active[slot] = incoming;
     incoming.slot = slot;
@@ -948,15 +1005,55 @@
     return { messages, statusApplies };
   };
 
-  const getValidTargetsForMoveInState = (state, actor, move) => {
-    const isRuleMatch = (targetUnit) => {
-      if (!targetUnit || !isAlive(targetUnit)) return false;
-      if (move.targetRule === "enemy") return targetUnit.team !== actor.team;
-      if (move.targetRule === "selfOnly") return targetUnit.uid === actor.uid;
-      if (move.targetRule === "allyOtherSingle") return targetUnit.team === actor.team && targetUnit.uid !== actor.uid;
-      if (move.targetRule === "anyOtherSingle") return targetUnit.uid !== actor.uid;
+  const isEnemyOnlyTargetRule = (move) => move?.targetRule === "enemy"
+    || (isDamageMoveCategory(move?.category) && move?.targetRule === "anyOtherSingle");
+
+  const isRuleMatchForTarget = (actor, move, targetUnit) => {
+    if (!actor || !move || !targetUnit || !isAlive(targetUnit)) return false;
+    if (!validateUnitTeam(actor, null, "isRuleMatchForTarget:actor")) return false;
+    if (!validateUnitTeam(targetUnit, null, "isRuleMatchForTarget:target")) return false;
+    if (move.targetRule === "selfOnly") return targetUnit.uid === actor.uid;
+    if (move.targetRule === "allyOtherSingle") return targetUnit.team === actor.team && targetUnit.uid !== actor.uid;
+    if (move.targetRule === "anyOtherSingle") {
+      if (targetUnit.uid === actor.uid) return false;
+      if (isEnemyOnlyTargetRule(move)) return targetUnit.team !== actor.team;
       return true;
-    };
+    }
+    if (move.targetRule === "enemy") return targetUnit.team !== actor.team;
+    return true;
+  };
+
+  const validateTargetingContext = (actor, target, move, context = "resolve") => {
+    if (!actor || !target || !move) return false;
+    const valid = isRuleMatchForTarget(actor, move, target);
+    debugBattleLog(`${context}:target`, {
+      actorName: actor.name,
+      actorUid: actor.uid,
+      actorTeam: actor.team,
+      moveId: move.id,
+      moveTargetRule: move.targetRule,
+      targetName: target.name,
+      targetUid: target.uid,
+      targetTeam: target.team,
+      valid
+    });
+    if (isDamageMoveCategory(move.category) && isEnemyOnlyTargetRule(move) && actor.team === target.team) {
+      console.warn("[battle-debug] Illegal same-team damaging target rejected", {
+        actorName: actor.name,
+        actorUid: actor.uid,
+        actorTeam: actor.team,
+        moveId: move.id,
+        moveTargetRule: move.targetRule,
+        targetName: target.name,
+        targetUid: target.uid,
+        targetTeam: target.team
+      });
+      return false;
+    }
+    return valid;
+  };
+
+  const getValidTargetsForMoveInState = (state, actor, move) => {
     const actorPos = toBoardPos(actor.team, actor.slot);
     const orientation = actor.team === TEAM.ALLY ? 1 : -1;
     const offsets = patterns[move.patternId] || [];
@@ -964,7 +1061,7 @@
       .map((o) => ({ x: actorPos.x + o.x, y: actorPos.y + (o.y * orientation) }))
       .filter(inBounds)
       .map((pos) => ({ pos, unit: getUnitAtFromState(state, pos) }))
-      .filter(({ unit }) => isRuleMatch(unit))
+      .filter(({ unit }) => isRuleMatchForTarget(actor, move, unit))
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
   };
 
@@ -977,12 +1074,7 @@
   };
 
   const isRuleMatchAtPosition = (actor, move, targetUnit) => {
-    if (!targetUnit || !isAlive(targetUnit)) return false;
-    if (move.targetRule === "enemy") return targetUnit.team !== actor.team;
-    if (move.targetRule === "selfOnly") return targetUnit.uid === actor.uid;
-    if (move.targetRule === "allyOtherSingle") return targetUnit.team === actor.team && targetUnit.uid !== actor.uid;
-    if (move.targetRule === "anyOtherSingle") return targetUnit.uid !== actor.uid;
-    return true;
+    return isRuleMatchForTarget(actor, move, targetUnit);
   };
 
   const canMoveReachTarget = (attacker, defender, moveId) => {
@@ -1206,6 +1298,13 @@
       }
       const move = MOVES[action.moveId];
       if (!move) return;
+      debugBattleLog("actor-before-action", {
+        actorName: actor.name,
+        actorUid: actor.uid,
+        actorTeam: actor.team,
+        moveId: move.id,
+        moveTargetRule: move.targetRule
+      });
       const patternPositions = getPatternPositionsForMove(actor, move);
       const targets = move.targetMode === "single"
         ? (action.targetPos ? [{ x: action.targetPos.x, y: action.targetPos.y }] : [])
@@ -1217,7 +1316,7 @@
         if (!inBounds(targetPos)) return;
         if (!patternPositions.some((p) => p.x === targetPos.x && p.y === targetPos.y)) return;
         const target = getUnitAtFromState(sim, targetPos);
-        if (!isRuleMatchAtPosition(actor, move, target)) return;
+        if (!validateTargetingContext(actor, target, move, "resolveTurn")) return;
         const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false, isCritical: false };
 
         move.beforeDamage.forEach((effect) => {
@@ -2123,6 +2222,7 @@
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: UNIT_LIBRARY[unitId].hp, hp: UNIT_LIBRARY[unitId].hp, statuses: [] }));
     nextState.battle.enemy.activeIndex = 0;
     gameState = nextState;
+    debugLogBattleTeams(gameState, "battle-start");
     setPhase(PHASE.PLAYING);
     initializePlanningTurn();
   };
