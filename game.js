@@ -81,6 +81,12 @@
       FORMATION_LIST_WIDTH: 740,
       FORMATION_LIST_ITEM_HEIGHT: 56,
       FORMATION_LIST_SPACING_Y: 8,
+      BATTLE_PREPARE_LIST_ITEM_HEIGHT: 192,
+      BATTLE_PREPARE_SLOT_LABEL_HEIGHT: 22,
+      BATTLE_PREPARE_PREVIEW_HEIGHT: 132,
+      BATTLE_PREPARE_GRID_COLUMNS: 3,
+      BATTLE_PREPARE_GRID_ROWS: 2,
+      BATTLE_PREPARE_SUMMARY_HEIGHT: 16,
       FRONT_SLOT_COLOR: "rgba(74, 113, 166, 0.28)",
       RESERVE_SLOT_COLOR: "rgba(89, 122, 96, 0.26)"
     },
@@ -1023,14 +1029,87 @@
     return true;
   };
 
-  const formatFormationPreview = (formation) => {
-    if (!Array.isArray(formation) || !formation.length) return ["EMPTY"];
-    const out = [];
-    for (let i = 0; i < FORMATION_MEMBER_COUNT; i += 1) {
-      const unitId = formation[i] || null;
-      out.push(unitId ? getUnitName(unitId) : "EMPTY");
+  const getFormationMembers = (formation) => {
+    const memberIds = getFormationUnitIds(formation).slice(0, FORMATION_MEMBER_COUNT);
+    return memberIds.map((unitId) => {
+      const unit = UNIT_LIBRARY[unitId];
+      return unit ? { unitId, unit } : null;
+    }).filter(Boolean);
+  };
+
+  const getMiniMonsterMetaTokens = (unit) => {
+    if (!unit || typeof unit !== "object") return [];
+    const tokens = [];
+    if (unit.gender === "male") tokens.push("♂");
+    if (unit.gender === "female") tokens.push("♀");
+    if (typeof unit.role === "string" && unit.role.trim()) tokens.push(unit.role.trim().toUpperCase());
+    if (Array.isArray(unit.types) && unit.types.length > 0 && typeof unit.types[0] === "string" && unit.types[0].trim()) {
+      tokens.push(unit.types[0].trim());
     }
-    return out;
+    return tokens.slice(0, 2);
+  };
+
+  const renderMiniMonsterCard = (unitId, cardIndex = 0) => {
+    const unit = unitId ? UNIT_LIBRARY[unitId] : null;
+    if (!unit) {
+      const missing = createEl("div", "mini-monster-card is-missing");
+      missing.append(
+        createEl("div", "mini-monster-empty", "不明"),
+        createEl("div", "mini-monster-name", "データなし")
+      );
+      return missing;
+    }
+    const card = createEl("div", "mini-monster-card");
+    const portrait = createImageWithFallback({
+      src: getAssetPath("portraits", unit.portrait),
+      alt: unit.name,
+      wrapperClass: "mini-monster-portrait",
+      placeholderLabel: "未設定",
+      placeholderSubLabel: unit.name
+    });
+    const name = createEl("div", "mini-monster-name", unit.name || `Monster ${cardIndex + 1}`);
+    const metaTokens = getMiniMonsterMetaTokens(unit);
+    const meta = createEl("div", `mini-monster-meta${metaTokens.length ? "" : " hidden"}`);
+    if (metaTokens.length) meta.textContent = metaTokens.join(" · ");
+    card.append(portrait, name, meta);
+    return card;
+  };
+
+  const renderFormationPreview = (formation) => {
+    const preview = createEl("div", "formation-preview-grid");
+    const members = getFormationUnitIds(formation).slice(0, FORMATION_MEMBER_COUNT);
+    if (!members.length) {
+      const empty = createEl("div", "formation-empty-state");
+      empty.append(
+        createEl("div", "formation-empty-title", "未編成"),
+        createEl("div", "formation-empty-sub", "モンスターを設定してください")
+      );
+      preview.appendChild(empty);
+      return preview;
+    }
+    members.forEach((unitId, index) => {
+      preview.appendChild(renderMiniMonsterCard(unitId, index));
+    });
+    return preview;
+  };
+
+  const renderFormationSlotCard = ({
+    formation,
+    index,
+    isSelected = false,
+    action = "formation-select",
+    showSummary = false
+  } = {}) => {
+    const item = createEl("button", `formation-slot-item formation-preview-card${isSelected ? " active" : ""}`);
+    item.dataset.action = action;
+    item.dataset.index = String(getSafeFormationSlot(index));
+    item.appendChild(createEl("div", "formation-slot-name", `Slot ${index + 1}`));
+    item.appendChild(renderFormationPreview(formation));
+    if (showSummary) {
+      const members = getFormationMembers(formation);
+      item.appendChild(createEl("div", "formation-slot-summary", `メンバー ${members.length}/${FORMATION_MEMBER_COUNT}`));
+    }
+    return item;
   };
 
   const getHomeInfo = (index, state) => {
@@ -3853,19 +3932,25 @@
     wrap.style.setProperty("--formation-list-x", `${CONFIG.UI.FORMATION_LIST_X}px`);
     wrap.style.setProperty("--formation-list-y", `${CONFIG.UI.FORMATION_LIST_Y}px`);
     wrap.style.setProperty("--formation-list-width", `${CONFIG.UI.FORMATION_LIST_WIDTH}px`);
-    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT}px`);
+    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.BATTLE_PREPARE_LIST_ITEM_HEIGHT}px`);
     wrap.style.setProperty("--formation-list-spacing-y", `${CONFIG.UI.FORMATION_LIST_SPACING_Y}px`);
+    wrap.style.setProperty("--formation-slot-label-height", `${CONFIG.UI.BATTLE_PREPARE_SLOT_LABEL_HEIGHT}px`);
+    wrap.style.setProperty("--formation-preview-height", `${CONFIG.UI.BATTLE_PREPARE_PREVIEW_HEIGHT}px`);
+    wrap.style.setProperty("--formation-preview-cols", `${CONFIG.UI.BATTLE_PREPARE_GRID_COLUMNS}`);
+    wrap.style.setProperty("--formation-preview-rows", `${CONFIG.UI.BATTLE_PREPARE_GRID_ROWS}`);
+    wrap.style.setProperty("--formation-summary-height", "0px");
     wrap.appendChild(createEl("h2", "formation-title", "Formation"));
     const list = createEl("div", "formation-slot-list");
     for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
       const formation = getFormationAt(gameState, i);
-      const lines = formatFormationPreview(formation).join(" / ");
       const isSelected = i === gameState.ui.formationIndex;
-      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}`);
-      item.dataset.action = "formation-select";
-      item.dataset.index = String(i);
-      item.append(createEl("div", "formation-slot-name", `Slot ${i + 1}`), createEl("div", "formation-slot-value", lines));
-      list.appendChild(item);
+      list.appendChild(renderFormationSlotCard({
+        formation,
+        index: i,
+        isSelected,
+        action: "formation-select",
+        showSummary: false
+      }));
     }
     wrap.appendChild(list);
     const buttons = createEl("div", "screen-button-row");
@@ -4361,19 +4446,25 @@
     wrap.style.setProperty("--formation-list-x", `${CONFIG.UI.FORMATION_LIST_X}px`);
     wrap.style.setProperty("--formation-list-y", `${CONFIG.UI.FORMATION_LIST_Y}px`);
     wrap.style.setProperty("--formation-list-width", `${CONFIG.UI.FORMATION_LIST_WIDTH}px`);
-    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.FORMATION_LIST_ITEM_HEIGHT}px`);
+    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.BATTLE_PREPARE_LIST_ITEM_HEIGHT}px`);
     wrap.style.setProperty("--formation-list-spacing-y", `${CONFIG.UI.FORMATION_LIST_SPACING_Y}px`);
+    wrap.style.setProperty("--formation-slot-label-height", `${CONFIG.UI.BATTLE_PREPARE_SLOT_LABEL_HEIGHT}px`);
+    wrap.style.setProperty("--formation-preview-height", `${CONFIG.UI.BATTLE_PREPARE_PREVIEW_HEIGHT}px`);
+    wrap.style.setProperty("--formation-preview-cols", `${CONFIG.UI.BATTLE_PREPARE_GRID_COLUMNS}`);
+    wrap.style.setProperty("--formation-preview-rows", `${CONFIG.UI.BATTLE_PREPARE_GRID_ROWS}`);
+    wrap.style.setProperty("--formation-summary-height", `${CONFIG.UI.BATTLE_PREPARE_SUMMARY_HEIGHT}px`);
     wrap.appendChild(createEl("h2", "formation-title", "Battle Prepare"));
     const list = createEl("div", "formation-slot-list");
     for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
       const formation = getFormationAt(gameState, i);
-      const lines = formatFormationPreview(formation).join(" / ");
       const isSelected = i === gameState.ui.battlePrepareIndex;
-      const item = createEl("button", `formation-slot-item${isSelected ? " active" : ""}`);
-      item.dataset.action = "battle-prepare-select";
-      item.dataset.index = String(i);
-      item.append(createEl("div", "formation-slot-name", `Slot ${i + 1}`), createEl("div", "formation-slot-value", lines));
-      list.appendChild(item);
+      list.appendChild(renderFormationSlotCard({
+        formation,
+        index: i,
+        isSelected,
+        action: "battle-prepare-select",
+        showSummary: true
+      }));
     }
     const buttons = createEl("div", "screen-button-row");
     const start = createEl("button", "screen-nav-btn", "Start Battle");
