@@ -1091,6 +1091,121 @@ button:disabled {
 .formation-slot-item {
   min-height: var(--formation-list-item-height);
   cursor: pointer;
+  display: grid;
+  grid-template-rows: minmax(var(--formation-slot-label-height, 22px), auto) minmax(var(--formation-preview-height, 26px), 1fr) minmax(var(--formation-summary-height, 0px), auto);
+  gap: 8px;
+}
+
+.formation-preview-card {
+  padding: 10px;
+}
+
+.formation-slot-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.formation-preview-grid {
+  width: 100%;
+  height: 100%;
+  min-height: var(--formation-preview-height, 96px);
+  border: 1px solid rgba(123, 153, 209, 0.35);
+  border-radius: 8px;
+  background: linear-gradient(165deg, rgba(20, 29, 45, 0.9), rgba(10, 18, 30, 0.86));
+  padding: 6px;
+  display: grid;
+  grid-template-columns: repeat(var(--formation-preview-cols, 3), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--formation-preview-rows, 2), minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mini-monster-card {
+  min-width: 0;
+  border: 1px solid rgba(110, 132, 182, 0.5);
+  border-radius: 7px;
+  background: rgba(28, 39, 63, 0.9);
+  padding: 4px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 2px;
+}
+
+.mini-monster-card.is-missing {
+  border-style: dashed;
+  place-items: center;
+  align-content: center;
+}
+
+.mini-monster-portrait {
+  min-height: 32px;
+  height: 100%;
+  border-radius: 5px;
+}
+
+.mini-monster-portrait .img-placeholder-label {
+  font-size: 10px;
+}
+
+.mini-monster-portrait .img-placeholder-sub {
+  font-size: 8px;
+}
+
+.mini-monster-name,
+.mini-monster-meta,
+.mini-monster-empty {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-monster-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ebf2ff;
+}
+
+.mini-monster-meta {
+  font-size: 9px;
+  color: #b7cbf3;
+}
+
+.mini-monster-meta.hidden {
+  display: none;
+}
+
+.mini-monster-empty {
+  font-size: 11px;
+  color: #d3e2ff;
+}
+
+.formation-empty-state {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  border: 1px dashed rgba(132, 158, 210, 0.45);
+  border-radius: 8px;
+  background: rgba(16, 25, 40, 0.84);
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.formation-empty-title {
+  font-size: 14px;
+  color: #d3e3ff;
+  letter-spacing: 0.05em;
+}
+
+.formation-empty-sub {
+  font-size: 10px;
+  color: #8ea8db;
+}
+
+.formation-slot-summary {
+  font-size: 11px;
+  color: #b9cbee;
+  letter-spacing: 0.03em;
 }
 
 .formation-help {
