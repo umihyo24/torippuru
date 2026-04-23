@@ -118,15 +118,24 @@
       HOLD_REPEAT_INITIAL_MS: 260,
       HOLD_REPEAT_INTERVAL_MS: 90,
       LAYOUT: {
+        SCREEN_PADDING_PX: 12,
         LEFT_PANEL_WIDTH_PX: 540,
         COLUMN_GAP_PX: 10,
+        PANEL_MIN_HEIGHT_PX: 786,
         PANEL_PADDING_PX: 10,
         SECTION_GAP_PX: 8,
+        SUMMARY_IMAGE_WIDTH_PX: 160,
+        SUMMARY_IMAGE_HEIGHT_PX: 118,
         STAT_ROW_GAP_PX: 4,
         STAT_BAR_HEIGHT_PX: 14,
+        STAT_LABEL_WIDTH_PX: 46,
+        STAT_CONTROL_WIDTH_PX: 142,
+        STAT_VALUE_WIDTH_PX: 44,
         MOVE_CARD_HEIGHT_PX: 56,
         MOVE_CARD_PADDING_PX: 6,
         MOVE_CARD_BORDER_PX: 1,
+        ACTION_PANEL_MIN_HEIGHT_PX: 78,
+        ACTION_BUTTON_HEIGHT_PX: 34,
         FONT_SIZE_BODY_PX: 12,
         FONT_SIZE_TITLE_PX: 22
       }
@@ -473,12 +482,20 @@
     { key: "spdef_up_def_down", label: "特防↑ 防御↓", upStat: "spdef", downStat: "def" }
   ];
   const TYPE_META = {
-    fire: { label: "ほのお", color: "#e26b3d", icon: "🔥" },
-    water: { label: "みず", color: "#4ba3ff", icon: "💧" },
-    nature: { label: "くさ", color: "#59b36b", icon: "🌿" },
-    earth: { label: "だいち", color: "#b98a52", icon: "🪨" },
-    shadow: { label: "かげ", color: "#7a5ac8", icon: "🌙" },
-    light: { label: "ひかり", color: "#f1d45a", icon: "✨" }
+    fire: { label: "ほのお", color: "#e26b3d", icon: "flame" },
+    water: { label: "みず", color: "#4ba3ff", icon: "drop" },
+    nature: { label: "くさ", color: "#59b36b", icon: "leaf" },
+    earth: { label: "だいち", color: "#b98a52", icon: "stone" },
+    shadow: { label: "かげ", color: "#7a5ac8", icon: "moon" },
+    light: { label: "ひかり", color: "#f1d45a", icon: "spark" }
+  };
+  const TYPE_ICON_GLYPHS = {
+    flame: "🔥",
+    drop: "💧",
+    leaf: "🌿",
+    stone: "🪨",
+    moon: "🌙",
+    spark: "✨"
   };
   const TYPE_FILTER_ORDER = ["all", "fire", "nature", "earth", "shadow", "light", "water"];
   const MONSTER_TRAITS = {
@@ -3734,10 +3751,11 @@
     const card = createEl("div", className);
     const typeKey = typeof move?.type === "string" ? move.type : "";
     const meta = TYPE_META[typeKey] || null;
+    const typeIcon = meta?.icon && TYPE_ICON_GLYPHS[meta.icon] ? TYPE_ICON_GLYPHS[meta.icon] : "◈";
     const typeBadge = createEl("span", "type-badge");
     if (meta) typeBadge.style.setProperty("--type-color", meta.color);
     typeBadge.append(
-      createEl("span", "type-badge-icon", meta?.icon || "◈"),
+      createEl("span", "type-badge-icon", typeIcon),
       createEl("span", "type-badge-label", meta?.label || typeKey || "不明")
     );
     card.append(
@@ -3783,15 +3801,24 @@
   const renderMonsterDetailScreen = () => {
     const wrap = createEl("section", "monster-detail-screen");
     const layout = CONFIG.MONSTER_BUILD.LAYOUT || {};
+    wrap.style.setProperty("--mb-screen-padding", `${Math.max(8, Number(layout.SCREEN_PADDING_PX) || 12)}px`);
     wrap.style.setProperty("--mb-left-width", `${Math.max(320, Number(layout.LEFT_PANEL_WIDTH_PX) || 540)}px`);
     wrap.style.setProperty("--mb-column-gap", `${Math.max(4, Number(layout.COLUMN_GAP_PX) || 10)}px`);
+    wrap.style.setProperty("--mb-panel-min-h", `${Math.max(620, Number(layout.PANEL_MIN_HEIGHT_PX) || 786)}px`);
     wrap.style.setProperty("--mb-panel-padding", `${Math.max(4, Number(layout.PANEL_PADDING_PX) || 10)}px`);
     wrap.style.setProperty("--mb-section-gap", `${Math.max(4, Number(layout.SECTION_GAP_PX) || 8)}px`);
+    wrap.style.setProperty("--mb-summary-image-w", `${Math.max(112, Number(layout.SUMMARY_IMAGE_WIDTH_PX) || 160)}px`);
+    wrap.style.setProperty("--mb-summary-image-h", `${Math.max(92, Number(layout.SUMMARY_IMAGE_HEIGHT_PX) || 118)}px`);
     wrap.style.setProperty("--mb-stat-row-gap", `${Math.max(2, Number(layout.STAT_ROW_GAP_PX) || 4)}px`);
     wrap.style.setProperty("--mb-stat-bar-h", `${Math.max(10, Number(layout.STAT_BAR_HEIGHT_PX) || 14)}px`);
+    wrap.style.setProperty("--mb-stat-label-w", `${Math.max(40, Number(layout.STAT_LABEL_WIDTH_PX) || 46)}px`);
+    wrap.style.setProperty("--mb-stat-control-w", `${Math.max(124, Number(layout.STAT_CONTROL_WIDTH_PX) || 142)}px`);
+    wrap.style.setProperty("--mb-stat-value-w", `${Math.max(40, Number(layout.STAT_VALUE_WIDTH_PX) || 44)}px`);
     wrap.style.setProperty("--mb-move-card-h", `${Math.max(44, Number(layout.MOVE_CARD_HEIGHT_PX) || 56)}px`);
     wrap.style.setProperty("--mb-move-card-p", `${Math.max(4, Number(layout.MOVE_CARD_PADDING_PX) || 6)}px`);
     wrap.style.setProperty("--mb-move-card-border", `${Math.max(1, Number(layout.MOVE_CARD_BORDER_PX) || 1)}px`);
+    wrap.style.setProperty("--mb-action-panel-min-h", `${Math.max(64, Number(layout.ACTION_PANEL_MIN_HEIGHT_PX) || 78)}px`);
+    wrap.style.setProperty("--mb-action-btn-h", `${Math.max(30, Number(layout.ACTION_BUTTON_HEIGHT_PX) || 34)}px`);
     wrap.style.setProperty("--mb-font-body", `${Math.max(11, Number(layout.FONT_SIZE_BODY_PX) || 12)}px`);
     wrap.style.setProperty("--mb-font-title", `${Math.max(18, Number(layout.FONT_SIZE_TITLE_PX) || 22)}px`);
     const monster = getSelectedMonster(gameState);
@@ -3817,8 +3844,8 @@
       createEl("div", "monster-list-sub", `ID: ${gameState.monster?.id || monster.id}`)
     );
     summary.append(portrait, title);
-    const leftScroll = createEl("div", "monster-build-left-scroll");
-    leftScroll.append(summary);
+    const leftBody = createEl("div", "monster-build-left-body");
+    leftBody.append(summary, renderMonsterTraitSection());
 
     const currentMovesSection = createEl("section", "move-section move-section-primary");
     const selectedSection = createEl("div", "move-section");
@@ -3842,17 +3869,8 @@
     });
     selectedSection.appendChild(selectedList);
     currentMovesSection.append(selectedSection);
-    leftScroll.append(currentMovesSection, renderMonsterTraitSection(), renderMonsterStatEditingSection(monster, draft, unlocks), renderMonsterNatureSection());
-
-    const actions = createEl("div", "monster-detail-actions in-panel");
-    const save = createEl("button", "screen-nav-btn", "保存");
-    save.dataset.action = "monster-detail-save";
-    const back = createEl("button", "screen-nav-btn", "戻る");
-    back.dataset.action = "monster-detail-back";
-    const reset = createEl("button", "screen-nav-btn danger", "リセット");
-    reset.dataset.action = "monster-detail-reset";
-    actions.append(save, back, reset);
-    leftPanel.append(leftScroll, actions);
+    leftBody.append(currentMovesSection, renderMonsterStatEditingSection(monster, draft, unlocks), renderMonsterNatureSection());
+    leftPanel.append(leftBody);
     body.appendChild(leftPanel);
 
     const movePanel = createEl("section", "monster-moves-panel");
@@ -3862,12 +3880,13 @@
     const filterRow = createEl("div", "type-filter-row");
     filters.forEach((filterKey) => {
       const meta = TYPE_META[filterKey] || null;
+      const icon = meta?.icon && TYPE_ICON_GLYPHS[meta.icon] ? TYPE_ICON_GLYPHS[meta.icon] : "◉";
       const btn = createEl("button", `type-filter-btn${activeFilter === filterKey ? " active" : ""}`);
       if (meta) btn.style.setProperty("--type-color", meta.color);
       btn.dataset.action = "monster-set-move-filter";
       btn.dataset.filterKey = filterKey;
       btn.append(
-        createEl("span", "type-badge-icon", meta?.icon || "◉"),
+        createEl("span", "type-badge-icon", icon),
         createEl("span", "type-badge-label", filterKey === "all" ? "すべて" : (meta?.label || filterKey))
       );
       filterRow.appendChild(btn);
@@ -3889,6 +3908,15 @@
     });
     if (!moveList.childElementCount) moveList.appendChild(renderMoveCard(null, "move-info-card compact"));
     movePanel.appendChild(moveList);
+    const actions = createEl("div", "monster-detail-actions action-panel-bottom-right");
+    const save = createEl("button", "screen-nav-btn", "保存");
+    save.dataset.action = "monster-detail-save";
+    const back = createEl("button", "screen-nav-btn", "戻る");
+    back.dataset.action = "monster-detail-back";
+    const reset = createEl("button", "screen-nav-btn danger", "リセット");
+    reset.dataset.action = "monster-detail-reset";
+    actions.append(save, back, reset);
+    movePanel.appendChild(actions);
     body.appendChild(movePanel);
     wrap.appendChild(body);
     return wrap;
