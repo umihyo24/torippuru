@@ -121,26 +121,26 @@
   const HOME_MENU_ITEMS = ["Battle", "Formation", "Monster", "Trainer Card", "Story", "Gacha", "Settings"];
 
   const ASSETS = {
-    backgrounds: { battle: "./assets/backgrounds/background_battle.png" },
+    backgrounds: { battle: "assets/backgrounds/background_battle.png" },
     icons: {
-      physical: "./assets/icons/icon_physical.png",
-      special: "./assets/icons/icon_special.png",
-      status: "./assets/icons/icon_status.png"
+      physical: "assets/icons/icon_physical.png",
+      special: "assets/icons/icon_special.png",
+      status: "assets/icons/icon_status.png"
     },
     portraits: {
-      emberlynx: "./assets/portraits/emberlynx.png",
-      hittokage: "./assets/portraits/hittokage.png",
-      maguma: "./assets/portraits/maguma.png",
-      mossblob: "./assets/portraits/mossblob.png",
-      frostfang: "./assets/portraits/frostfang.png",
-      sandko: "./assets/portraits/sandko.png",
-      stormimp: "./assets/portraits/stormimp.png",
-      ironboar: "./assets/portraits/ironboar.png",
-      wyvern: "./assets/portraits/wyvern.png",
-      golem: "./assets/portraits/golem.png",
-      shinju: "./assets/portraits/shinju.png",
-      venomtoad: "./assets/portraits/venomtoad.png",
-      duskmoth: "./assets/portraits/duskmoth.png"
+      emberlynx: "assets/portraits/emberlynx.png",
+      hittokage: "assets/portraits/hittokage.png",
+      maguma: "assets/portraits/maguma.png",
+      mossblob: "assets/portraits/mossblob.png",
+      frostfang: "assets/portraits/frostfang.png",
+      sandko: "assets/portraits/sandko.png",
+      stormimp: "assets/portraits/stormimp.png",
+      ironboar: "assets/portraits/ironboar.png",
+      wyvern: "assets/portraits/wyvern.png",
+      golem: "assets/portraits/golem.png",
+      shinju: "assets/portraits/shinju.png",
+      venomtoad: "assets/portraits/venomtoad.png",
+      duskmoth: "assets/portraits/duskmoth.png"
     }
   };
 
@@ -150,7 +150,8 @@
     const normalizedKey = typeof key === "string" ? key.trim() : "";
     if (!normalizedKey) return "";
     const mapped = table[normalizedKey];
-    return typeof mapped === "string" ? mapped : "";
+    if (typeof mapped !== "string") return "";
+    return mapped.replace(/\\/g, "/");
   };
 
   const patterns = {
@@ -2458,7 +2459,10 @@
   };
 
   const createImageWithFallback = ({ src, alt, mirror = false, wrapperClass = "portrait-wrap", placeholderLabel = "画像なし", placeholderSubLabel = "NO SIGNAL" }) => {
-    const wrap = createEl("div", `${wrapperClass}${mirror ? " mirror" : ""}`);
+    const baseClass = "portrait-wrap";
+    const normalizedWrapperClass = typeof wrapperClass === "string" && wrapperClass.trim() ? wrapperClass.trim() : baseClass;
+    const mergedClass = normalizedWrapperClass === baseClass ? baseClass : `${baseClass} ${normalizedWrapperClass}`;
+    const wrap = createEl("div", `${mergedClass}${mirror ? " mirror" : ""}`);
     const img = document.createElement("img");
     const placeholder = createEl("div", "img-placeholder");
     const normalizedSrc = typeof src === "string" ? src.trim() : "";
