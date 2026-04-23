@@ -1335,8 +1335,19 @@ button:disabled {
 .monster-build-left-panel {
   display: grid;
   gap: var(--mb-section-gap, 8px);
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.monster-build-left-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: var(--mb-section-gap, 8px);
+  padding-right: 2px;
 }
 
 .monster-summary-card {
@@ -1379,6 +1390,36 @@ button:disabled {
   gap: 6px;
 }
 
+.monster-trait-panel {
+  border: 1px solid #667598;
+  border-radius: 10px;
+  background: rgba(16, 23, 38, 0.88);
+  padding: var(--mb-panel-padding, 10px);
+  display: grid;
+  gap: 6px;
+}
+
+.trait-option-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.trait-option-btn {
+  border: 1px solid #5f7097;
+  background: rgba(21, 32, 52, 0.9);
+  color: #e8f1ff;
+  border-radius: 7px;
+  padding: 6px;
+  font-weight: 700;
+}
+
+.trait-option-btn.active {
+  background: #7fb7ff;
+  border-color: #a6ccff;
+  color: #122137;
+}
+
 .nature-option-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1406,10 +1447,33 @@ button:disabled {
   background: rgba(12, 19, 32, 0.82);
   padding: var(--mb-panel-padding, 10px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: var(--mb-section-gap, 8px);
   max-height: 100%;
   min-height: 0;
+}
+
+.type-filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.type-filter-btn {
+  border: 1px solid color-mix(in srgb, var(--type-color, #7789ae) 65%, #a7b8d8);
+  background: color-mix(in srgb, var(--type-color, #445a88) 24%, rgba(16, 24, 38, 0.9));
+  color: #eef4ff;
+  border-radius: 8px;
+  padding: 6px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.type-filter-btn.active {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--type-color, #ffe163) 42%, transparent);
 }
 
 .monster-move-list-title {
@@ -1518,6 +1582,26 @@ button:disabled {
 .move-info-name { font-weight: 700; line-height: 1.1; }
 .move-info-meta { color: #b7c8eb; font-size: 11px; line-height: 1.1; }
 .move-info-power { color: #dbe8ff; font-size: 11px; line-height: 1.1; }
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--type-color, #6078a5) 70%, #a9bcdb);
+  background: color-mix(in srgb, var(--type-color, #334b74) 30%, rgba(10, 17, 29, 0.9));
+  color: #eef4ff;
+  font-size: 11px;
+}
+.type-badge-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+.type-badge-label {
+  font-size: 11px;
+  line-height: 1;
+}
 .move-candidate-row.disabled-picked {
   filter: grayscale(1);
   opacity: 0.45;

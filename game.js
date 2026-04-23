@@ -472,6 +472,34 @@
     { key: "def_up_spdef_down", label: "防御↑ 特防↓", upStat: "def", downStat: "spdef" },
     { key: "spdef_up_def_down", label: "特防↑ 防御↓", upStat: "spdef", downStat: "def" }
   ];
+  const TYPE_META = {
+    fire: { label: "ほのお", color: "#e26b3d", icon: "🔥" },
+    water: { label: "みず", color: "#4ba3ff", icon: "💧" },
+    nature: { label: "くさ", color: "#59b36b", icon: "🌿" },
+    earth: { label: "だいち", color: "#b98a52", icon: "🪨" },
+    shadow: { label: "かげ", color: "#7a5ac8", icon: "🌙" },
+    light: { label: "ひかり", color: "#f1d45a", icon: "✨" }
+  };
+  const TYPE_FILTER_ORDER = ["all", "fire", "nature", "earth", "shadow", "light", "water"];
+  const MONSTER_TRAITS = {
+    hittokage: [
+      {
+        key: "iatsukan",
+        name: "いあつかん",
+        description: "ばにでたときに正面のモンスターのこうげきを1段階さげる"
+      },
+      {
+        key: "gyakkyo",
+        name: "ぎゃっきょう◯",
+        description: "HPが1/3以下のとき、わざの威力が1.5倍"
+      },
+      {
+        key: "kokakudahou",
+        name: "こうかくだほう",
+        description: "わざが届かないモンスターにもわざがとどく。"
+      }
+    ]
+  };
 
   const createNatureModifierByKey = (key) => {
     const preset = NATURE_MODIFIER_PRESETS.find((entry) => entry.key === key) || NATURE_MODIFIER_PRESETS[0];
@@ -494,13 +522,15 @@
     remainingPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS,
     maxTotalPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS,
     maxPerStatIncrease: CONFIG.MONSTER_BUILD.PER_STAT_MAX,
-    natureModifier: createNatureModifierByKey("no_modifier")
+    natureModifier: createNatureModifierByKey("no_modifier"),
+    traits: [],
+    selectedTraitKey: null
   });
 
   const createDefaultMovesBuildState = () => ({
-    innate: [],
     selected: [],
-    moveList: []
+    moveList: [],
+    activeTypeFilter: "all"
   });
 
   const createDefaultTrainerCardUnlocks = () => ({
@@ -671,7 +701,6 @@
         monsterListIndex: -1,
         monsterDetailTab: "status",
         selectedMoveIndex: null,
-        selectedMoveListFilter: null,
         monsterDetailSnapshot: null,
         formationEdit: {
           selectedSlotIndex: -1,
@@ -729,6 +758,7 @@
       monsterTrainingDrafts: {},
       monsterMoveDrafts: {},
       monsterNatureDrafts: {},
+      monsterTraitDrafts: {},
       trainerCard: {
         badges: {
           novice: true,
@@ -844,10 +874,9 @@
   };
   const getMonsterMoveDraft = (monsterId, state = gameState) => {
     const baseMoves = Array.isArray(UNIT_LIBRARY?.[monsterId]?.moves) ? UNIT_LIBRARY[monsterId].moves : [];
-    const innate = baseMoves.slice(0, 1).filter((moveId) => !!MOVES[moveId]);
     const baseSelected = [];
     for (const moveId of baseMoves) {
-      if (!MOVES[moveId] || innate.includes(moveId) || baseSelected.includes(moveId)) continue;
+      if (!MOVES[moveId] || baseSelected.includes(moveId)) continue;
       baseSelected.push(moveId);
       if (baseSelected.length >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) break;
     }
@@ -856,7 +885,7 @@
     const selected = [];
     for (let i = 0; i < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES; i += 1) {
       const moveId = storedSelected[i] || null;
-      if (!moveId || !MOVES[moveId] || innate.includes(moveId) || selected.includes(moveId)) {
+      if (!moveId || !MOVES[moveId] || selected.includes(moveId)) {
         selected.push(baseSelected[i] || null);
         continue;
       }
@@ -864,9 +893,33 @@
     }
     while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
     state.monsterMoveDrafts[monsterId] = selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES);
-    const moveList = Object.keys(MOVES).filter((moveId) => !innate.includes(moveId));
-    state.moves = { innate, selected, moveList };
+    const moveList = Object.keys(MOVES);
+    const activeTypeFilter = TYPE_FILTER_ORDER.includes(state?.moves?.activeTypeFilter) ? state.moves.activeTypeFilter : "all";
+    state.moves = { selected, moveList, activeTypeFilter };
     return selected;
+  };
+
+  const getMonsterTraits = (monsterId) => {
+    const traits = Array.isArray(MONSTER_TRAITS?.[monsterId]) ? MONSTER_TRAITS[monsterId] : [];
+    return traits
+      .map((trait) => ({
+        key: typeof trait?.key === "string" ? trait.key : "",
+        name: typeof trait?.name === "string" ? trait.name : "未設定",
+        description: typeof trait?.description === "string" ? trait.description : "説明なし"
+      }))
+      .filter((trait) => !!trait.key);
+  };
+
+  const getMonsterTraitDraft = (monsterId, state = gameState) => {
+    const traits = getMonsterTraits(monsterId);
+    if (!traits.length) {
+      if (state?.monsterTraitDrafts && monsterId) state.monsterTraitDrafts[monsterId] = null;
+      return { traits: [], selectedTraitKey: null };
+    }
+    const current = state?.monsterTraitDrafts?.[monsterId];
+    const selectedTraitKey = traits.some((trait) => trait.key === current) ? current : traits[0].key;
+    if (state?.monsterTraitDrafts && monsterId) state.monsterTraitDrafts[monsterId] = selectedTraitKey;
+    return { traits, selectedTraitKey };
   };
 
   const syncMonsterBuildState = (monsterId, state = gameState) => {
@@ -874,6 +927,7 @@
     if (!monster) return;
     const draft = getMonsterTrainingDraft(monsterId, state);
     const natureModifier = getMonsterNatureDraft(monsterId, state);
+    const traitDraft = getMonsterTraitDraft(monsterId, state);
     const computed = calculateFinalMonsterStats(monster, draft, natureModifier);
     state.monster = {
       id: monster.id || "",
@@ -885,7 +939,9 @@
       remainingPoints: getRemainingTrainingPoints(draft),
       maxTotalPoints: CONFIG.MONSTER_BUILD.MAX_TOTAL_POINTS,
       maxPerStatIncrease: CONFIG.MONSTER_BUILD.PER_STAT_MAX,
-      natureModifier: computed.natureModifier
+      natureModifier: computed.natureModifier,
+      traits: traitDraft.traits,
+      selectedTraitKey: traitDraft.selectedTraitKey
     };
     getMonsterMoveDraft(monsterId, state);
   };
@@ -896,6 +952,7 @@
       monsterId,
       training: getMonsterTrainingDraft(monsterId, state),
       natureKey: getMonsterNatureDraft(monsterId, state)?.key || "no_modifier",
+      selectedTraitKey: getMonsterTraitDraft(monsterId, state).selectedTraitKey,
       selectedMoves: getMonsterMoveDraft(monsterId, state).slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES)
     };
   };
@@ -905,6 +962,7 @@
     if (!snapshot?.monsterId || !UNIT_LIBRARY[snapshot.monsterId]) return false;
     state.monsterTrainingDrafts[snapshot.monsterId] = { ...createDefaultStatAllocation(), ...(snapshot.training || {}) };
     state.monsterNatureDrafts[snapshot.monsterId] = snapshot.natureKey || "no_modifier";
+    state.monsterTraitDrafts[snapshot.monsterId] = snapshot.selectedTraitKey || null;
     const selected = Array.isArray(snapshot.selectedMoves) ? snapshot.selectedMoves.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
     while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
     state.monsterMoveDrafts[snapshot.monsterId] = selected;
@@ -1008,7 +1066,8 @@
     gameState.ui.selectedMoveIndex = Number.isInteger(gameState.ui.selectedMoveIndex)
       ? clamp(gameState.ui.selectedMoveIndex, 0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES - 1)
       : null;
-    gameState.ui.selectedMoveListFilter = typeof gameState.ui.selectedMoveListFilter === "string" ? gameState.ui.selectedMoveListFilter : null;
+    if (!gameState.moves || typeof gameState.moves !== "object") gameState.moves = createDefaultMovesBuildState();
+    if (!TYPE_FILTER_ORDER.includes(gameState.moves.activeTypeFilter)) gameState.moves.activeTypeFilter = "all";
     const monsterIds = getMonsterLibraryIds(gameState);
     if (!UNIT_LIBRARY[gameState.selectedMonsterId]) {
       gameState.selectedMonsterId = monsterIds.length ? monsterIds[0] : null;
@@ -1076,7 +1135,7 @@
     gameState.selectedMonsterId = monsterId;
     gameState.ui.monsterDetailTab = "status";
     gameState.ui.selectedMoveIndex = null;
-    gameState.ui.selectedMoveListFilter = "all";
+    gameState.moves.activeTypeFilter = "all";
     getMonsterTrainingDraft(monsterId, gameState);
     syncMonsterBuildState(monsterId, gameState);
     gameState.ui.monsterDetailSnapshot = captureMonsterDetailSnapshot(monsterId, gameState);
@@ -1117,6 +1176,19 @@
     if (!UNIT_LIBRARY[monsterId]) return;
     const next = createNatureModifierByKey(modifierKey).key;
     gameState.monsterNatureDrafts[monsterId] = next;
+    syncMonsterBuildState(monsterId, gameState);
+  };
+
+  const setMonsterTraitSelection = (monsterId, traitKey) => {
+    if (!monsterId || !UNIT_LIBRARY[monsterId]) return;
+    const { traits } = getMonsterTraitDraft(monsterId, gameState);
+    if (!traits.length) {
+      gameState.monsterTraitDrafts[monsterId] = null;
+      syncMonsterBuildState(monsterId, gameState);
+      return;
+    }
+    const selected = traits.some((trait) => trait.key === traitKey) ? traitKey : traits[0].key;
+    gameState.monsterTraitDrafts[monsterId] = selected;
     syncMonsterBuildState(monsterId, gameState);
   };
 
@@ -3660,9 +3732,18 @@
 
   const renderMoveCard = (move, className = "move-info-card") => {
     const card = createEl("div", className);
+    const typeKey = typeof move?.type === "string" ? move.type : "";
+    const meta = TYPE_META[typeKey] || null;
+    const typeBadge = createEl("span", "type-badge");
+    if (meta) typeBadge.style.setProperty("--type-color", meta.color);
+    typeBadge.append(
+      createEl("span", "type-badge-icon", meta?.icon || "◈"),
+      createEl("span", "type-badge-label", meta?.label || typeKey || "不明")
+    );
     card.append(
       createEl("div", "move-info-name", move?.name || "未設定"),
-      createEl("div", "move-info-meta", `Type: ${move?.type || "-"} / Role: ${MOVE_ROLE_LABELS[getMoveRole(move)] || "-"} / Target: ${getMoveTargetLabel(move)}`),
+      createEl("div", "move-info-meta", `Role: ${MOVE_ROLE_LABELS[getMoveRole(move)] || "-"} / Target: ${getMoveTargetLabel(move)}`),
+      typeBadge,
       createEl("div", "move-info-power", getMoveEffectText(move)),
       createEl("div", "mini", move?.description || "-")
     );
@@ -3673,9 +3754,30 @@
     const types = new Set();
     (Array.isArray(moveIds) ? moveIds : []).forEach((moveId) => {
       const type = MOVES?.[moveId]?.type;
-      if (typeof type === "string" && type) types.add(type);
+      if (TYPE_META[type]) types.add(type);
     });
-    return ["all", ...Array.from(types)];
+    return TYPE_FILTER_ORDER.filter((key) => key === "all" || types.has(key));
+  };
+
+  const renderMonsterTraitSection = () => {
+    const section = createEl("section", "monster-trait-panel");
+    section.appendChild(createEl("h3", "mini-heading", "特性"));
+    const traits = Array.isArray(gameState.monster?.traits) ? gameState.monster.traits : [];
+    const selectedTraitKey = gameState.monster?.selectedTraitKey || null;
+    if (!traits.length) {
+      section.appendChild(createEl("div", "monster-detail-note", "特性なし"));
+      return section;
+    }
+    const row = createEl("div", "trait-option-row");
+    traits.forEach((trait) => {
+      const btn = createEl("button", `trait-option-btn${trait.key === selectedTraitKey ? " active" : ""}`, trait.name);
+      btn.dataset.action = "monster-select-trait";
+      btn.dataset.traitKey = trait.key;
+      row.appendChild(btn);
+    });
+    const selectedTrait = traits.find((trait) => trait.key === selectedTraitKey) || traits[0];
+    section.append(row, createEl("div", "monster-detail-note", selectedTrait?.description || "説明なし"));
+    return section;
   };
 
   const renderMonsterDetailScreen = () => {
@@ -3715,18 +3817,10 @@
       createEl("div", "monster-list-sub", `ID: ${gameState.monster?.id || monster.id}`)
     );
     summary.append(portrait, title);
-    leftPanel.append(summary);
+    const leftScroll = createEl("div", "monster-build-left-scroll");
+    leftScroll.append(summary);
 
     const currentMovesSection = createEl("section", "move-section move-section-primary");
-    const innateSection = createEl("div", "move-section");
-    innateSection.appendChild(createEl("h3", "mini-heading", "固有わざ"));
-    const innateList = createEl("div", "move-list");
-    (gameState.moves?.innate || []).forEach((moveId) => {
-      const move = MOVES[moveId];
-      innateList.appendChild(renderMoveCard(move));
-    });
-    if (!innateList.childElementCount) innateList.appendChild(renderMoveCard(null));
-    innateSection.appendChild(innateList);
     const selectedSection = createEl("div", "move-section");
     selectedSection.appendChild(createEl("h3", "mini-heading", "装備わざ（最大4）"));
     const selectedList = createEl("div", "move-list");
@@ -3747,8 +3841,8 @@
       selectedList.appendChild(row);
     });
     selectedSection.appendChild(selectedList);
-    currentMovesSection.append(innateSection, selectedSection);
-    leftPanel.append(currentMovesSection, renderMonsterStatEditingSection(monster, draft, unlocks), renderMonsterNatureSection());
+    currentMovesSection.append(selectedSection);
+    leftScroll.append(currentMovesSection, renderMonsterTraitSection(), renderMonsterStatEditingSection(monster, draft, unlocks), renderMonsterNatureSection());
 
     const actions = createEl("div", "monster-detail-actions in-panel");
     const save = createEl("button", "screen-nav-btn", "保存");
@@ -3758,19 +3852,24 @@
     const reset = createEl("button", "screen-nav-btn danger", "リセット");
     reset.dataset.action = "monster-detail-reset";
     actions.append(save, back, reset);
-    leftPanel.appendChild(actions);
+    leftPanel.append(leftScroll, actions);
     body.appendChild(leftPanel);
 
     const movePanel = createEl("section", "monster-moves-panel");
     movePanel.appendChild(createEl("h3", "monster-move-list-title", "わざリスト"));
     const filters = getMoveListFilters(gameState.moves?.moveList || []);
-    const activeFilter = filters.includes(gameState.ui.selectedMoveListFilter || "") ? gameState.ui.selectedMoveListFilter : "all";
-    const filterRow = createEl("div", "nature-option-row");
+    const activeFilter = filters.includes(gameState.moves?.activeTypeFilter || "") ? gameState.moves.activeTypeFilter : "all";
+    const filterRow = createEl("div", "type-filter-row");
     filters.forEach((filterKey) => {
-      const label = filterKey === "all" ? "すべて" : filterKey;
-      const btn = createEl("button", `nature-option-btn${activeFilter === filterKey ? " active" : ""}`, label);
+      const meta = TYPE_META[filterKey] || null;
+      const btn = createEl("button", `type-filter-btn${activeFilter === filterKey ? " active" : ""}`);
+      if (meta) btn.style.setProperty("--type-color", meta.color);
       btn.dataset.action = "monster-set-move-filter";
       btn.dataset.filterKey = filterKey;
+      btn.append(
+        createEl("span", "type-badge-icon", meta?.icon || "◉"),
+        createEl("span", "type-badge-label", filterKey === "all" ? "すべて" : (meta?.label || filterKey))
+      );
       filterRow.appendChild(btn);
     });
     movePanel.appendChild(filterRow);
@@ -4198,7 +4297,12 @@
       return;
     }
     if (a === "monster-set-move-filter") {
-      gameState.ui.selectedMoveListFilter = target.dataset.filterKey || "all";
+      gameState.moves.activeTypeFilter = TYPE_FILTER_ORDER.includes(target.dataset.filterKey || "") ? target.dataset.filterKey : "all";
+      render();
+      return;
+    }
+    if (a === "monster-select-trait") {
+      setMonsterTraitSelection(gameState.selectedMonsterId, target.dataset.traitKey);
       render();
       return;
     }
