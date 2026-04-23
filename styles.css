@@ -600,13 +600,36 @@ button:disabled {
   width: 18px;
   height: 18px;
   justify-self: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
 }
 
 .move-icon-asset img {
+  width: 100%;
+  height: 100%;
+  display: none;
+  position: absolute;
+  inset: 0;
   object-fit: contain;
+  z-index: 1;
+}
+
+.move-icon-asset.is-loaded img {
+  display: block;
+}
+
+.move-icon-asset.is-loaded .img-placeholder {
+  display: none;
+}
+
+.move-icon-asset.is-fallback .img-placeholder {
+  display: flex;
 }
 
 .move-icon-asset .img-placeholder {
+  position: absolute;
+  inset: 0;
   font-size: 7px;
   border-radius: 4px;
 }
