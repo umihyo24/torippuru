@@ -2726,8 +2726,6 @@
       row.style.top = `${rect.y - CONFIG.UI.FORMATION_TOP_Y}px`;
       row.style.width = `${rect.width}px`;
       row.style.height = `${rect.height}px`;
-      row.dataset.action = "edit-slot-select";
-      row.dataset.slotIndex = String(rect.index);
       const imageWrap = createEl("div", "formation-slot-image");
       if (unit) {
         const portrait = createImageWithFallback({
@@ -2769,8 +2767,6 @@
       row.style.top = `${rect.y - CONFIG.UI.MONSTER_GRID_Y}px`;
       row.style.width = `${rect.width}px`;
       row.style.height = `${rect.height}px`;
-      row.dataset.action = "edit-monster-select";
-      row.dataset.monsterIndex = String(rect.index);
       const portrait = createImageWithFallback({
         src: getAssetPath("portraits", unit.portrait),
         alt: unit.name,
@@ -2791,19 +2787,16 @@
     buttons.style.width = `${CONFIG.UI.BUTTON_AREA_WIDTH}px`;
     buttons.style.height = `${CONFIG.UI.BUTTON_AREA_HEIGHT}px`;
     const saveBtn = createEl("button", "screen-nav-btn", "Save");
-    saveBtn.dataset.action = "edit-save";
     saveBtn.style.left = `${buttonRects.save.x - CONFIG.UI.BUTTON_AREA_X}px`;
     saveBtn.style.top = `${buttonRects.save.y - CONFIG.UI.BUTTON_AREA_Y}px`;
     saveBtn.style.width = `${buttonRects.save.width}px`;
     saveBtn.style.height = `${buttonRects.save.height}px`;
     const cancelBtn = createEl("button", "screen-nav-btn", "Cancel");
-    cancelBtn.dataset.action = "edit-cancel";
     cancelBtn.style.left = `${buttonRects.cancel.x - CONFIG.UI.BUTTON_AREA_X}px`;
     cancelBtn.style.top = `${buttonRects.cancel.y - CONFIG.UI.BUTTON_AREA_Y}px`;
     cancelBtn.style.width = `${buttonRects.cancel.width}px`;
     cancelBtn.style.height = `${buttonRects.cancel.height}px`;
     const backBtn = createEl("button", "screen-nav-btn", "Back");
-    backBtn.dataset.action = "edit-back";
     backBtn.style.left = `${buttonRects.back.x - CONFIG.UI.BUTTON_AREA_X}px`;
     backBtn.style.top = `${buttonRects.back.y - CONFIG.UI.BUTTON_AREA_Y}px`;
     backBtn.style.width = `${buttonRects.back.width}px`;
@@ -2914,6 +2907,17 @@
     };
   };
 
+  const getFormationEditLocalPointerPosition = (event) => {
+    const bodyRect = document.querySelector(".formation-edit-body")?.getBoundingClientRect?.();
+    if (!bodyRect) return { x: -1, y: -1 };
+    const localX = event.clientX - bodyRect.left;
+    const localY = event.clientY - bodyRect.top;
+    return {
+      x: Number.isFinite(localX) ? localX : -1,
+      y: Number.isFinite(localY) ? localY : -1
+    };
+  };
+
   const handleFormationEditPointerClick = (x, y) => {
     const slotRects = getFormationSlotRects();
     for (const rect of slotRects) {
@@ -2943,7 +2947,7 @@
 
   document.addEventListener("click", (event) => {
     if (gameState.phase === PHASE.FORMATION_EDIT) {
-      const pointer = getLocalPointerPosition(event);
+      const pointer = getFormationEditLocalPointerPosition(event);
       if (handleFormationEditPointerClick(pointer.x, pointer.y)) {
         render();
         return;
@@ -2977,26 +2981,6 @@
     }
     if (a === "go-home") {
       enterHome();
-      render();
-      return;
-    }
-    if (a === "edit-slot-select") {
-      handleFormationSlotSelect(Number(target.dataset.slotIndex));
-      render();
-      return;
-    }
-    if (a === "edit-monster-select") {
-      assignMonsterToSelectedSlot(Number(target.dataset.monsterIndex));
-      render();
-      return;
-    }
-    if (a === "edit-save") {
-      saveFormationEdit();
-      render();
-      return;
-    }
-    if (a === "edit-cancel" || a === "edit-back") {
-      cancelFormationEdit();
       render();
       return;
     }
@@ -3087,7 +3071,7 @@
 
   document.addEventListener("wheel", (event) => {
     if (gameState.phase !== PHASE.FORMATION_EDIT) return;
-    const pointer = getLocalPointerPosition(event);
+    const pointer = getFormationEditLocalPointerPosition(event);
     const gridRect = {
       x: CONFIG.UI.MONSTER_GRID_X,
       y: CONFIG.UI.MONSTER_GRID_Y,
