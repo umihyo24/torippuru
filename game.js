@@ -61,15 +61,21 @@
       PARTY_SPACING_X: 12,
       CARD_WIDTH: 220,
       CARD_HEIGHT: 86,
-      MENU_X: 64,
-      MENU_Y: 110,
-      MENU_WIDTH: 220,
-      MENU_ITEM_HEIGHT: 42,
-      MENU_SPACING_Y: 56,
-      PANEL_X: 420,
-      PANEL_Y: 90,
-      PANEL_WIDTH: 760,
-      PANEL_HEIGHT: 680,
+      HOME_LEFT_X: 36,
+      HOME_LEFT_Y: 58,
+      HOME_LEFT_WIDTH: 364,
+      HOME_LEFT_HEIGHT: 540,
+      HOME_MENU_GRID_X: 426,
+      HOME_MENU_GRID_Y: 72,
+      HOME_MENU_CARD_WIDTH: 196,
+      HOME_MENU_CARD_HEIGHT: 124,
+      HOME_MENU_COLS: 2,
+      HOME_MENU_GAP_X: 16,
+      HOME_MENU_GAP_Y: 16,
+      HOME_INFO_X: 36,
+      HOME_INFO_Y: 624,
+      HOME_INFO_WIDTH: 1208,
+      HOME_INFO_HEIGHT: 186,
       FORMATION_LIST_X: 20,
       FORMATION_LIST_Y: 72,
       FORMATION_LIST_WIDTH: 740,
@@ -114,11 +120,19 @@
     MONSTER_LIST: "monster_list",
     MONSTER_DETAIL: "monster_detail",
     TRAINER_CARD: "trainer_card",
+    SETTINGS: "settings",
     BATTLE_PREPARE: "battle_prepare",
     PLAYING: "playing",
     GAMEOVER: "gameover"
   };
-  const HOME_MENU_ITEMS = ["Battle", "Formation", "Monster", "Trainer Card", "Story", "Gacha", "Settings"];
+  const HOME_MENU_ITEMS = [
+    { key: "battle", label: "Battle", icon: "⚔" },
+    { key: "formation", label: "Formation", icon: "☷" },
+    { key: "monsters", label: "Monster List", icon: "🐾" },
+    { key: "story", label: "Story", icon: "📖" },
+    { key: "gacha", label: "Gacha", icon: "✦" },
+    { key: "settings", label: "Settings", icon: "⚙" }
+  ];
 
   const ASSETS = {
     backgrounds: { battle: "assets/backgrounds/background_battle.png" },
@@ -313,7 +327,7 @@
   };
 
   const getSafeHomeIndex = (value) => {
-    const max = Math.max(0, HOME_MENU_ITEMS.length - 1);
+    const max = Math.max(0, getHubMenuItems(gameState).length - 1);
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
   };
 
@@ -451,7 +465,10 @@
     selectedMoveId: null,
     selectedTargets: [],
       ui: {
-        homeIndex: -1,
+        homeIndex: 0,
+        homeHoverIndex: -1,
+        currentHubSection: HOME_MENU_ITEMS[0]?.key || "battle",
+        hubMenuItems: HOME_MENU_ITEMS.map((item) => item.key),
         formationIndex: -1,
         battlePrepareIndex: -1,
         monsterListIndex: -1,
@@ -625,19 +642,20 @@
   };
 
   const getHomeInfo = (index, state) => {
-    const safeIndex = getSelectableIndex(index, HOME_MENU_ITEMS.length - 1);
+    const menuItems = getHubMenuItems(state);
+    const safeIndex = getSelectableIndex(index, menuItems.length - 1);
     if (safeIndex < 0) {
       return { title: "HOME", description: "メニューを選択してください。" };
     }
-    const menu = HOME_MENU_ITEMS[safeIndex] || "";
-    if (menu === "Battle") {
+    const menuKey = menuItems[safeIndex]?.key || "";
+    if (menuKey === "battle") {
       return {
         title: "Battle",
         description: "編成を選択してバトルを開始します。",
         extra: { lines: ["戦闘前に編成選択画面へ移動します。"] }
       };
     }
-    if (menu === "Formation") {
+    if (menuKey === "formation") {
       const formations = Array.isArray(state?.formations) ? state.formations : [];
       const savedCount = formations.filter((entry) => Array.isArray(entry)).length;
       return {
@@ -646,26 +664,61 @@
         extra: { lines: [`Saved: ${savedCount}/${FORMATION_SLOT_COUNT}`] }
       };
     }
-    if (menu === "Monster") {
+    if (menuKey === "monsters") {
+      const unlockedCount = getMonsterLibraryIds(state).length;
       return {
-        title: "Monster",
-        description: "モンスター一覧から育成詳細を開きます。"
+        title: "Monster List",
+        description: "モンスター一覧を確認し、育成詳細を開きます。",
+        extra: { lines: [`Monsters: ${unlockedCount}`] }
       };
     }
-    if (menu === "Trainer Card") {
-      return {
-        title: "Trainer Card",
-        description: "進行度と解放機能を確認します。"
-      };
-    }
-    if (menu === "Story") return { title: "Story", description: "ストーリーは準備中です。" };
-    if (menu === "Gacha") return { title: "Gacha", description: "ガチャは準備中です。" };
-    if (menu === "Settings") return { title: "Settings", description: "設定は準備中です。" };
+    if (menuKey === "story") return { title: "Story", description: "ストーリーモードは準備中です。今後の拡張をお待ちください。" };
+    if (menuKey === "gacha") return { title: "Gacha", description: "モンスター勧誘機能は準備中です。実装後はここから利用できます。" };
+    if (menuKey === "settings") return { title: "Settings", description: "ゲーム設定は準備中です。音量や表示設定を追加予定です。" };
     return { title: "", description: "" };
   };
 
+  const getHomeInfoIndex = (state = gameState) => {
+    const menuItems = getHubMenuItems(state);
+    const hoverIndex = getSelectableIndex(state?.ui?.homeHoverIndex, menuItems.length - 1);
+    if (hoverIndex >= 0) return hoverIndex;
+    return getSelectableIndex(state?.ui?.homeIndex, menuItems.length - 1);
+  };
+
+  const getHubMenuItems = (state = gameState) => {
+    const keys = Array.isArray(state?.ui?.hubMenuItems) && state.ui.hubMenuItems.length
+      ? state.ui.hubMenuItems
+      : HOME_MENU_ITEMS.map((item) => item.key);
+    return keys.map((key) => HOME_MENU_ITEMS.find((item) => item.key === key)).filter(Boolean);
+  };
+
+  const getHomeMenuCardRects = (state = gameState) => {
+    const menuItems = getHubMenuItems(state);
+    const rects = [];
+    const cols = Math.max(1, Math.trunc(CONFIG.UI.HOME_MENU_COLS));
+    for (let i = 0; i < menuItems.length; i += 1) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      rects.push({
+        index: i,
+        x: CONFIG.UI.HOME_MENU_GRID_X + (col * (CONFIG.UI.HOME_MENU_CARD_WIDTH + CONFIG.UI.HOME_MENU_GAP_X)),
+        y: CONFIG.UI.HOME_MENU_GRID_Y + (row * (CONFIG.UI.HOME_MENU_CARD_HEIGHT + CONFIG.UI.HOME_MENU_GAP_Y)),
+        width: CONFIG.UI.HOME_MENU_CARD_WIDTH,
+        height: CONFIG.UI.HOME_MENU_CARD_HEIGHT
+      });
+    }
+    return rects;
+  };
+
   const ensureUiSafety = () => {
-    gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, HOME_MENU_ITEMS.length - 1);
+    gameState.ui.hubMenuItems = HOME_MENU_ITEMS.map((item) => item.key);
+    const menuItems = getHubMenuItems(gameState);
+    gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, menuItems.length - 1);
+    gameState.ui.homeHoverIndex = getSelectableIndex(gameState.ui.homeHoverIndex, menuItems.length - 1);
+    const safeHubKey = menuItems[gameState.ui.homeIndex]?.key || menuItems[0]?.key || "battle";
+    if (!gameState.ui.hubMenuItems.includes(gameState.ui.currentHubSection)) {
+      gameState.ui.currentHubSection = safeHubKey;
+    }
     gameState.ui.formationIndex = getSelectableIndex(gameState.ui.formationIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.battlePrepareIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.monsterListIndex = getSafeMonsterListIndex(gameState, gameState.ui.monsterListIndex);
@@ -694,7 +747,10 @@
   };
 
   const enterHome = () => {
-    gameState.ui.homeIndex = -1;
+    gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
+    gameState.ui.homeHoverIndex = -1;
+    const hubItems = getHubMenuItems(gameState);
+    gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
     gameState.ui.formationIndex = -1;
     gameState.ui.battlePrepareIndex = -1;
     setPhase(PHASE.HOME);
@@ -744,6 +800,10 @@
     setPhase(PHASE.TRAINER_CARD);
   };
 
+  const enterSettings = () => {
+    setPhase(PHASE.SETTINGS);
+  };
+
   const setMonsterDetailTab = (tab) => {
     gameState.ui.monsterDetailTab = tab === "moves" ? "moves" : "status";
     if (gameState.ui.monsterDetailTab !== "moves") gameState.ui.selectedMoveSlot = null;
@@ -788,24 +848,28 @@
     enterFormation();
   };
 
-  const handleHomeSelection = (index) => {
+  const handleHomeMenuConfirm = (index) => {
     if (!Number.isFinite(index) || index < 0) return;
-    gameState.ui.homeIndex = getSafeHomeIndex(index);
-    const selected = HOME_MENU_ITEMS[gameState.ui.homeIndex];
-    if (selected === "Battle") {
+    const hubItems = getHubMenuItems(gameState);
+    const safeIndex = getSelectableIndex(index, hubItems.length - 1);
+    if (safeIndex < 0) return;
+    gameState.ui.homeIndex = safeIndex;
+    const selectedKey = hubItems[safeIndex]?.key;
+    gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
+    if (selectedKey === "battle") {
       enterBattlePrepare();
       return;
     }
-    if (selected === "Formation") {
+    if (selectedKey === "formation") {
       enterFormation();
       return;
     }
-    if (selected === "Monster") {
+    if (selectedKey === "monsters") {
       enterMonsterList();
       return;
     }
-    if (selected === "Trainer Card") {
-      enterTrainerCard();
+    if (selectedKey === "settings") {
+      enterSettings();
     }
   };
 
@@ -2997,33 +3061,60 @@
 
   const renderHomeScreen = () => {
     const wrap = createEl("section", "home-screen");
-    wrap.style.setProperty("--menu-x", `${CONFIG.UI.MENU_X}px`);
-    wrap.style.setProperty("--menu-y", `${CONFIG.UI.MENU_Y}px`);
-    wrap.style.setProperty("--menu-spacing-y", `${CONFIG.UI.MENU_SPACING_Y}px`);
-    wrap.style.setProperty("--menu-width", `${CONFIG.UI.MENU_WIDTH}px`);
-    wrap.style.setProperty("--menu-item-height", `${CONFIG.UI.MENU_ITEM_HEIGHT}px`);
-    wrap.style.setProperty("--panel-x", `${CONFIG.UI.PANEL_X}px`);
-    wrap.style.setProperty("--panel-y", `${CONFIG.UI.PANEL_Y}px`);
-    wrap.style.setProperty("--panel-width", `${CONFIG.UI.PANEL_WIDTH}px`);
-    wrap.style.setProperty("--panel-height", `${CONFIG.UI.PANEL_HEIGHT}px`);
+    const hubItems = getHubMenuItems(gameState);
+    const left = createEl("div", "home-left-panel");
+    left.style.left = `${CONFIG.UI.HOME_LEFT_X}px`;
+    left.style.top = `${CONFIG.UI.HOME_LEFT_Y}px`;
+    left.style.width = `${CONFIG.UI.HOME_LEFT_WIDTH}px`;
+    left.style.height = `${CONFIG.UI.HOME_LEFT_HEIGHT}px`;
+    left.appendChild(createEl("h2", "home-left-title", "Trainer Hub"));
+    const mascotId = Array.isArray(gameState?.formations?.[0]) ? gameState.formations[0].find((unitId) => UNIT_LIBRARY[unitId]) : null;
+    const mascot = UNIT_LIBRARY[mascotId] || UNIT_LIBRARY[INITIAL_PARTY.ally[0]];
+    const portrait = createImageWithFallback({
+      src: getAssetPath("portraits", mascot?.portrait),
+      alt: mascot?.name || "Mascot",
+      wrapperClass: "home-mascot-portrait",
+      placeholderLabel: mascot?.name || "Mascot",
+      placeholderSubLabel: "NO IMAGE"
+    });
+    const mascotWrap = createEl("div", "home-mascot-wrap");
+    mascotWrap.appendChild(portrait);
+    left.append(mascotWrap, createEl("div", "home-mascot-name", mascot?.name || "No Monster"));
 
-    const menu = createEl("div", "home-menu");
-    HOME_MENU_ITEMS.forEach((label, index) => {
-      const isSelected = index === gameState.ui.homeIndex;
-      const item = createEl("button", `home-menu-item${isSelected ? " active" : ""}`, label);
-      item.dataset.action = "home-select";
-      item.dataset.index = String(index);
-      menu.appendChild(item);
+    const menu = createEl("div", "home-menu-grid");
+    const cardRects = getHomeMenuCardRects(gameState);
+    const hoverIndex = getSelectableIndex(gameState.ui.homeHoverIndex, hubItems.length - 1);
+    cardRects.forEach((rect) => {
+      const menuItem = hubItems[rect.index];
+      const isSelected = rect.index === gameState.ui.homeIndex;
+      const isHovered = rect.index === hoverIndex;
+      const card = createEl("button", `home-menu-card${isSelected ? " active" : ""}${isHovered ? " hover" : ""}`);
+      card.style.left = `${rect.x}px`;
+      card.style.top = `${rect.y}px`;
+      card.style.width = `${rect.width}px`;
+      card.style.height = `${rect.height}px`;
+      card.dataset.action = "home-card-confirm";
+      card.dataset.index = String(rect.index);
+      card.append(
+        createEl("div", "home-menu-icon", menuItem?.icon || "■"),
+        createEl("div", "home-menu-label", menuItem?.label || "")
+      );
+      menu.appendChild(card);
     });
 
-    const panel = createEl("div", "home-info-panel");
-    const info = getHomeInfo(gameState.ui.homeIndex, gameState);
+    const panel = createEl("div", "home-bottom-info-panel");
+    panel.style.left = `${CONFIG.UI.HOME_INFO_X}px`;
+    panel.style.top = `${CONFIG.UI.HOME_INFO_Y}px`;
+    panel.style.width = `${CONFIG.UI.HOME_INFO_WIDTH}px`;
+    panel.style.height = `${CONFIG.UI.HOME_INFO_HEIGHT}px`;
+    const infoIndex = getHomeInfoIndex(gameState);
+    const info = getHomeInfo(infoIndex, gameState) || { title: "HOME", description: "メニューを選択してください。" };
     panel.appendChild(createEl("h2", "home-info-title", info?.title || ""));
     panel.appendChild(createEl("p", "home-info-description", info?.description || ""));
     const lines = Array.isArray(info?.extra?.lines) ? info.extra.lines : [];
     if (info?.extra?.label) panel.appendChild(createEl("div", "home-info-sub", info.extra.label));
     lines.forEach((line) => panel.appendChild(createEl("div", "home-info-line", String(line))));
-    wrap.append(menu, panel);
+    wrap.append(left, menu, panel);
     return wrap;
   };
 
@@ -3224,6 +3315,16 @@
     return wrap;
   };
 
+  const renderSettingsScreen = () => {
+    const wrap = createEl("section", "trainer-card-screen");
+    wrap.appendChild(createEl("h2", "formation-title", "Settings"));
+    wrap.appendChild(createEl("div", "formation-help", "ゲーム設定は準備中です。今後ここに音量や表示設定を追加します。"));
+    const back = createEl("button", "screen-nav-btn", "Back HOME");
+    back.dataset.action = "go-home";
+    wrap.appendChild(back);
+    return wrap;
+  };
+
   const renderFormationEditScreen = () => {
     const wrap = createEl("section", "formation-edit-screen");
     const edit = gameState.ui.formationEdit;
@@ -3398,6 +3499,8 @@
       main.appendChild(renderMonsterDetailScreen());
     } else if (gameState.phase === PHASE.TRAINER_CARD) {
       main.appendChild(renderTrainerCardScreen());
+    } else if (gameState.phase === PHASE.SETTINGS) {
+      main.appendChild(renderSettingsScreen());
     } else if (gameState.phase === PHASE.BATTLE_PREPARE) {
       main.appendChild(renderBattlePrepareScreen());
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
@@ -3455,6 +3558,44 @@
     };
   };
 
+  const getHomeLocalPointerPosition = (event) => {
+    const screenRect = document.querySelector(".home-screen")?.getBoundingClientRect?.();
+    if (!screenRect) return { x: -1, y: -1 };
+    const localX = event.clientX - screenRect.left;
+    const localY = event.clientY - screenRect.top;
+    return {
+      x: Number.isFinite(localX) ? localX : -1,
+      y: Number.isFinite(localY) ? localY : -1
+    };
+  };
+
+  const updateHomeHoverFromPoint = (x, y) => {
+    let nextHover = -1;
+    const rects = getHomeMenuCardRects();
+    for (const rect of rects) {
+      if (isPointInRect(x, y, rect)) {
+        nextHover = rect.index;
+        break;
+      }
+    }
+    if (gameState.ui.homeHoverIndex !== nextHover) {
+      gameState.ui.homeHoverIndex = nextHover;
+      return true;
+    }
+    return false;
+  };
+
+  const handleHomeCardPointerClick = (x, y) => {
+    const rects = getHomeMenuCardRects();
+    for (const rect of rects) {
+      if (isPointInRect(x, y, rect)) {
+        handleHomeMenuConfirm(rect.index);
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleFormationEditPointerClick = (x, y) => {
     const slotRects = getFormationSlotRects();
     for (const rect of slotRects) {
@@ -3483,6 +3624,13 @@
   };
 
   document.addEventListener("click", (event) => {
+    if (gameState.phase === PHASE.HOME) {
+      const pointer = getHomeLocalPointerPosition(event);
+      if (handleHomeCardPointerClick(pointer.x, pointer.y)) {
+        render();
+        return;
+      }
+    }
     if (gameState.phase === PHASE.FORMATION_EDIT) {
       const pointer = getFormationEditLocalPointerPosition(event);
       if (handleFormationEditPointerClick(pointer.x, pointer.y)) {
@@ -3493,8 +3641,8 @@
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const a = target.dataset.action;
-    if (a === "home-select") {
-      handleHomeSelection(Number(target.dataset.index));
+    if (a === "home-card-confirm") {
+      handleHomeMenuConfirm(Number(target.dataset.index));
       render();
       return;
     }
@@ -3566,12 +3714,32 @@
     if (a === "close-panels") dispatch({ type: "CLOSE_PANELS" });
   });
 
+  document.addEventListener("mousemove", (event) => {
+    if (gameState.phase !== PHASE.HOME) return;
+    const pointer = getHomeLocalPointerPosition(event);
+    if (updateHomeHoverFromPoint(pointer.x, pointer.y)) render();
+  });
+
+  document.addEventListener("mouseleave", () => {
+    if (gameState.phase !== PHASE.HOME) return;
+    if (gameState.ui.homeHoverIndex !== -1) {
+      gameState.ui.homeHoverIndex = -1;
+      render();
+    }
+  });
+
   document.addEventListener("keydown", (event) => {
     if (gameState.phase === PHASE.HOME) {
-      if (event.key === "ArrowUp") gameState.ui.homeIndex -= 1;
-      if (event.key === "ArrowDown") gameState.ui.homeIndex += 1;
-      if (event.key === "Enter") handleHomeSelection(gameState.ui.homeIndex);
+      const cols = Math.max(1, Math.trunc(CONFIG.UI.HOME_MENU_COLS));
+      const current = getSafeHomeIndex(gameState.ui.homeIndex);
+      if (event.key === "ArrowUp") gameState.ui.homeIndex = current - cols;
+      if (event.key === "ArrowDown") gameState.ui.homeIndex = current + cols;
+      if (event.key === "ArrowLeft") gameState.ui.homeIndex = current - 1;
+      if (event.key === "ArrowRight") gameState.ui.homeIndex = current + 1;
+      if (event.key === "Enter") handleHomeMenuConfirm(gameState.ui.homeIndex);
       ensureUiSafety();
+      const hubItems = getHubMenuItems(gameState);
+      gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
       render();
       return;
     }
@@ -3611,6 +3779,12 @@
     }
 
     if (gameState.phase === PHASE.TRAINER_CARD) {
+      if (event.key === "Escape") enterHome();
+      render();
+      return;
+    }
+
+    if (gameState.phase === PHASE.SETTINGS) {
       if (event.key === "Escape") enterHome();
       render();
       return;
