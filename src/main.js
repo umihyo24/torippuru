@@ -1012,7 +1012,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     state.monster = {
       id: monster.id || "",
       name: monster.name || "",
-      imageKey: monster.portrait || null,
+      imageKey: monster.imageKey || monster.portrait || null,
       baseStats: computed.baseStats,
       allocatedStats: computed.allocatedStats,
       finalStats: computed.finalStats,
@@ -1083,7 +1083,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     }
     const card = createEl("div", "mini-monster-card");
     const portrait = createImageWithFallback({
-      src: getAssetPath("portraits", unit.portrait),
+      src: getMonsterImageSrc(unit),
       alt: unit.name,
       wrapperClass: "mini-monster-portrait",
       placeholderLabel: "未設定",
@@ -3614,9 +3614,17 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return overlay;
   };
 
+  const getMonsterImageSrc = (unit) => {
+    if (!unit || typeof unit !== "object") return "";
+    const imageKey = typeof unit.imageKey === "string" && unit.imageKey.trim()
+      ? unit.imageKey.trim()
+      : (typeof unit.portrait === "string" ? unit.portrait.trim() : "");
+    if (!imageKey) return "";
+    return getAssetPath("portraits", imageKey);
+  };
+
   const getUnitPortraitPath = (unit) => {
-    if (!unit) return "";
-    return getAssetPath("portraits", unit.portrait);
+    return getMonsterImageSrc(unit);
   };
 
   const renderBattleSprite = (unit) => {
@@ -3977,7 +3985,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const mascotId = Array.isArray(gameState?.formations?.[0]) ? gameState.formations[0].find((unitId) => MONSTERS[unitId]) : null;
     const mascot = MONSTERS[mascotId] || MONSTERS[INITIAL_PARTY.ally[0]];
     const portrait = createImageWithFallback({
-      src: getAssetPath("portraits", mascot?.portrait),
+      src: getMonsterImageSrc(mascot),
       alt: mascot?.name || "Mascot",
       wrapperClass: "home-mascot-portrait",
       placeholderLabel: mascot?.name || "Mascot",
@@ -4070,7 +4078,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       card.dataset.action = "monster-open-detail";
       card.dataset.monsterId = monsterId;
       const portrait = createImageWithFallback({
-        src: getAssetPath("portraits", monster.portrait),
+        src: getMonsterImageSrc(monster),
         alt: monster.name,
         wrapperClass: "monster-list-portrait",
         placeholderLabel: monster.name,
@@ -4289,7 +4297,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const leftPanel = createEl("aside", "monster-build-left-panel");
     const summary = createEl("div", "monster-summary-card");
     const portrait = createImageWithFallback({
-      src: getAssetPath("portraits", monster.portrait),
+      src: getMonsterImageSrc(monster),
       alt: monster.name,
       wrapperClass: "monster-detail-portrait",
       placeholderLabel: monster.name,
@@ -4475,7 +4483,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       const imageWrap = createEl("div", "formation-slot-image");
       if (unit) {
         const portrait = createImageWithFallback({
-          src: getAssetPath("portraits", unit.portrait),
+          src: getMonsterImageSrc(unit),
           alt: unit.name,
           wrapperClass: "slot-portrait",
           placeholderLabel: unit.name,
@@ -4514,7 +4522,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       row.style.width = `${rect.width}px`;
       row.style.height = `${rect.height}px`;
       const portrait = createImageWithFallback({
-        src: getAssetPath("portraits", unit.portrait),
+        src: getMonsterImageSrc(unit),
         alt: unit.name,
         wrapperClass: "monster-card-portrait",
         placeholderLabel: unit.name,
