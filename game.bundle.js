@@ -1152,7 +1152,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       : {};
     const allyTeam = createAllyTeamFromFormation(selectedFormation, { selectedTraitByMonsterId: seedMonsterTraitDrafts });
     return ({
-      phase: PHASE.HOME,
+      phase: PHASE.START,
       turn: 1,
       winner: null,
       systemMessage: "",
@@ -1526,7 +1526,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         bootState.phase = PHASE.START;
         bootState.ui.startView = START_VIEW.TRIAL_SELECT;
       } else {
-        bootState.phase = PHASE.HOME;
+        bootState.phase = PHASE.START;
       }
       bootState.systemMessage = "前回のバトルは安全に中断されました。準備画面から再開してください。";
       clearSessionSave();
@@ -2055,13 +2055,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   };
 
   const enterHome = () => {
-    gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
-    gameState.ui.homeHoverIndex = -1;
-    const hubItems = getHubMenuItems(gameState);
-    gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
-    gameState.ui.formationIndex = -1;
-    gameState.ui.battlePrepareIndex = -1;
-    setPhase(PHASE.HOME);
+    enterHub();
   };
 
   const enterFormation = () => {
@@ -2309,7 +2303,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const selectedKey = hubItems[safeIndex]?.key;
     gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
     if (selectedKey === "battle") {
-      enterBattlePrepare();
+      enterTrialSelect();
       return;
     }
     if (selectedKey === "hanafudaTrials") {

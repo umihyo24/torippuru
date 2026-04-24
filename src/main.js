@@ -567,7 +567,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       : {};
     const allyTeam = createAllyTeamFromFormation(selectedFormation, { selectedTraitByMonsterId: seedMonsterTraitDrafts });
     return ({
-      phase: PHASE.HOME,
+      phase: PHASE.START,
       turn: 1,
       winner: null,
       systemMessage: "",
@@ -941,7 +941,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         bootState.phase = PHASE.START;
         bootState.ui.startView = START_VIEW.TRIAL_SELECT;
       } else {
-        bootState.phase = PHASE.HOME;
+        bootState.phase = PHASE.START;
       }
       bootState.systemMessage = "前回のバトルは安全に中断されました。準備画面から再開してください。";
       clearSessionSave();
@@ -1470,13 +1470,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const enterHome = () => {
-    gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
-    gameState.ui.homeHoverIndex = -1;
-    const hubItems = getHubMenuItems(gameState);
-    gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
-    gameState.ui.formationIndex = -1;
-    gameState.ui.battlePrepareIndex = -1;
-    setPhase(PHASE.HOME);
+    enterHub();
   };
 
   const enterFormation = () => {
@@ -1724,7 +1718,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const selectedKey = hubItems[safeIndex]?.key;
     gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
     if (selectedKey === "battle") {
-      enterBattlePrepare();
+      enterTrialSelect();
       return;
     }
     if (selectedKey === "hanafudaTrials") {
