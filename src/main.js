@@ -212,8 +212,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     { key: "formation", label: "Formation", icon: "☷" },
     { key: "monsters", label: "Monster List", icon: "🐾" },
     { key: "hanafudaTrials", label: "十二札試練", icon: "🃏" },
-    { key: "story", label: "Story", icon: "📖" },
-    { key: "gacha", label: "Gacha", icon: "✦" },
     { key: "settings", label: "Settings", icon: "⚙" }
   ];
   const SAVE_VERSION = 1;
@@ -567,7 +565,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       : {};
     const allyTeam = createAllyTeamFromFormation(selectedFormation, { selectedTraitByMonsterId: seedMonsterTraitDrafts });
     return ({
-      phase: PHASE.START,
+      phase: PHASE.HOME,
       turn: 1,
       winner: null,
       systemMessage: "",
@@ -1447,10 +1445,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const enterHub = () => {
-    gameState.ui.startView = START_VIEW.TRIAL_SELECT;
+    gameState.ui.startView = START_VIEW.HUB;
     gameState.progress.selectedTrial = null;
     gameState.progress.pendingReward = null;
-    enterHome();
+    setPhase(PHASE.HOME);
   };
 
   const enterTrialSelect = () => {
@@ -1470,7 +1468,9 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const enterHome = () => {
-    enterHub();
+    gameState.ui.startView = START_VIEW.HUB;
+    gameState.progress.selectedTrial = null;
+    setPhase(PHASE.HOME);
   };
 
   const enterFormation = () => {
@@ -1718,7 +1718,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const selectedKey = hubItems[safeIndex]?.key;
     gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
     if (selectedKey === "battle") {
-      enterTrialSelect();
+      enterBattlePrepare();
       return;
     }
     if (selectedKey === "hanafudaTrials") {
@@ -4413,17 +4413,17 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       card.dataset.action = "select-trial";
       card.dataset.trialId = trialId;
       card.dataset.index = String(index);
-      const statusText = cleared ? "Cleared" : (unlocked ? "Unlocked" : "Locked");
+      const statusText = cleared ? "CLEARED" : (unlocked ? "UNLOCKED" : "LOCKED");
       card.append(
-        createEl("div", "trial-card-index", `Trial ${index + 1}`),
+        createEl("div", "trial-card-index", `第${index + 1}試練`),
         createEl("div", "trial-card-title", boss?.name || trialId),
-        createEl("div", "trial-card-lesson", `Lesson: ${lessonFocus}`),
+        createEl("div", "trial-card-lesson", `Focus: ${lessonFocus}`),
         createEl("div", "trial-card-status", statusText)
       );
       list.appendChild(card);
     });
     const buttons = createEl("div", "screen-button-row");
-    const back = createEl("button", "screen-nav-btn", "Back Hub");
+    const back = createEl("button", "screen-nav-btn", "もどる");
     back.dataset.action = "go-home";
     buttons.appendChild(back);
     wrap.append(list, buttons);
@@ -4438,20 +4438,19 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       return wrap;
     }
     const trialNo = HANAFUDA_BOSS_ORDER.indexOf(bossDef.id) + 1;
-    const introPages = [
-      `Trial ${trialNo}: ${bossDef.coreConcept || bossDef.name}`,
-      `Lesson: ${bossDef.data.intendedLesson}\nHint: ${bossDef.bossGimmickSummary || bossDef.data.bossGimmick?.key || "-"}`
-    ];
+    const introTitle = `Trial ${trialNo}: ${bossDef.coreConcept || bossDef.name}`;
+    const lesson = bossDef.data.intendedLesson || HANAFUDA_PROGRESS_LESSONS[Math.max(0, trialNo - 1)] || "-";
+    const hint = bossDef.bossGimmickSummary || bossDef.data.bossGimmick?.key || "-";
     wrap.appendChild(createEl("h2", "formation-title", bossDef.name));
-    wrap.appendChild(createEl("div", "formation-help", `試練題目: ${introPages[0]}`));
-    const pageText = introPages[clamp(gameState.ui.trialIntroPage, 0, introPages.length - 1)];
-    pageText.split("\n").forEach((line) => wrap.appendChild(createEl("p", "home-info-description", line)));
+    wrap.appendChild(createEl("div", "formation-help", `試練題目: ${introTitle}`));
+    wrap.appendChild(createEl("p", "home-info-description", `Lesson: ${lesson}`));
+    wrap.appendChild(createEl("p", "home-info-description", `Hint: ${hint}`));
     const buttons = createEl("div", "screen-button-row");
     const back = createEl("button", "screen-nav-btn", "もどる");
     back.dataset.action = "open-trial-select";
-    const next = createEl("button", "screen-nav-btn primary", gameState.ui.trialIntroPage >= introPages.length - 1 ? "試練開始" : "次へ");
-    next.dataset.action = gameState.ui.trialIntroPage >= introPages.length - 1 ? "start-selected-trial" : "trial-intro-next";
-    buttons.append(back, next);
+    const start = createEl("button", "screen-nav-btn primary", "試練開始");
+    start.dataset.action = "start-selected-trial";
+    buttons.append(back, start);
     wrap.appendChild(buttons);
     return wrap;
   };
@@ -4491,7 +4490,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const renderStartPhaseScreen = () => {
-    if (gameState.ui.startView === START_VIEW.TRIAL_SELECT) return renderTrialSelectScreen();
     if (gameState.ui.startView === START_VIEW.TRIAL_INTRO) return renderTrialIntroScreen();
     return renderTrialSelectScreen();
   };
@@ -5392,11 +5390,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       render();
       return;
     }
-    if (a === "trial-intro-next") {
-      gameState.ui.trialIntroPage = clamp(gameState.ui.trialIntroPage + 1, 0, 1);
-      render();
-      return;
-    }
     if (a === "start-selected-trial") {
       if (gameState.progress.selectedTrial) startHanafudaTrial(gameState.progress.selectedTrial);
       render();
@@ -5576,9 +5569,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   document.addEventListener("keydown", (event) => {
     if (gameState.phase === PHASE.START) {
-      if (gameState.ui.startView === START_VIEW.HUB) {
-        if (event.key === "Enter") enterTrialSelect();
-      } else if (gameState.ui.startView === START_VIEW.TRIAL_SELECT) {
+      if (gameState.ui.startView === START_VIEW.TRIAL_SELECT) {
         if (event.key === "ArrowUp") gameState.ui.trialSelectIndex -= 1;
         if (event.key === "ArrowDown") gameState.ui.trialSelectIndex += 1;
         gameState.ui.trialSelectIndex = getSelectableIndex(gameState.ui.trialSelectIndex, HANAFUDA_BOSS_ORDER.length - 1);
@@ -5589,8 +5580,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         if (event.key === "Escape") enterHub();
       } else if (gameState.ui.startView === START_VIEW.TRIAL_INTRO) {
         if (event.key === "Enter") {
-          if (gameState.ui.trialIntroPage >= 1 && gameState.progress.selectedTrial) startHanafudaTrial(gameState.progress.selectedTrial);
-          else gameState.ui.trialIntroPage += 1;
+          if (gameState.progress.selectedTrial) startHanafudaTrial(gameState.progress.selectedTrial);
         }
         if (event.key === "Escape") enterTrialSelect();
       }
