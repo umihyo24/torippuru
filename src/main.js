@@ -3,6 +3,13 @@ import { MONSTERS } from "./data/monsters.js";
 import { TRAITS as TRAIT_LIBRARY } from "./data/traits.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
 import { getAssetPath } from "./data/assets.js";
+import {
+  HANAFUDA_BOSSES,
+  HANAFUDA_BOSS_ORDER,
+  HANAFUDA_PROGRESS_LESSONS,
+  HANAFUDA_BALANCE_ASSUMPTIONS,
+  HANAFUDA_TEST_CASES
+} from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 
 (() => {
@@ -182,6 +189,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     battleTargeting: true
   };
   const PHASE = {
+    START: "start",
     HOME: "home",
     FORMATION: "formation",
     FORMATION_EDIT: "formation_edit",
@@ -191,7 +199,13 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     SETTINGS: "settings",
     BATTLE_PREPARE: "battle_prepare",
     PLAYING: "playing",
+    REWARD: "reward",
     GAMEOVER: "gameover"
+  };
+  const START_VIEW = {
+    HUB: "hub",
+    TRIAL_SELECT: "trial_select",
+    TRIAL_INTRO: "trial_intro"
   };
   const HOME_MENU_ITEMS = [
     { key: "battle", label: "Battle", icon: "⚔" },
@@ -329,6 +343,36 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       if (MONSTERS[unitId]) base[idx] = unitId;
     });
     return [base, null, null];
+  };
+
+  const normalizeTrialIds = (list = []) => {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    return list
+      .filter((trialId) => typeof trialId === "string" && HANAFUDA_BOSSES[trialId] && !seen.has(trialId) && seen.add(trialId));
+  };
+
+  const createDefaultProgress = () => ({
+    unlockedTrials: [HANAFUDA_BOSS_ORDER[0] || "tsurumatsu"].filter((id) => !!HANAFUDA_BOSSES[id]),
+    clearedTrials: [],
+    selectedTrial: null,
+    pendingReward: null
+  });
+
+  const createProgressState = (seedProgress = null) => {
+    const fallback = createDefaultProgress();
+    if (!seedProgress || typeof seedProgress !== "object") return fallback;
+    const unlockedTrials = normalizeTrialIds(seedProgress.unlockedTrials);
+    const clearedTrials = normalizeTrialIds(seedProgress.clearedTrials);
+    const selectedTrial = typeof seedProgress.selectedTrial === "string" && HANAFUDA_BOSSES[seedProgress.selectedTrial]
+      ? seedProgress.selectedTrial
+      : null;
+    return {
+      unlockedTrials: unlockedTrials.length ? unlockedTrials : fallback.unlockedTrials.slice(),
+      clearedTrials,
+      selectedTrial,
+      pendingReward: null
+    };
   };
 
   const createDefaultStatAllocation = () => ({
@@ -522,10 +566,15 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       : {};
     const allyTeam = createAllyTeamFromFormation(selectedFormation, { selectedTraitByMonsterId: seedMonsterTraitDrafts });
     return ({
-      phase: PHASE.HOME,
+      phase: PHASE.START,
       turn: 1,
       winner: null,
       systemMessage: "",
+      progressionMeta: {
+        balanceAssumptions: HANAFUDA_BALANCE_ASSUMPTIONS,
+        testCases: HANAFUDA_TEST_CASES
+      },
+      progress: createProgressState(seed?.progress),
       formations: seedFormations,
       availableMonsters: seedAvailableMonsters,
       autosaveSlots: [],
@@ -577,6 +626,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     monster: createDefaultMonsterBuildState(),
     moves: createDefaultMovesBuildState(),
       ui: {
+        startView: START_VIEW.HUB,
+        trialSelectIndex: 0,
+        trialIntroPage: 0,
+        rewardChoiceIndex: 0,
         homeIndex: 0,
         homeHoverIndex: -1,
         currentHubSection: HOME_MENU_ITEMS[0]?.key || "battle",
@@ -655,6 +708,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         },
         unlocks: createDefaultTrainerCardUnlocks()
       },
+      trialBattle: {
+        bossId: null,
+        gimmick: null
+      },
       temp: { renderCells: [] }
     });
   };
@@ -723,6 +780,9 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     if (!saveData.monsters || typeof saveData.monsters !== "object") return false;
     if (!Array.isArray(saveData.formations)) return false;
     if (!saveData.settings || typeof saveData.settings !== "object") return false;
+    if (!saveData.progress || typeof saveData.progress !== "object") return false;
+    if (!Array.isArray(saveData.progress.unlockedTrials)) return false;
+    if (!Array.isArray(saveData.progress.clearedTrials)) return false;
     if (!saveData.formations.every((formation) => formation === null || validateFormationForSave(formation))) return false;
     return Object.values(saveData.monsters).every(validateMonsterEntryForSave);
   };
@@ -736,7 +796,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     if (!sessionData || typeof sessionData !== "object") return false;
     if (sessionData.version !== SAVE_VERSION) return false;
     if (!Number.isFinite(Number(sessionData.startedAt))) return false;
-    if (!["battlePrepare", "home"].includes(sessionData.lastSafeScreen)) return false;
+    if (!["battlePrepare", "home", "start"].includes(sessionData.lastSafeScreen)) return false;
     if (!(sessionData.selectedFormationId === null || typeof sessionData.selectedFormationId === "string")) return false;
     if (!["in_battle", "interrupted"].includes(sessionData.status)) return false;
     return true;
@@ -765,7 +825,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       savedAt: Date.now(),
       monsters,
       formations: (state?.formations || []).map((formation) => (Array.isArray(formation) ? cloneFormation(formation) : null)),
-      settings: (state?.settings && typeof state.settings === "object") ? { ...state.settings } : {}
+      settings: (state?.settings && typeof state.settings === "object") ? { ...state.settings } : {},
+      progress: {
+        unlockedTrials: normalizeTrialIds(state?.progress?.unlockedTrials),
+        clearedTrials: normalizeTrialIds(state?.progress?.clearedTrials)
+      }
     };
   };
   const applySaveDataToGameState = (state, saveData) => {
@@ -775,6 +839,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     while (nextFormations.length < FORMATION_SLOT_COUNT) nextFormations.push(null);
     state.formations = nextFormations.map((formation) => (Array.isArray(formation) ? cloneFormation(formation) : null));
     state.settings = { ...(valid.settings || {}) };
+    state.progress = createProgressState({
+      unlockedTrials: valid?.progress?.unlockedTrials || [],
+      clearedTrials: valid?.progress?.clearedTrials || [],
+      selectedTrial: null
+    });
     state.monsterTrainingDrafts = {};
     state.monsterMoveDrafts = {};
     state.monsterTraitDrafts = {};
@@ -839,7 +908,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const payload = {
       version: SAVE_VERSION,
       startedAt: Number(data?.startedAt) || Date.now(),
-      lastSafeScreen: data?.lastSafeScreen === "battlePrepare" ? "battlePrepare" : "home",
+      lastSafeScreen: data?.lastSafeScreen === "battlePrepare" ? "battlePrepare" : "start",
       selectedFormationId: data?.selectedFormationId ?? null,
       status: data?.status === "interrupted" ? "interrupted" : "in_battle"
     };
@@ -861,7 +930,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       if (sessionRaw.lastSafeScreen === "battlePrepare") {
         bootState.phase = PHASE.BATTLE_PREPARE;
       } else {
-        bootState.phase = PHASE.HOME;
+        bootState.phase = PHASE.START;
       }
       bootState.systemMessage = "前回のバトルは安全に中断されました。準備画面から再開してください。";
       clearSessionSave();
@@ -1225,6 +1294,13 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const ensureUiSafety = () => {
+    if (!gameState.progress || typeof gameState.progress !== "object") gameState.progress = createDefaultProgress();
+    gameState.progress.unlockedTrials = normalizeTrialIds(gameState.progress.unlockedTrials);
+    if (!gameState.progress.unlockedTrials.length) gameState.progress.unlockedTrials = [HANAFUDA_BOSS_ORDER[0]];
+    gameState.progress.clearedTrials = normalizeTrialIds(gameState.progress.clearedTrials);
+    gameState.progress.selectedTrial = (typeof gameState.progress.selectedTrial === "string" && HANAFUDA_BOSSES[gameState.progress.selectedTrial])
+      ? gameState.progress.selectedTrial
+      : null;
     gameState.ui.hubMenuItems = HOME_MENU_ITEMS.map((item) => item.key);
     const menuItems = getHubMenuItems(gameState);
     gameState.ui.homeIndex = getSelectableIndex(gameState.ui.homeIndex, menuItems.length - 1);
@@ -1236,6 +1312,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     gameState.ui.formationIndex = getSelectableIndex(gameState.ui.formationIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.battlePrepareIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
     gameState.ui.monsterListIndex = getSafeMonsterListIndex(gameState, gameState.ui.monsterListIndex);
+    if (!Object.values(START_VIEW).includes(gameState.ui.startView)) gameState.ui.startView = START_VIEW.HUB;
+    gameState.ui.trialSelectIndex = getSelectableIndex(gameState.ui.trialSelectIndex, HANAFUDA_BOSS_ORDER.length - 1);
+    gameState.ui.trialIntroPage = clamp(Number(gameState.ui.trialIntroPage) || 0, 0, 1);
+    gameState.ui.rewardChoiceIndex = getSelectableIndex(gameState.ui.rewardChoiceIndex, 2);
     if (gameState.ui.monsterDetailTab !== "moves") gameState.ui.monsterDetailTab = "status";
     gameState.ui.selectedMoveIndex = Number.isInteger(gameState.ui.selectedMoveIndex)
       ? clamp(gameState.ui.selectedMoveIndex, 0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES - 1)
@@ -1264,18 +1344,115 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const setPhase = (phase) => {
     gameState.phase = phase;
-    if (phase === PHASE.GAMEOVER || phase === PHASE.HOME || phase === PHASE.BATTLE_PREPARE) clearSessionSave();
+    if ([PHASE.GAMEOVER, PHASE.HOME, PHASE.START, PHASE.BATTLE_PREPARE, PHASE.REWARD].includes(phase)) clearSessionSave();
     ensureUiSafety();
   };
 
+  const getSelectedTrialBoss = () => {
+    const trialId = gameState?.progress?.selectedTrial;
+    return (typeof trialId === "string" && HANAFUDA_BOSSES[trialId]) ? HANAFUDA_BOSSES[trialId] : null;
+  };
+
+  const getNextTrialId = (trialId) => {
+    const index = HANAFUDA_BOSS_ORDER.indexOf(trialId);
+    if (index < 0 || index >= HANAFUDA_BOSS_ORDER.length - 1) return null;
+    return HANAFUDA_BOSS_ORDER[index + 1] || null;
+  };
+
+  const markTrialCleared = (trialId) => {
+    gameState.progress.clearedTrials = normalizeTrialIds([...gameState.progress.clearedTrials, trialId]);
+    gameState.progress.unlockedTrials = normalizeTrialIds([...gameState.progress.unlockedTrials, trialId]);
+    const nextTrialId = getNextTrialId(trialId);
+    if (nextTrialId) {
+      gameState.progress.unlockedTrials = normalizeTrialIds([...gameState.progress.unlockedTrials, nextTrialId]);
+    }
+    writeAutosave();
+    saveMainGame();
+  };
+
+  const buildTrialRewardChoices = (bossDef) => {
+    const allMoveIds = Object.keys(MOVES);
+    const moveId = allMoveIds[(bossDef.order - 1) % Math.max(1, allMoveIds.length)] || "clawStrike";
+    const allMonsterIds = Object.keys(MONSTERS);
+    const monsterId = allMonsterIds[(bossDef.order + 2) % Math.max(1, allMonsterIds.length)] || allMonsterIds[0];
+    return [
+      {
+        key: "move",
+        title: "Move Reward",
+        description: `${bossDef.data.rewardConcept} / ${MOVES[moveId]?.name || moveId} を研究開放`,
+        payload: { moveId, rewardConcept: bossDef.data.rewardConcept }
+      },
+      {
+        key: "stat",
+        title: "Stat Reward",
+        description: `${bossDef.name}の教訓に基づき先頭モンスターの全能力+1`,
+        payload: { statBonus: 1, lesson: bossDef.data.intendedLesson }
+      },
+      {
+        key: "monster",
+        title: "Monster Reward",
+        description: `${MONSTERS[monsterId]?.name || monsterId} を図鑑に加入`,
+        payload: { monsterId, themeIdentity: bossDef.data.themeIdentity }
+      }
+    ];
+  };
+
+  const applyTrialRewardChoice = (choice) => {
+    if (!choice || typeof choice !== "object") return;
+    if (choice.key === "move") {
+      const moveId = choice.payload?.moveId;
+      if (!moveId || !MOVES[moveId]) return;
+      Object.keys(MONSTERS).forEach((monsterId) => {
+        const draft = Array.isArray(gameState.monsterMoveDrafts[monsterId]) ? gameState.monsterMoveDrafts[monsterId].slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
+        if (draft.includes(moveId) || draft.length >= CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) return;
+        draft.push(moveId);
+        gameState.monsterMoveDrafts[monsterId] = draft;
+      });
+      return;
+    }
+    if (choice.key === "stat") {
+      const leaderId = getFormationAt(gameState, 0)?.find((unitId) => !!MONSTERS[unitId]);
+      if (!leaderId) return;
+      const draft = { ...(getMonsterTrainingDraft(leaderId, gameState) || createDefaultStatAllocation()) };
+      ["hp", "atk", "def", "spatk", "spdef", "spd"].forEach((statKey) => {
+        draft[statKey] = clamp((Number(draft[statKey]) || 0) + 1, 0, TRAINING_PER_STAT_CAP);
+      });
+      gameState.monsterTrainingDrafts[leaderId] = draft;
+      syncMonsterBuildState(leaderId, gameState);
+      return;
+    }
+    if (choice.key === "monster") {
+      const monsterId = choice.payload?.monsterId;
+      if (!monsterId || !MONSTERS[monsterId]) return;
+      if (!gameState.availableMonsters.includes(monsterId)) gameState.availableMonsters.push(monsterId);
+    }
+  };
+
+  const enterHub = () => {
+    gameState.ui.startView = START_VIEW.HUB;
+    gameState.progress.selectedTrial = null;
+    gameState.progress.pendingReward = null;
+    setPhase(PHASE.START);
+  };
+
+  const enterTrialSelect = () => {
+    gameState.ui.startView = START_VIEW.TRIAL_SELECT;
+    const selectedIndex = HANAFUDA_BOSS_ORDER.indexOf(gameState.progress.selectedTrial);
+    gameState.ui.trialSelectIndex = selectedIndex >= 0 ? selectedIndex : 0;
+    setPhase(PHASE.START);
+  };
+
+  const enterTrialIntro = (trialId) => {
+    if (!HANAFUDA_BOSSES[trialId]) return;
+    if (!gameState.progress.unlockedTrials.includes(trialId)) return;
+    gameState.progress.selectedTrial = trialId;
+    gameState.ui.startView = START_VIEW.TRIAL_INTRO;
+    gameState.ui.trialIntroPage = 0;
+    setPhase(PHASE.START);
+  };
+
   const enterHome = () => {
-    gameState.ui.homeIndex = getSafeHomeIndex(gameState.ui.homeIndex);
-    gameState.ui.homeHoverIndex = -1;
-    const hubItems = getHubMenuItems(gameState);
-    gameState.ui.currentHubSection = hubItems[gameState.ui.homeIndex]?.key || hubItems[0]?.key || "battle";
-    gameState.ui.formationIndex = -1;
-    gameState.ui.battlePrepareIndex = -1;
-    setPhase(PHASE.HOME);
+    enterHub();
   };
 
   const enterFormation = () => {
@@ -1523,7 +1700,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const selectedKey = hubItems[safeIndex]?.key;
     gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
     if (selectedKey === "battle") {
-      enterBattlePrepare();
+      enterTrialSelect();
       return;
     }
     if (selectedKey === "formation") {
@@ -2931,14 +3108,39 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     });
   };
 
+  const handleBattleFinished = (winner) => {
+    gameState.winner = winner;
+    const trialId = gameState?.progress?.selectedTrial;
+    const bossDef = (trialId && HANAFUDA_BOSSES[trialId]) ? HANAFUDA_BOSSES[trialId] : null;
+    if (!bossDef) {
+      setPhase(PHASE.GAMEOVER);
+      return;
+    }
+    if (winner === TEAM.ALLY) {
+      const rewardChoices = buildTrialRewardChoices(bossDef);
+      gameState.progress.pendingReward = {
+        trialId,
+        bossName: bossDef.name,
+        rewardConcept: bossDef.data.rewardConcept,
+        choices: rewardChoices,
+        selectedIndex: 0
+      };
+      markTrialCleared(trialId);
+      gameState.ui.rewardChoiceIndex = 0;
+      setPhase(PHASE.REWARD);
+      return;
+    }
+    gameState.systemMessage = `${bossDef.name}に敗北。進行度は失われません。`;
+    setPhase(PHASE.GAMEOVER);
+  };
+
   const updateBattlePlayback = (now) => {
     const flow = gameState.battleFlow;
     const event = flow.eventQueue[flow.currentEventIndex];
 
     if (!event) {
       if (flow.pendingTurnResult?.nextState?.winner) {
-        setPhase(PHASE.GAMEOVER);
-        gameState.winner = flow.pendingTurnResult.nextState.winner;
+        handleBattleFinished(flow.pendingTurnResult.nextState.winner);
       } else {
         finalizeTurnAndProceed();
       }
@@ -3099,8 +3301,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     }
     const winner = getWinnerFromRemainingUnits(gameState);
     if (winner) {
-      setPhase(PHASE.GAMEOVER);
-      gameState.winner = winner;
+      handleBattleFinished(winner);
       return;
     }
     if (shouldTriggerResetMove(gameState)) {
@@ -3111,8 +3312,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     if (gameState.playing.turnCount >= 1) gameState.playing.hasCompletedFirstTurn = true;
     initializePlanningTurn();
     if (gameState.turn > CONFIG.MAX_TURNS && gameState.phase !== PHASE.GAMEOVER) {
-      setPhase(PHASE.GAMEOVER);
-      gameState.winner = "draw";
+      handleBattleFinished("draw");
     }
   };
 
@@ -3287,8 +3487,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       if (!gameState.battleFlow.koReplacement.pendingSlots.length) {
         const winner = getWinnerFromRemainingUnits(gameState);
         if (winner) {
-          setPhase(PHASE.GAMEOVER);
-          gameState.winner = winner;
+          handleBattleFinished(winner);
           return;
         }
         gameState.battleFlow.mode = "command";
@@ -3402,7 +3601,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     gameState = createInitialState({
       formations: gameState.formations,
       availableMonsters: gameState.availableMonsters,
-      monsterTraitDrafts: gameState.monsterTraitDrafts
+      monsterTraitDrafts: gameState.monsterTraitDrafts,
+      progress: gameState.progress
     });
     setPhase(PHASE.PLAYING);
     applyBattleStartTraitEffects(gameState);
@@ -3436,6 +3636,26 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: MONSTERS[unitId].hp, hp: MONSTERS[unitId].hp, statuses: [] }));
   };
 
+  const createBossUnitIdFromDefinition = (bossDef) => {
+    const library = Object.keys(MONSTERS);
+    if (!library.length) return null;
+    const keyBase = bossDef?.id || "";
+    const hash = keyBase.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+    return library[hash % library.length] || library[0];
+  };
+
+  const createEnemyPartyFromBossDefinition = (bossDef) => {
+    const bossMonsterId = createBossUnitIdFromDefinition(bossDef);
+    if (!bossMonsterId || !MONSTERS[bossMonsterId]) return [];
+    return [{ unitId: bossMonsterId, slot: 0, maxHp: MONSTERS[bossMonsterId].hp, hp: MONSTERS[bossMonsterId].hp, statuses: [] }];
+  };
+
+  const resolveBattleFormationIndex = () => {
+    const candidates = (gameState.formations || []).map((formation, index) => ({ formation, index }));
+    const selected = candidates.find((entry) => hasAnyValidFormationMember(entry.formation));
+    return selected ? selected.index : 0;
+  };
+
   const startBattleFromFormation = (formationIndex) => {
     const safeIndex = getSafeFormationSlot(formationIndex);
     const formation = getFormationAt(gameState, safeIndex);
@@ -3445,7 +3665,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       formations: gameState.formations,
       availableMonsters: gameState.availableMonsters,
       battleFormationIndex: safeIndex,
-      monsterTraitDrafts: gameState.monsterTraitDrafts
+      monsterTraitDrafts: gameState.monsterTraitDrafts,
+      progress: gameState.progress
     });
     nextState.battle.player.party = playerParty;
     nextState.battle.player.activeIndex = 0;
@@ -3462,6 +3683,47 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     });
     gameState = nextState;
     debugLogBattleTeams(gameState, "battle-start");
+    setPhase(PHASE.PLAYING);
+    applyBattleStartTraitEffects(gameState);
+    initializePlanningTurn();
+  };
+
+  const startSelectedTrialBattle = () => {
+    const bossDef = getSelectedTrialBoss();
+    if (!bossDef) return;
+    const safeIndex = resolveBattleFormationIndex();
+    const formation = getFormationAt(gameState, safeIndex);
+    if (!hasAnyValidFormationMember(formation)) return;
+    const playerParty = createBattlePartyFromFormation(safeIndex);
+    const enemyParty = createEnemyPartyFromBossDefinition(bossDef);
+    const nextState = createInitialState({
+      formations: gameState.formations,
+      availableMonsters: gameState.availableMonsters,
+      battleFormationIndex: safeIndex,
+      monsterTraitDrafts: gameState.monsterTraitDrafts,
+      progress: gameState.progress
+    });
+    nextState.battle.player.party = playerParty;
+    nextState.battle.player.activeIndex = 0;
+    nextState.battle.enemy.party = enemyParty;
+    nextState.battle.enemy.activeIndex = 0;
+    nextState.progress.selectedTrial = bossDef.id;
+    nextState.trialBattle = {
+      bossId: bossDef.id,
+      gimmick: {
+        key: bossDef.data.bossGimmick?.key || null,
+        hooks: bossDef.data.bossGimmick?.gameStateHooks || [],
+        stateInit: bossDef.data.bossGimmick?.stateInit || {}
+      }
+    };
+    writeSessionSave({
+      startedAt: Date.now(),
+      lastSafeScreen: "start",
+      selectedFormationId: `formation_${safeIndex}`,
+      status: "in_battle"
+    });
+    gameState = nextState;
+    debugLogBattleTeams(gameState, `trial-start:${bossDef.id}`);
     setPhase(PHASE.PLAYING);
     applyBattleStartTraitEffects(gameState);
     initializePlanningTurn();
@@ -4050,6 +4312,125 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const visibleRows = Math.max(1, Math.floor((CONFIG.UI.MONSTER_GRID_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)
       / (CONFIG.UI.MONSTER_CARD_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)));
     return Math.max(0, Math.ceil(itemCount / CONFIG.UI.MONSTER_GRID_COLS) - visibleRows);
+  };
+
+  const renderProgressBoard = () => {
+    const board = createEl("div", "home-info-sub");
+    board.appendChild(createEl("div", "mini-heading", "Twelve Card Progress"));
+    HANAFUDA_BOSS_ORDER.forEach((trialId, index) => {
+      const boss = HANAFUDA_BOSSES[trialId];
+      const isCleared = gameState.progress.clearedTrials.includes(trialId);
+      const isUnlocked = gameState.progress.unlockedTrials.includes(trialId);
+      const marker = isCleared ? "✓" : (isUnlocked ? "•" : "🔒");
+      board.appendChild(createEl("div", "home-info-line", `[${marker}] ${index + 1}. ${boss?.name || trialId}`));
+    });
+    return board;
+  };
+
+  const renderStartHubScreen = () => {
+    const wrap = createEl("section", "home-screen");
+    wrap.appendChild(createEl("h2", "formation-title", "Hanafuda Hub"));
+    wrap.appendChild(createEl("p", "home-info-description", "十二札試練を選び、順番に攻略しましょう。"));
+    wrap.appendChild(renderProgressBoard());
+    const actionRow = createEl("div", "screen-button-row");
+    const trialBtn = createEl("button", "screen-nav-btn primary", "Trial Select");
+    trialBtn.dataset.action = "open-trial-select";
+    actionRow.appendChild(trialBtn);
+    wrap.appendChild(actionRow);
+    return wrap;
+  };
+
+  const renderTrialSelectScreen = () => {
+    const wrap = createEl("section", "formation-screen");
+    wrap.appendChild(createEl("h2", "formation-title", "Twelve Trials"));
+    const list = createEl("div", "monster-list-grid");
+    HANAFUDA_BOSS_ORDER.forEach((trialId, index) => {
+      const boss = HANAFUDA_BOSSES[trialId];
+      const unlocked = gameState.progress.unlockedTrials.includes(trialId);
+      const cleared = gameState.progress.clearedTrials.includes(trialId);
+      const lessonFocus = HANAFUDA_PROGRESS_LESSONS[index] || boss?.data?.intendedLesson || "-";
+      const card = createEl("button", `monster-list-item${index === gameState.ui.trialSelectIndex ? " active" : ""}`);
+      card.disabled = !unlocked;
+      card.dataset.action = "select-trial";
+      card.dataset.trialId = trialId;
+      card.dataset.index = String(index);
+      card.append(
+        createEl("div", "monster-list-name", `${index + 1}. ${boss?.name || trialId}`),
+        createEl("div", "monster-list-sub", `Lesson: ${lessonFocus}`),
+        createEl("div", "monster-list-sub", cleared ? "✓ Cleared" : (unlocked ? "• Unlocked" : "🔒 Locked"))
+      );
+      list.appendChild(card);
+    });
+    const buttons = createEl("div", "screen-button-row");
+    const back = createEl("button", "screen-nav-btn", "Back Hub");
+    back.dataset.action = "go-home";
+    buttons.appendChild(back);
+    wrap.append(list, buttons);
+    return wrap;
+  };
+
+  const renderTrialIntroScreen = () => {
+    const bossDef = getSelectedTrialBoss();
+    const wrap = createEl("section", "formation-screen");
+    if (!bossDef) {
+      wrap.appendChild(createEl("p", "formation-help", "試練データが見つかりません。"));
+      return wrap;
+    }
+    const introPages = [
+      `${bossDef.name} — ${bossDef.data.themeIdentity}`,
+      `Lesson: ${bossDef.data.intendedLesson}\nGimmick: ${bossDef.bossGimmickSummary || bossDef.data.bossGimmick?.key || "-"}`
+    ];
+    wrap.appendChild(createEl("h2", "formation-title", bossDef.name));
+    const pageText = introPages[clamp(gameState.ui.trialIntroPage, 0, introPages.length - 1)];
+    pageText.split("\n").forEach((line) => wrap.appendChild(createEl("p", "home-info-description", line)));
+    const buttons = createEl("div", "screen-button-row");
+    const back = createEl("button", "screen-nav-btn", "Back");
+    back.dataset.action = "open-trial-select";
+    const next = createEl("button", "screen-nav-btn", gameState.ui.trialIntroPage >= introPages.length - 1 ? "Start Trial" : "Next");
+    next.dataset.action = gameState.ui.trialIntroPage >= introPages.length - 1 ? "start-selected-trial" : "trial-intro-next";
+    buttons.append(back, next);
+    wrap.appendChild(buttons);
+    return wrap;
+  };
+
+  const renderRewardScreen = () => {
+    const reward = gameState.progress.pendingReward;
+    const wrap = createEl("section", "formation-screen");
+    wrap.appendChild(createEl("h2", "formation-title", `Reward - ${reward?.bossName || ""}`));
+    const choices = Array.isArray(reward?.choices) ? reward.choices : [];
+    const list = createEl("div", "monster-list-grid");
+    choices.forEach((choice, index) => {
+      const card = createEl("button", `monster-list-item${index === gameState.ui.rewardChoiceIndex ? " active" : ""}`);
+      card.dataset.action = "pick-reward";
+      card.dataset.index = String(index);
+      card.append(
+        createEl("div", "monster-list-name", choice.title),
+        createEl("div", "monster-list-sub", choice.description)
+      );
+      list.appendChild(card);
+    });
+    const row = createEl("div", "screen-button-row");
+    const confirm = createEl("button", "screen-nav-btn primary", "受け取ってHubへ");
+    confirm.dataset.action = "confirm-reward";
+    row.appendChild(confirm);
+    wrap.append(list, row);
+    return wrap;
+  };
+
+  const renderBattleResultScreen = () => {
+    const wrap = createEl("section", "formation-screen");
+    wrap.appendChild(createEl("h2", "formation-title", gameState.winner === TEAM.ALLY ? "Victory" : "Trial Failed"));
+    wrap.appendChild(createEl("p", "home-info-description", gameState.systemMessage || "敗北しても試練進行は失われません。"));
+    const back = createEl("button", "screen-nav-btn primary", "Hubへ戻る");
+    back.dataset.action = "go-home";
+    wrap.appendChild(back);
+    return wrap;
+  };
+
+  const renderStartPhaseScreen = () => {
+    if (gameState.ui.startView === START_VIEW.TRIAL_SELECT) return renderTrialSelectScreen();
+    if (gameState.ui.startView === START_VIEW.TRIAL_INTRO) return renderTrialIntroScreen();
+    return renderStartHubScreen();
   };
 
   const renderHomeScreen = () => {
@@ -4761,7 +5142,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const render = () => {
     ensureUiSafety();
-    if (gameState.phase === PHASE.PLAYING || gameState.phase === PHASE.GAMEOVER) {
+    if (gameState.phase === PHASE.PLAYING) {
       syncPartyUiState();
     }
     clearTempArrays();
@@ -4782,7 +5163,13 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     }
 
     const main = createEl("div", "main");
-    if (gameState.phase === PHASE.HOME) {
+    if (gameState.phase === PHASE.START) {
+      main.appendChild(renderStartPhaseScreen());
+    } else if (gameState.phase === PHASE.REWARD) {
+      main.appendChild(renderRewardScreen());
+    } else if (gameState.phase === PHASE.GAMEOVER) {
+      main.appendChild(renderBattleResultScreen());
+    } else if (gameState.phase === PHASE.HOME) {
       main.appendChild(renderHomeScreen());
     } else if (gameState.phase === PHASE.FORMATION) {
       main.appendChild(renderFormationScreen());
@@ -4804,9 +5191,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       battleStage.appendChild(renderBattlefield());
       battleStage.appendChild(renderBattleMessageBox());
       main.appendChild(battleStage);
-      if (gameState.phase !== PHASE.GAMEOVER) {
-        main.appendChild(renderCommandArea());
-      }
+      main.appendChild(renderCommandArea());
     }
     app.append(main);
     const logModal = renderLogModal();
@@ -4928,6 +5313,45 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const a = target.dataset.action;
     if (a === "home-card-confirm") {
       handleHomeMenuConfirm(Number(target.dataset.index));
+      render();
+      return;
+    }
+    if (a === "open-trial-select") {
+      enterTrialSelect();
+      render();
+      return;
+    }
+    if (a === "select-trial") {
+      const trialId = target.dataset.trialId;
+      const index = Number(target.dataset.index);
+      gameState.ui.trialSelectIndex = getSelectableIndex(index, HANAFUDA_BOSS_ORDER.length - 1);
+      if (trialId && gameState.progress.unlockedTrials.includes(trialId)) enterTrialIntro(trialId);
+      render();
+      return;
+    }
+    if (a === "trial-intro-next") {
+      gameState.ui.trialIntroPage = clamp(gameState.ui.trialIntroPage + 1, 0, 1);
+      render();
+      return;
+    }
+    if (a === "start-selected-trial") {
+      startSelectedTrialBattle();
+      render();
+      return;
+    }
+    if (a === "pick-reward") {
+      gameState.ui.rewardChoiceIndex = getSelectableIndex(Number(target.dataset.index), 2);
+      render();
+      return;
+    }
+    if (a === "confirm-reward") {
+      const reward = gameState.progress.pendingReward;
+      const choices = Array.isArray(reward?.choices) ? reward.choices : [];
+      const selected = choices[gameState.ui.rewardChoiceIndex] || choices[0] || null;
+      if (selected) applyTrialRewardChoice(selected);
+      gameState.progress.pendingReward = null;
+      gameState.progress.selectedTrial = null;
+      enterHub();
       render();
       return;
     }
@@ -5088,6 +5512,53 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   });
 
   document.addEventListener("keydown", (event) => {
+    if (gameState.phase === PHASE.START) {
+      if (gameState.ui.startView === START_VIEW.HUB) {
+        if (event.key === "Enter") enterTrialSelect();
+      } else if (gameState.ui.startView === START_VIEW.TRIAL_SELECT) {
+        if (event.key === "ArrowUp") gameState.ui.trialSelectIndex -= 1;
+        if (event.key === "ArrowDown") gameState.ui.trialSelectIndex += 1;
+        gameState.ui.trialSelectIndex = getSelectableIndex(gameState.ui.trialSelectIndex, HANAFUDA_BOSS_ORDER.length - 1);
+        if (event.key === "Enter") {
+          const trialId = HANAFUDA_BOSS_ORDER[gameState.ui.trialSelectIndex];
+          if (trialId && gameState.progress.unlockedTrials.includes(trialId)) enterTrialIntro(trialId);
+        }
+        if (event.key === "Escape") enterHub();
+      } else if (gameState.ui.startView === START_VIEW.TRIAL_INTRO) {
+        if (event.key === "Enter") {
+          if (gameState.ui.trialIntroPage >= 1) startSelectedTrialBattle();
+          else gameState.ui.trialIntroPage += 1;
+        }
+        if (event.key === "Escape") enterTrialSelect();
+      }
+      render();
+      return;
+    }
+
+    if (gameState.phase === PHASE.REWARD) {
+      if (event.key === "ArrowUp") gameState.ui.rewardChoiceIndex -= 1;
+      if (event.key === "ArrowDown") gameState.ui.rewardChoiceIndex += 1;
+      gameState.ui.rewardChoiceIndex = getSelectableIndex(gameState.ui.rewardChoiceIndex, 2);
+      if (event.key === "Enter") {
+        const reward = gameState.progress.pendingReward;
+        const selected = reward?.choices?.[gameState.ui.rewardChoiceIndex] || reward?.choices?.[0];
+        if (selected) applyTrialRewardChoice(selected);
+        gameState.progress.pendingReward = null;
+        gameState.progress.selectedTrial = null;
+        enterHub();
+      }
+      render();
+      return;
+    }
+
+    if (gameState.phase === PHASE.GAMEOVER) {
+      if (event.key === "Enter" || event.key === "Escape") {
+        enterHub();
+        render();
+      }
+      return;
+    }
+
     if (gameState.phase === PHASE.HOME) {
       const cols = Math.max(1, Math.trunc(CONFIG.UI.HOME_MENU_COLS));
       const current = getSafeHomeIndex(gameState.ui.homeIndex);
