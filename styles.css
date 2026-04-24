@@ -42,6 +42,64 @@ body {
   background: linear-gradient(180deg, #2f2238 0%, #1d2435 40%, #1c2b20 100%);
 }
 
+.hanafuda-trial-select-screen {
+  background: linear-gradient(180deg, rgba(20, 26, 40, 0.95), rgba(16, 20, 32, 0.92));
+  border: 1px solid rgba(120, 145, 190, 0.35);
+  border-radius: 12px;
+}
+
+.hanafuda-trial-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.hanafuda-trial-card {
+  border: 1px solid rgba(114, 134, 170, 0.45);
+  border-radius: 10px;
+  background: linear-gradient(160deg, rgba(40, 48, 70, 0.95), rgba(28, 34, 50, 0.94));
+  color: #eef4ff;
+  padding: 10px;
+  min-height: 118px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  transition: 0.15s ease;
+}
+
+.hanafuda-trial-card.active {
+  border-color: #ffe163;
+  box-shadow: 0 0 0 2px rgba(255, 225, 99, 0.35);
+}
+
+.hanafuda-trial-card.cleared {
+  border-color: #79dfaf;
+}
+
+.hanafuda-trial-card.locked {
+  opacity: 0.42;
+  filter: saturate(0.45);
+}
+
+.trial-card-index {
+  font-size: 11px;
+  color: #b9c7e6;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.trial-card-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.trial-card-lesson,
+.trial-card-status {
+  font-size: 12px;
+  color: #d6e1fa;
+}
+
 .shared-content-width {
   width: min(100%, var(--section-max-width-px, var(--shared-content-max-width)));
   margin-inline: auto;
