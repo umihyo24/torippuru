@@ -88,9 +88,9 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       FORMATION_LIST_WIDTH: 740,
       FORMATION_LIST_ITEM_HEIGHT: 56,
       FORMATION_LIST_SPACING_Y: 8,
-      BATTLE_PREPARE_LIST_ITEM_HEIGHT: 192,
+      BATTLE_PREPARE_LIST_ITEM_HEIGHT: 158,
       BATTLE_PREPARE_SLOT_LABEL_HEIGHT: 22,
-      BATTLE_PREPARE_PREVIEW_HEIGHT: 132,
+      BATTLE_PREPARE_PREVIEW_HEIGHT: 98,
       BATTLE_PREPARE_GRID_COLUMNS: 3,
       BATTLE_PREPARE_GRID_ROWS: 2,
       BATTLE_PREPARE_SUMMARY_HEIGHT: 16,
@@ -1097,14 +1097,17 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return card;
   };
 
-  const renderFormationPreview = (formation) => {
+  const renderFormationPreview = (formation, options = {}) => {
+    const emptySubText = typeof options.emptySubText === "string" && options.emptySubText.trim()
+      ? options.emptySubText.trim()
+      : "モンスターを設定してください";
     const preview = createEl("div", "formation-preview-grid");
     const members = getFormationUnitIds(formation).slice(0, FORMATION_MEMBER_COUNT);
     if (!members.length) {
       const empty = createEl("div", "formation-empty-state");
       empty.append(
         createEl("div", "formation-empty-title", "未編成"),
-        createEl("div", "formation-empty-sub", "モンスターを設定してください")
+        createEl("div", "formation-empty-sub", emptySubText)
       );
       preview.appendChild(empty);
       return preview;
@@ -1120,15 +1123,22 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     index,
     isSelected = false,
     action = "formation-select",
-    showSummary = false
+    showSummary = false,
+    previewOptions = {},
+    extraClassName = ""
   } = {}) => {
-    const item = createEl("button", `formation-slot-item formation-preview-card${isSelected ? " active" : ""}`);
+    const members = getFormationMembers(formation);
+    const hasMembers = members.length > 0;
+    const hasExtraClass = typeof extraClassName === "string" && extraClassName.trim();
+    const item = createEl(
+      "button",
+      `formation-slot-item formation-preview-card${isSelected ? " active" : ""}${hasMembers ? " filled" : ""}${hasExtraClass ? ` ${extraClassName.trim()}` : ""}`
+    );
     item.dataset.action = action;
     item.dataset.index = String(getSafeFormationSlot(index));
     item.appendChild(createEl("div", "formation-slot-name", `Slot ${index + 1}`));
-    item.appendChild(renderFormationPreview(formation));
+    item.appendChild(renderFormationPreview(formation, previewOptions));
     if (showSummary) {
-      const members = getFormationMembers(formation);
       item.appendChild(createEl("div", "formation-slot-summary", `メンバー ${members.length}/${FORMATION_MEMBER_COUNT}`));
     }
     return item;
@@ -4546,7 +4556,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const renderBattlePrepareScreen = () => {
-    const wrap = createEl("section", "formation-screen");
+    const wrap = createEl("section", "formation-screen battle-prepare-screen");
     wrap.style.setProperty("--formation-list-x", `${CONFIG.UI.FORMATION_LIST_X}px`);
     wrap.style.setProperty("--formation-list-y", `${CONFIG.UI.FORMATION_LIST_Y}px`);
     wrap.style.setProperty("--formation-list-width", `${CONFIG.UI.FORMATION_LIST_WIDTH}px`);
@@ -4558,6 +4568,14 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     wrap.style.setProperty("--formation-preview-rows", `${CONFIG.UI.BATTLE_PREPARE_GRID_ROWS}`);
     wrap.style.setProperty("--formation-summary-height", `${CONFIG.UI.BATTLE_PREPARE_SUMMARY_HEIGHT}px`);
     wrap.appendChild(createEl("h2", "formation-title", "Battle Prepare"));
+    const selectedIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
+    const selectedFormation = selectedIndex >= 0 ? getFormationAt(gameState, selectedIndex) : null;
+    const selectedMemberCount = getFormationMembers(selectedFormation).length;
+    wrap.appendChild(createEl(
+      "div",
+      "battle-prepare-status",
+      `選択中: Slot ${selectedIndex + 1} / メンバー ${selectedMemberCount}/${FORMATION_MEMBER_COUNT}`
+    ));
     const list = createEl("div", "formation-slot-list");
     for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
       const formation = getFormationAt(gameState, i);
@@ -4567,18 +4585,20 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         index: i,
         isSelected,
         action: "battle-prepare-select",
-        showSummary: true
+        showSummary: true,
+        previewOptions: { emptySubText: "モンスターを編成して出撃" },
+        extraClassName: "battle-prepare-slot"
       }));
     }
     const buttons = createEl("div", "screen-button-row");
-    const start = createEl("button", "screen-nav-btn", "Start Battle");
-    start.dataset.action = "battle-start";
-    const selectedFormation = gameState.ui.battlePrepareIndex >= 0 ? getFormationAt(gameState, gameState.ui.battlePrepareIndex) : null;
-    start.disabled = gameState.ui.battlePrepareIndex < 0 || !hasAnyValidFormationMember(selectedFormation);
-    const back = createEl("button", "screen-nav-btn", "Back HOME");
+    buttons.classList.add("battle-prepare-actions");
+    const back = createEl("button", "screen-nav-btn", "もどる");
     back.dataset.action = "go-home";
-    buttons.append(start, back);
-    wrap.append(list, buttons, createEl("div", "formation-help", "Choose a saved formation to start battle"));
+    const start = createEl("button", "screen-nav-btn primary", "勝ちにいく");
+    start.dataset.action = "battle-start";
+    start.disabled = selectedIndex < 0 || !hasAnyValidFormationMember(selectedFormation);
+    buttons.append(back, start);
+    wrap.append(list, buttons, createEl("div", "formation-help", "編成を確認して出撃しましょう"));
     return wrap;
   };
 
