@@ -1068,21 +1068,8 @@ button:disabled {
 }
 
 .formation-edit-screen {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.formation-edit-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  padding-bottom: 16px;
+  min-height: 840px;
+  overflow: hidden;
 }
 
 .formation-title { margin: 0; }
@@ -1234,7 +1221,32 @@ button:disabled {
 .formation-edit-body {
   position: relative;
   min-height: 780px;
-  flex-shrink: 0;
+}
+
+.formation-edit-body.two-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.formation-edit-left-panel,
+.formation-edit-right-panel {
+  position: absolute;
+  border: 2px solid #4e638d;
+  border-radius: 10px;
+  background: rgba(12, 22, 44, 0.92);
+}
+
+.formation-edit-left-panel {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 10px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.formation-left-main {
+  position: relative;
+  min-height: 0;
 }
 
 .formation-pane-title {
@@ -1259,9 +1271,9 @@ button:disabled {
 
 .formation-edit-area {
   position: absolute;
-  border: 2px solid #4e638d;
+  border: 1px solid #4e638d;
   border-radius: 10px;
-  background: rgba(12, 22, 44, 0.88);
+  background: rgba(12, 22, 44, 0.82);
 }
 
 .formation-grid-area {
@@ -1333,14 +1345,14 @@ button:disabled {
 }
 
 .formation-edit-footer {
-  height: 72px;
+  height: 54px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: center;
-  gap: 16px;
-  padding: 12px;
-  background: #0b1220;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  border-top: none;
   flex-shrink: 0;
 }
 
@@ -1406,6 +1418,132 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.formation-edit-right-panel {
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
+  gap: 10px;
+}
+
+.formation-detail-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.formation-empty-detail {
+  min-height: 120px;
+  border: 1px dashed rgba(138, 164, 215, 0.55);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #b7c8ee;
+}
+
+.formation-detail-top {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.formation-detail-portrait {
+  width: 140px;
+  height: 110px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.formation-detail-top-info {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.formation-detail-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.formation-detail-key {
+  font-size: 12px;
+  color: #b7caee;
+}
+
+.formation-detail-type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.formation-type-badge {
+  border: 1px solid color-mix(in srgb, var(--type-color, #6a84b5) 72%, #ffffff 28%);
+  background: color-mix(in srgb, var(--type-color, #6a84b5) 25%, rgba(18, 29, 49, 0.92));
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.formation-type-badge.muted {
+  --type-color: #5d6c88;
+  color: #a8b8d8;
+}
+
+.formation-detail-trait {
+  border: 1px solid rgba(130, 154, 208, 0.45);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.formation-detail-stat-grid {
+  border: 1px solid rgba(130, 154, 208, 0.35);
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.formation-detail-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(31, 47, 79, 0.7);
+  font-size: 12px;
+}
+
+.formation-detail-move-list {
+  border: 1px solid rgba(130, 154, 208, 0.35);
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  gap: 5px;
+}
+
+.formation-detail-move-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 52px 44px 95px;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  border-radius: 6px;
+  background: rgba(25, 38, 64, 0.72);
+  padding: 4px 6px;
+}
+
+.formation-detail-move-row .move-name,
+.formation-detail-move-row .move-power {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.formation-open-build-btn {
+  justify-self: end;
 }
 
 .monster-list-screen,

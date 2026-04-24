@@ -35,31 +35,39 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     SPEED_BASE: 1,
     UI: {
       FORMATION_EDIT_PADDING: 20,
-      FORMATION_TOP_X: 20,
-      FORMATION_TOP_Y: 72,
-      FORMATION_TOP_WIDTH: 740,
-      FORMATION_TOP_HEIGHT: 248,
-      SLOT_WIDTH: 238,
-      SLOT_HEIGHT: 112,
+      FORMATION_LEFT_PANEL_X: 20,
+      FORMATION_LEFT_PANEL_Y: 60,
+      FORMATION_LEFT_PANEL_WIDTH: 760,
+      FORMATION_LEFT_PANEL_HEIGHT: 760,
+      FORMATION_RIGHT_PANEL_X: 796,
+      FORMATION_RIGHT_PANEL_Y: 60,
+      FORMATION_RIGHT_PANEL_WIDTH: 448,
+      FORMATION_RIGHT_PANEL_HEIGHT: 760,
+      FORMATION_TOP_X: 12,
+      FORMATION_TOP_Y: 50,
+      FORMATION_TOP_WIDTH: 736,
+      FORMATION_TOP_HEIGHT: 228,
+      SLOT_WIDTH: 236,
+      SLOT_HEIGHT: 102,
       SLOT_IMAGE_HEIGHT: 78,
       SLOT_NAME_HEIGHT: 24,
       SLOT_GAP_X: 12,
       SLOT_GAP_Y: 12,
-      DIVIDER_Y: 336,
+      DIVIDER_Y: 290,
       DIVIDER_HEIGHT: 4,
-      MONSTER_GRID_X: 20,
-      MONSTER_GRID_Y: 352,
-      MONSTER_GRID_WIDTH: 740,
-      MONSTER_GRID_HEIGHT: 424,
+      MONSTER_GRID_X: 12,
+      MONSTER_GRID_Y: 304,
+      MONSTER_GRID_WIDTH: 736,
+      MONSTER_GRID_HEIGHT: 396,
       MONSTER_CARD_WIDTH: 116,
-      MONSTER_CARD_HEIGHT: 96,
+      MONSTER_CARD_HEIGHT: 92,
       MONSTER_GRID_COLS: 6,
       MONSTER_GRID_GAP_X: 8,
       MONSTER_GRID_GAP_Y: 8,
-      BUTTON_AREA_X: 20,
-      BUTTON_AREA_Y: 790,
-      BUTTON_AREA_WIDTH: 740,
-      BUTTON_AREA_HEIGHT: 56,
+      BUTTON_AREA_X: 12,
+      BUTTON_AREA_Y: 710,
+      BUTTON_AREA_WIDTH: 736,
+      BUTTON_AREA_HEIGHT: 42,
       BUTTON_WIDTH: 140,
       BUTTON_HEIGHT: 42,
       BUTTON_GAP: 12,
@@ -579,8 +587,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         monsterDetailTab: "status",
         selectedMoveIndex: null,
         monsterDetailSnapshot: null,
+        returnTo: null,
         formationEdit: {
           selectedSlotIndex: -1,
+          selectedMonsterKey: null,
+          returnScreenAfterMonsterEdit: null,
           draft: null,
           scrollOffset: 0
         },
@@ -1233,9 +1244,12 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     }
     const edit = gameState.ui.formationEdit;
     edit.selectedSlotIndex = getSelectableIndex(edit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
+    edit.selectedMonsterKey = MONSTERS[edit.selectedMonsterKey] ? edit.selectedMonsterKey : null;
+    edit.returnScreenAfterMonsterEdit = edit.returnScreenAfterMonsterEdit === "formationEdit" ? "formationEdit" : null;
     if (!Array.isArray(edit.draft)) edit.draft = createEmptyFormation();
     edit.draft = cloneFormation(edit.draft);
     edit.scrollOffset = Math.max(0, Number.isFinite(edit.scrollOffset) ? Math.trunc(edit.scrollOffset) : 0);
+    gameState.ui.returnTo = gameState.ui.returnTo === "formationEdit" ? "formationEdit" : null;
   };
 
   const setPhase = (phase) => {
@@ -1262,8 +1276,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   const enterFormationEdit = (index) => {
     const safeIndex = getSafeFormationSlot(index);
     const source = getFormationAt(gameState, safeIndex) || createEmptyFormation();
+    const firstMonsterInDraft = source.find((unitId) => MONSTERS[unitId]) || null;
     gameState.currentEditIndex = safeIndex;
     gameState.ui.formationEdit.selectedSlotIndex = -1;
+    gameState.ui.formationEdit.selectedMonsterKey = firstMonsterInDraft;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
     gameState.ui.formationEdit.draft = cloneFormation(source);
     gameState.ui.formationEdit.scrollOffset = 0;
     setPhase(PHASE.FORMATION_EDIT);
@@ -1281,6 +1298,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     if (!MONSTERS[gameState.selectedMonsterId]) {
       gameState.selectedMonsterId = ids[gameState.ui.monsterListIndex] || ids[0] || null;
     }
+    gameState.ui.returnTo = null;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
     setPhase(PHASE.MONSTER_LIST);
   };
 
@@ -1401,21 +1420,34 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const saveMonsterDetailAndExit = () => {
     const monsterId = gameState.selectedMonsterId;
-    if (!monsterId || !MONSTERS[monsterId]) {
-      enterMonsterList();
+    if (monsterId && MONSTERS[monsterId]) {
+      const selected = Array.isArray(gameState.moves?.selected) ? gameState.moves.selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
+      while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
+      gameState.monsterMoveDrafts[monsterId] = selected;
+      gameState.ui.monsterDetailSnapshot = captureMonsterDetailSnapshot(monsterId, gameState);
+      writeAutosave();
+    }
+    const shouldReturnFormation = gameState.ui.returnTo === "formationEdit" || gameState.ui.formationEdit.returnScreenAfterMonsterEdit === "formationEdit";
+    gameState.ui.returnTo = null;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
+    if (shouldReturnFormation) {
+      if (monsterId && MONSTERS[monsterId]) gameState.ui.formationEdit.selectedMonsterKey = monsterId;
+      setPhase(PHASE.FORMATION_EDIT);
       return;
     }
-    const selected = Array.isArray(gameState.moves?.selected) ? gameState.moves.selected.slice(0, CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) : [];
-    while (selected.length < CONFIG.MONSTER_BUILD.MAX_SELECTABLE_MOVES) selected.push(null);
-    gameState.monsterMoveDrafts[monsterId] = selected;
-    gameState.ui.monsterDetailSnapshot = captureMonsterDetailSnapshot(monsterId, gameState);
-    writeAutosave();
     enterMonsterList();
   };
 
   const cancelMonsterDetailAndExit = () => {
     restoreMonsterDetailSnapshot(gameState);
     gameState.ui.monsterDetailSnapshot = null;
+    const shouldReturnFormation = gameState.ui.returnTo === "formationEdit" || gameState.ui.formationEdit.returnScreenAfterMonsterEdit === "formationEdit";
+    gameState.ui.returnTo = null;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
+    if (shouldReturnFormation) {
+      setPhase(PHASE.FORMATION_EDIT);
+      return;
+    }
     enterMonsterList();
   };
 
@@ -1449,6 +1481,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const draft = cloneFormation(gameState.ui.formationEdit.draft);
     const isEmpty = draft.every((unitId) => !unitId);
     gameState.formations[index] = isEmpty ? null : draft;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
+    gameState.ui.returnTo = null;
     gameState.currentEditIndex = null;
     writeAutosave();
     enterFormation();
@@ -1456,6 +1490,9 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const cancelFormationEdit = () => {
     gameState.ui.formationEdit.draft = createEmptyFormation();
+    gameState.ui.formationEdit.selectedMonsterKey = null;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
+    gameState.ui.returnTo = null;
     gameState.currentEditIndex = null;
     enterFormation();
   };
@@ -1463,6 +1500,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   const resetFormationEditDraft = () => {
     gameState.ui.formationEdit.draft = createEmptyFormation();
     gameState.ui.formationEdit.selectedSlotIndex = 0;
+    gameState.ui.formationEdit.selectedMonsterKey = null;
     gameState.ui.formationEdit.scrollOffset = 0;
   };
 
@@ -1498,7 +1536,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const handleFormationSlotSelect = (index) => {
-    gameState.ui.formationEdit.selectedSlotIndex = getSafeEditPartyIndex(index);
+    const safeIndex = getSafeEditPartyIndex(index);
+    gameState.ui.formationEdit.selectedSlotIndex = safeIndex;
+    const selectedKey = safeIndex >= 0 ? gameState.ui.formationEdit.draft[safeIndex] : null;
+    gameState.ui.formationEdit.selectedMonsterKey = MONSTERS[selectedKey] ? selectedKey : null;
   };
 
   const findMonsterSlotInDraft = (draft, monsterId) => cloneFormation(draft).findIndex((unitId) => unitId === monsterId);
@@ -1525,12 +1566,45 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const assignMonsterToSelectedSlot = (monsterIndex) => {
-    const slotIndex = getSelectableIndex(gameState.ui.formationEdit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
-    if (slotIndex < 0) return;
     const boxIndex = getSafeEditMonsterIndex(gameState, monsterIndex);
     const unitId = gameState.availableMonsters[boxIndex] || null;
     if (!unitId) return;
+    gameState.ui.formationEdit.selectedMonsterKey = unitId;
+    const slotIndex = getSelectableIndex(gameState.ui.formationEdit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
+    if (slotIndex < 0) return;
     gameState.ui.formationEdit.draft = assignOrSwapMonsterInDraft(gameState.ui.formationEdit.draft, slotIndex, unitId);
+  };
+
+  const getFormationEditSelectedMonsterId = (state = gameState) => {
+    const selected = state?.ui?.formationEdit?.selectedMonsterKey;
+    if (selected && MONSTERS[selected]) return selected;
+    const slotIndex = getSelectableIndex(state?.ui?.formationEdit?.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
+    if (slotIndex >= 0) {
+      const fromSlot = state?.ui?.formationEdit?.draft?.[slotIndex];
+      if (fromSlot && MONSTERS[fromSlot]) return fromSlot;
+    }
+    return null;
+  };
+
+  const getMonsterTypeKeys = (monsterId) => {
+    if (!monsterId || !MONSTERS[monsterId]) return [];
+    const moves = getMonsterMoveDraft(monsterId, gameState);
+    const typeKeys = [];
+    moves.forEach((moveId) => {
+      const typeKey = MOVES?.[moveId]?.type;
+      if (!TYPE_META[typeKey] || typeKeys.includes(typeKey)) return;
+      typeKeys.push(typeKey);
+    });
+    return typeKeys;
+  };
+
+  const openMonsterEditFromFormation = () => {
+    const monsterId = getFormationEditSelectedMonsterId(gameState);
+    if (!monsterId) return;
+    gameState.ui.formationEdit.selectedMonsterKey = monsterId;
+    gameState.ui.formationEdit.returnScreenAfterMonsterEdit = "formationEdit";
+    gameState.ui.returnTo = "formationEdit";
+    enterMonsterDetail(monsterId);
   };
 
   const getTeamState = (state, team) => state.teams[team];
@@ -4446,14 +4520,22 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const wrap = createEl("section", "formation-edit-screen");
     const edit = gameState.ui.formationEdit;
     const draft = cloneFormation(edit.draft);
+    const selectedMonsterId = getFormationEditSelectedMonsterId(gameState);
+    const selectedMonster = selectedMonsterId ? MONSTERS[selectedMonsterId] : null;
     const slotRects = getFormationSlotRects();
     const monsterRects = getMonsterGridItemRects(edit.scrollOffset, gameState.availableMonsters.length);
     wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
     wrap.style.setProperty("--front-slot-color", CONFIG.UI.FRONT_SLOT_COLOR);
     wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
-    const content = createEl("div", "formation-edit-content");
-    content.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
-    const body = createEl("div", "formation-edit-body");
+    const body = createEl("div", "formation-edit-body two-panel");
+    const leftPanel = createEl("section", "formation-edit-left-panel");
+    leftPanel.style.left = `${CONFIG.UI.FORMATION_LEFT_PANEL_X}px`;
+    leftPanel.style.top = `${CONFIG.UI.FORMATION_LEFT_PANEL_Y}px`;
+    leftPanel.style.width = `${CONFIG.UI.FORMATION_LEFT_PANEL_WIDTH}px`;
+    leftPanel.style.height = `${CONFIG.UI.FORMATION_LEFT_PANEL_HEIGHT}px`;
+    leftPanel.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
+
+    const leftBody = createEl("div", "formation-left-main");
     const formationArea = createEl("div", "formation-edit-area formation-grid-area");
     formationArea.style.left = `${CONFIG.UI.FORMATION_TOP_X}px`;
     formationArea.style.top = `${CONFIG.UI.FORMATION_TOP_Y}px`;
@@ -4530,18 +4612,93 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       box.appendChild(row);
     });
 
-    body.append(formationArea, divider, box);
-    content.append(body, createEl("div", "formation-help", "スロット選択→モンスター選択 / マウスホイールで一覧スクロール"));
+    leftBody.append(formationArea, divider, box);
 
     const footer = createEl("div", "formation-edit-footer");
-    const backBtn = createEl("button", "screen-nav-btn", "Back");
+    const backBtn = createEl("button", "screen-nav-btn", "もどる");
     backBtn.dataset.action = "formation-edit-back";
-    const saveBtn = createEl("button", "screen-nav-btn primary", "Save");
+    const saveBtn = createEl("button", "screen-nav-btn primary", "保存/確定");
     saveBtn.dataset.action = "formation-edit-save";
-    const resetBtn = createEl("button", "screen-nav-btn danger", "Reset");
-    resetBtn.dataset.action = "formation-edit-reset";
-    footer.append(backBtn, saveBtn, resetBtn);
-    wrap.append(content, footer);
+    footer.append(backBtn, saveBtn);
+    leftPanel.append(leftBody, footer);
+
+    const rightPanel = createEl("section", "formation-edit-right-panel");
+    rightPanel.style.left = `${CONFIG.UI.FORMATION_RIGHT_PANEL_X}px`;
+    rightPanel.style.top = `${CONFIG.UI.FORMATION_RIGHT_PANEL_Y}px`;
+    rightPanel.style.width = `${CONFIG.UI.FORMATION_RIGHT_PANEL_WIDTH}px`;
+    rightPanel.style.height = `${CONFIG.UI.FORMATION_RIGHT_PANEL_HEIGHT}px`;
+    rightPanel.appendChild(createEl("h3", "formation-detail-title", "選択中モンスター"));
+
+    if (!selectedMonster) {
+      rightPanel.appendChild(createEl("div", "formation-empty-detail", "モンスターを選択してください"));
+    } else {
+      const detailTop = createEl("div", "formation-detail-top");
+      detailTop.appendChild(createImageWithFallback({
+        src: getMonsterImageSrc(selectedMonster),
+        alt: selectedMonster.name,
+        wrapperClass: "formation-detail-portrait",
+        placeholderLabel: selectedMonster.name,
+        placeholderSubLabel: "NO IMAGE"
+      }));
+      const topInfo = createEl("div", "formation-detail-top-info");
+      topInfo.append(
+        createEl("div", "formation-detail-name", selectedMonster.name || "-"),
+        createEl("div", "formation-detail-key", `ID: ${selectedMonsterId}`)
+      );
+      const typeRow = createEl("div", "formation-detail-type-row");
+      const typeKeys = getMonsterTypeKeys(selectedMonsterId);
+      if (typeKeys.length) {
+        typeKeys.forEach((typeKey) => {
+          const meta = TYPE_META[typeKey] || {};
+          const badge = createEl("span", "formation-type-badge", meta.label || typeKey);
+          if (meta.color) badge.style.setProperty("--type-color", meta.color);
+          typeRow.appendChild(badge);
+        });
+      } else {
+        typeRow.appendChild(createEl("span", "formation-type-badge muted", "TYPE情報なし"));
+      }
+      topInfo.appendChild(typeRow);
+      detailTop.appendChild(topInfo);
+
+      const traitDraft = getMonsterTraitDraft(selectedMonsterId, gameState);
+      const selectedTrait = traitDraft.traits.find((trait) => trait.key === traitDraft.selectedTraitKey) || null;
+      const traitBox = createEl("div", "formation-detail-trait", `特性: ${selectedTrait?.name || "なし"}`);
+      const statsDraft = getMonsterTrainingDraft(selectedMonsterId, gameState);
+      const nature = getMonsterNatureDraft(selectedMonsterId, gameState);
+      const computed = calculateFinalMonsterStats(selectedMonster, statsDraft, nature);
+      const statGrid = createEl("div", "formation-detail-stat-grid");
+      TRAINING_STAT_ROWS.forEach((row) => {
+        const line = createEl("div", "formation-detail-stat-row");
+        line.append(
+          createEl("span", "stat-label", row.label),
+          createEl("span", "stat-value", String(Number(computed.finalStats?.[row.key]) || 0))
+        );
+        statGrid.appendChild(line);
+      });
+
+      const moveSection = createEl("div", "formation-detail-move-list");
+      const equippedMoves = getMonsterMoveDraft(selectedMonsterId, gameState);
+      equippedMoves.forEach((moveId, index) => {
+        const move = MOVES[moveId] || null;
+        const row = createEl("div", "formation-detail-move-row");
+        const meta = TYPE_META[move?.type] || null;
+        const role = MOVE_ROLE_LABELS[getMoveRole(move)] || "不明";
+        row.append(
+          createEl("span", "move-slot", `M${index + 1}`),
+          createEl("span", "move-name", move?.name || "未設定"),
+          createEl("span", "move-type", meta?.label || "-"),
+          createEl("span", "move-role", role),
+          createEl("span", "move-power", move ? getMoveEffectText(move) : "-")
+        );
+        moveSection.appendChild(row);
+      });
+      const editBtn = createEl("button", "screen-nav-btn primary formation-open-build-btn", "能力設定へ");
+      editBtn.dataset.action = "formation-edit-open-monster-detail";
+      rightPanel.append(detailTop, traitBox, statGrid, moveSection, editBtn);
+    }
+
+    body.append(leftPanel, rightPanel);
+    wrap.append(body);
     return wrap;
   };
 
@@ -4664,11 +4821,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const getFormationEditLocalPointerPosition = (event) => {
-    const body = document.querySelector(".formation-edit-body");
-    const bodyRect = body?.getBoundingClientRect?.();
-    if (!bodyRect || !body) return { x: -1, y: -1 };
-    const localX = event.clientX - bodyRect.left;
-    const localY = event.clientY - bodyRect.top + body.scrollTop;
+    const leftMain = document.querySelector(".formation-left-main");
+    const panelRect = leftMain?.getBoundingClientRect?.();
+    if (!panelRect) return { x: -1, y: -1 };
+    const localX = event.clientX - panelRect.left;
+    const localY = event.clientY - panelRect.top;
     return {
       x: Number.isFinite(localX) ? localX : -1,
       y: Number.isFinite(localY) ? localY : -1
@@ -4771,8 +4928,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       render();
       return;
     }
-    if (a === "formation-edit-reset") {
-      resetFormationEditDraft();
+    if (a === "formation-edit-open-monster-detail") {
+      openMonsterEditFromFormation();
       render();
       return;
     }
@@ -4951,7 +5108,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     }
 
     if (gameState.phase === PHASE.MONSTER_DETAIL) {
-      if (event.key === "Escape") enterMonsterList();
+      if (event.key === "Escape") cancelMonsterDetailAndExit();
       render();
       return;
     }
@@ -4986,6 +5143,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         const idx = getSelectableIndex(edit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
         if (idx >= 0) {
           const draft = cloneFormation(edit.draft);
+          if (draft[idx] && draft[idx] === edit.selectedMonsterKey) edit.selectedMonsterKey = null;
           draft[idx] = null;
           edit.draft = draft;
         }
