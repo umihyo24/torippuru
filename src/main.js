@@ -2,6 +2,7 @@ import { MOVES } from "./data/moves.js";
 import { MONSTERS } from "./data/monsters.js";
 import { TRAITS as TRAIT_LIBRARY } from "./data/traits.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
+import { getAssetPath } from "./data/assets.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 
 (() => {
@@ -199,40 +200,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     sessionSave: "game_session_save"
   };
   const AUTOSAVE_LABELS = ["最新", "1つ前", "2つ前"];
-
-  const ASSETS = {
-    backgrounds: { battle: "assets/backgrounds/background_battle.png" },
-    icons: {
-      physical: "assets/icons/icon_physical.png",
-      special: "assets/icons/icon_special.png",
-      status: "assets/icons/icon_status.png"
-    },
-    portraits: {
-      emberlynx: "assets/portraits/emberlynx.png",
-      hittokage: "assets/portraits/hittokage.png",
-      maguma: "assets/portraits/maguma.png",
-      mossblob: "assets/portraits/mossblob.png",
-      frostfang: "assets/portraits/frostfang.png",
-      sandko: "assets/portraits/sandko.png",
-      stormimp: "assets/portraits/stormimp.png",
-      ironboar: "assets/portraits/ironboar.png",
-      wyvern: "assets/portraits/wyvern.png",
-      golem: "assets/portraits/golem.png",
-      shinju: "assets/portraits/shinju.png",
-      venomtoad: "assets/portraits/venomtoad.png",
-      duskmoth: "assets/portraits/duskmoth.png"
-    }
-  };
-
-  const getAssetPath = (type, key) => {
-    const table = ASSETS?.[type];
-    if (!table || typeof table !== "object") return "";
-    const normalizedKey = typeof key === "string" ? key.trim() : "";
-    if (!normalizedKey) return "";
-    const mapped = table[normalizedKey];
-    if (typeof mapped !== "string") return "";
-    return mapped.replace(/\\/g, "/");
-  };
 
   const patterns = {
     front3: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 }],
