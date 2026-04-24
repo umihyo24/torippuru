@@ -2,7 +2,7 @@ import { MOVES } from "./data/moves.js";
 import { MONSTERS } from "./data/monsters.js";
 import { TRAITS as TRAIT_LIBRARY } from "./data/traits.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
-import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
+import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 
 (() => {
   "use strict";
@@ -268,7 +268,10 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
     intimidate: { key: "intimidate", name: "いあつかん", description: "登場時、正面の相手のこうげきを1段階さげる" },
     wonder_guard: { key: "wonder_guard", name: "ふしぎなまもり", description: "弱点以外の攻撃を受けない" },
     koukakudahou: { key: "koukakudahou", name: "こうかくだほう", description: "自分以外のタイプのわざも一致威力になる" },
-    no_guard: { key: "no_guard", name: "ノーガード", description: "お互いのすべての技が必中になる" }
+    no_guard: { key: "no_guard", name: "ノーガード", description: "お互いのすべての技が必中になる" },
+    ino_ichiban: { key: "ino_ichiban", name: "いのいちばん", description: "1ターン目だけ先制しやすくなる", traitKey: "first_turn_priority" },
+    innocence: { key: "innocence", name: "イノセンス", description: "能力低下を受けない", traitKey: "ignore_stat_down" },
+    innovation: { key: "innovation", name: "イノベーション", description: "攻撃後に攻撃↑防御↓", traitKey: "atk_up_def_down" }
   };
 
   const INITIAL_PARTY = {
@@ -323,6 +326,9 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
     if (move.effectKey === "multi_hit_2") return "2回攻撃";
     if (move.effectKey === "priority_plus_1") return "先制攻撃";
     if (move.effectKey === "always_hit") return "必中";
+    if (move.effectKey === "self_def_down") return "使用後に防御が下がる";
+    if (move.effectKey === "self_atk_def_down") return "使用後に攻撃と防御が下がる";
+    if (move.effectKey === "recoil_20") return "与えたダメージの20%を反動で受ける";
     if ((Number(move.power) || 0) > 0) return `威力 ${move.power}`;
     const effects = Array.isArray(move.beforeDamage) ? move.beforeDamage : [];
     if (effects.some((e) => e?.type === "applyStatus")) return "状態異常を付与";
@@ -495,7 +501,7 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
       selectedTraitKey,
       moveIds: [...base.moves],
       statuses: [],
-      buffs: { atkStage: 0, critStage: 0, critStageDuration: 0 },
+      buffs: { atkStage: 0, defStage: 0, spdStage: 0, critStage: 0, critStageDuration: 0 },
       isSwitching: false,
       switchTargetId: null
     };
@@ -1677,6 +1683,12 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
     if (key === "atk" && Number.isFinite(unit?.buffs?.atkStage) && unit.buffs.atkStage !== 0) {
       value = Math.max(1, Math.floor(value * (1 + (CONFIG.TURN_START_ATK_STAGE_RATIO * unit.buffs.atkStage))));
     }
+    if (key === "def" && Number.isFinite(unit?.buffs?.defStage) && unit.buffs.defStage !== 0) {
+      value = Math.max(1, Math.floor(value * (1 + (CONFIG.TURN_START_ATK_STAGE_RATIO * unit.buffs.defStage))));
+    }
+    if (key === "spd" && Number.isFinite(unit?.buffs?.spdStage) && unit.buffs.spdStage !== 0) {
+      value = Math.max(1, Math.floor(value * (1 + (CONFIG.TURN_START_ATK_STAGE_RATIO * unit.buffs.spdStage))));
+    }
     if (key === "def" && !ignoreDefUp && findStatus(unit.statuses, "defUp")) value = Math.floor(value * (1 + CONFIG.DEF_UP_RATIO));
     return value;
   };
@@ -1721,6 +1733,42 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
     return next - before;
   };
 
+  const adjustDefStage = (unit, amount) => {
+    if (!unit || !Number.isFinite(amount)) return 0;
+    const before = Number(unit?.buffs?.defStage) || 0;
+    const next = clamp(before + Math.trunc(amount), -CONFIG.CRIT_STAGE_MAX, CONFIG.CRIT_STAGE_MAX);
+    unit.buffs.defStage = next;
+    return next - before;
+  };
+
+  const adjustSpdStage = (unit, amount) => {
+    if (!unit || !Number.isFinite(amount)) return 0;
+    const before = Number(unit?.buffs?.spdStage) || 0;
+    const next = clamp(before + Math.trunc(amount), -CONFIG.CRIT_STAGE_MAX, CONFIG.CRIT_STAGE_MAX);
+    unit.buffs.spdStage = next;
+    return next - before;
+  };
+
+  const getTraitEffectKey = (unit) => {
+    const selectedTrait = getSelectedTrait(unit);
+    const traitDef = TRAIT_LIBRARY[selectedTrait?.key];
+    return typeof traitDef?.traitKey === "string" ? traitDef.traitKey : "";
+  };
+
+  const ignoresStatDown = (unit) => {
+    const traitCtx = applyTraitEffect(createAttackContext({ attacker: unit }), getTraitEffectKey(unit));
+    return !!traitCtx?.ignoreStatDown;
+  };
+
+  const adjustStageWithTraitRule = (unit, statKey, amount) => {
+    if (!unit || !Number.isFinite(amount)) return 0;
+    if (amount < 0 && ignoresStatDown(unit)) return 0;
+    if (statKey === "atk") return adjustAtkStage(unit, amount);
+    if (statKey === "def") return adjustDefStage(unit, amount);
+    if (statKey === "spd") return adjustSpdStage(unit, amount);
+    return 0;
+  };
+
   const isWeaknessHit = (defender, move) => {
     const weaknessTypes = Array.isArray(defender?.weaknessTypes) ? defender.weaknessTypes : [];
     if (!weaknessTypes.length) return true;
@@ -1739,7 +1787,7 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
     if ((eventType === "onBattleStart" || eventType === "onSwitchIn") && source && sourceTrait?.key === "intimidate") {
       const opponent = context.opponent || null;
       if (opponent && isAlive(opponent)) {
-        const changed = adjustAtkStage(opponent, -1);
+        const changed = adjustStageWithTraitRule(opponent, "atk", -1);
         if (changed !== 0) {
           out.effects.push({ type: "addAtkStage", amount: changed, targetId: opponent.uid, targetName: opponent.name });
           out.messages.push(`${source.name}の ${sourceTrait.name}が 発動した！`);
@@ -1780,7 +1828,7 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
       const traitDef = TRAIT_LIBRARY[sourceTrait.key];
       (traitDef?.onTurnStart || []).forEach((effect) => {
         if (effect.type === "addAtkStage") {
-          const changed = adjustAtkStage(source, Number(effect.amount) || 0);
+          const changed = adjustStageWithTraitRule(source, "atk", Number(effect.amount) || 0);
           if (changed !== 0) out.effects.push({ type: "addAtkStage", amount: changed, targetId: source.uid, targetName: source.name });
         }
       });
@@ -2084,7 +2132,9 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
     if (!move) return 0;
     const actor = state?.teams?.[action.team]?.active?.[action.slot];
     if (!actor || !isAlive(actor)) return 0;
-    const ctx = applyMoveEffect(createAttackContext({ attacker: actor, move, aliveAllies: getAliveAlliesCount(state, actor.team) }));
+    const turnNumber = Math.max(1, Number(state?.turn) || Number(gameState?.turn) || 1);
+    const ctx = applyMoveEffect(createAttackContext({ attacker: actor, move, aliveAllies: getAliveAlliesCount(state, actor.team), turnNumber }));
+    applyTraitEffect(ctx, getTraitEffectKey(actor));
     return Math.max(0, Number(ctx.priority) || 0);
   };
 
@@ -2193,7 +2243,7 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
   };
 
   const resolveTurn = () => {
-    const sim = JSON.parse(JSON.stringify({ teams: gameState.teams, globalStatuses: gameState.globalStatuses }));
+    const sim = JSON.parse(JSON.stringify({ teams: gameState.teams, globalStatuses: gameState.globalStatuses, turn: gameState.turn }));
     const actions = [...Object.values(gameState.plannedActions), ...Object.values(gameState.enemyPlannedActions)];
     const speedSort = (a, b) => {
       const ua = sim.teams[a.team].active[a.slot];
@@ -2201,8 +2251,8 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
       const pa = getActionPriority(a, sim);
       const pb = getActionPriority(b, sim);
       if (pa !== pb) return pb - pa;
-      const sa = ua ? ua.spd : -1;
-      const sb = ub ? ub.spd : -1;
+      const sa = ua ? getEffectiveStat(ua, "spd") : -1;
+      const sb = ub ? getEffectiveStat(ub, "spd") : -1;
       if (sa !== sb) return sb - sa;
       if (a.team !== b.team) return byTeamOrder(a.team) - byTeamOrder(b.team);
       return a.slot - b.slot;
@@ -2353,7 +2403,7 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
       });
       const patternPositions = getPatternPositionsForMove(actor, move);
       const targets = getActionTargetPositions({ state: sim, actor, move, action });
-      const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0, isCritical: false };
+      const actionResult = { type: "fight", team: action.team, actorId: actor.uid, actorName: actor.name, moveId: move.id, moveName: move.name, targets: [], selfHpBefore: actor.hp, selfHpAfter: actor.hp, selfHeal: 0, selfStatChanges: [], isCritical: false };
       const isCritical = isCriticalHit(actor, move);
       const moveCtx = applyMoveEffect(createAttackContext({ attacker: actor, move, aliveAllies: getAliveAlliesCount(sim, actor.team) }));
       const hitCount = getMoveHitCount({ state: sim, actor, move });
@@ -2445,6 +2495,26 @@ import { applyMoveEffect, createAttackContext } from "./battle/battleEngine.js";
 
         targetResult.defeated = target.hp <= 0;
         actionResult.targets.push(targetResult);
+      });
+
+      const moveSelfChanges = Array.isArray(moveCtx?.selfStatChanges) ? moveCtx.selfStatChanges : [];
+      moveSelfChanges.forEach((change) => {
+        const stat = typeof change?.stat === "string" ? change.stat : "";
+        const amount = Math.trunc(Number(change?.amount) || 0);
+        if (!stat || amount === 0) return;
+        const changed = adjustStageWithTraitRule(actor, stat, amount);
+        if (changed === 0) return;
+        actionResult.selfStatChanges.push({ stat, amount: changed, source: "move" });
+      });
+      const traitAfterCtx = applyTraitEffect(createAttackContext({ attacker: actor, move }), getTraitEffectKey(actor));
+      const traitSelfChanges = Array.isArray(traitAfterCtx?.afterAttackSelfChanges) ? traitAfterCtx.afterAttackSelfChanges : [];
+      traitSelfChanges.forEach((change) => {
+        const stat = typeof change?.stat === "string" ? change.stat : "";
+        const amount = Math.trunc(Number(change?.amount) || 0);
+        if (!stat || amount === 0) return;
+        const changed = adjustStageWithTraitRule(actor, stat, amount);
+        if (changed === 0) return;
+        actionResult.selfStatChanges.push({ stat, amount: changed, source: "trait" });
       });
 
       actionResult.selfHpAfter = actor.hp;
