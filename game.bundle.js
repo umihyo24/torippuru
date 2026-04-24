@@ -46,7 +46,7 @@ const MONSTERS = {
   wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 85, atk: 95, mag: 70, def: 65, res: 65, spd: 100, weaknessTypes: ["light", "water"], traits: ["intimidate", "battleRhythm", "openingSurge"], selectedTraitKey: "intimidate", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
   golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 90, mag: 40, def: 110, res: 50, spd: 40, weaknessTypes: ["water", "nature"], traits: ["battleRhythm", "openingSurge", "intimidate"], selectedTraitKey: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
   shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 80, atk: 55, mag: 100, def: 55, res: 70, spd: 120, weaknessTypes: ["shadow", "earth"], traits: ["intimidate", "wonder_guard", "no_guard"], selectedTraitKey: "intimidate", moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
-  boar: { id: "boar", name: "イノシッシ", portrait: "ironboar", hp: 94, atk: 128, mag: 30, def: 52, res: 48, spd: 74, weaknessTypes: ["water", "earth"], traits: ["ino_ichiban", "innocence", "innovation"], selectedTraitKey: "ino_ichiban", moves: ["chototsu_moshin", "abareru", "bakajikara", "tossin"] }
+  inoshissi: { id: "inoshissi", name: "イノシッシ", portrait: "inoshissi", imageKey: "inoshissi", hp: 94, atk: 128, mag: 30, def: 52, res: 48, spd: 74, weaknessTypes: ["water", "earth"], traits: ["ino_ichiban", "innocence", "innovation"], selectedTraitKey: "ino_ichiban", moves: ["chototsu_moshin", "abareru", "bakajikara", "tossin"] }
 };
 
 // ---- src/data/traits.js ----
@@ -100,6 +100,7 @@ const ASSETS = {
     sandko: "assets/portraits/sandko.png",
     stormimp: "assets/portraits/stormimp.png",
     ironboar: "assets/portraits/ironboar.png",
+    inoshissi: "assets/monsters/inoshissi.png",
     wyvern: "assets/portraits/wyvern.png",
     golem: "assets/portraits/golem.png",
     shinju: "assets/portraits/shinju.png",
@@ -1219,7 +1220,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     state.monster = {
       id: monster.id || "",
       name: monster.name || "",
-      imageKey: monster.portrait || null,
+      imageKey: monster.imageKey || monster.portrait || null,
       baseStats: computed.baseStats,
       allocatedStats: computed.allocatedStats,
       finalStats: computed.finalStats,
@@ -1290,7 +1291,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     }
     const card = createEl("div", "mini-monster-card");
     const portrait = createImageWithFallback({
-      src: getAssetPath("portraits", unit.portrait),
+      src: getMonsterImageSrc(unit),
       alt: unit.name,
       wrapperClass: "mini-monster-portrait",
       placeholderLabel: "未設定",
@@ -3821,9 +3822,17 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return overlay;
   };
 
+  const getMonsterImageSrc = (unit) => {
+    if (!unit || typeof unit !== "object") return "";
+    const imageKey = typeof unit.imageKey === "string" && unit.imageKey.trim()
+      ? unit.imageKey.trim()
+      : (typeof unit.portrait === "string" ? unit.portrait.trim() : "");
+    if (!imageKey) return "";
+    return getAssetPath("portraits", imageKey);
+  };
+
   const getUnitPortraitPath = (unit) => {
-    if (!unit) return "";
-    return getAssetPath("portraits", unit.portrait);
+    return getMonsterImageSrc(unit);
   };
 
   const renderBattleSprite = (unit) => {
@@ -4184,7 +4193,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const mascotId = Array.isArray(gameState?.formations?.[0]) ? gameState.formations[0].find((unitId) => MONSTERS[unitId]) : null;
     const mascot = MONSTERS[mascotId] || MONSTERS[INITIAL_PARTY.ally[0]];
     const portrait = createImageWithFallback({
-      src: getAssetPath("portraits", mascot?.portrait),
+      src: getMonsterImageSrc(mascot),
       alt: mascot?.name || "Mascot",
       wrapperClass: "home-mascot-portrait",
       placeholderLabel: mascot?.name || "Mascot",
@@ -4277,7 +4286,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       card.dataset.action = "monster-open-detail";
       card.dataset.monsterId = monsterId;
       const portrait = createImageWithFallback({
-        src: getAssetPath("portraits", monster.portrait),
+        src: getMonsterImageSrc(monster),
         alt: monster.name,
         wrapperClass: "monster-list-portrait",
         placeholderLabel: monster.name,
@@ -4496,7 +4505,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const leftPanel = createEl("aside", "monster-build-left-panel");
     const summary = createEl("div", "monster-summary-card");
     const portrait = createImageWithFallback({
-      src: getAssetPath("portraits", monster.portrait),
+      src: getMonsterImageSrc(monster),
       alt: monster.name,
       wrapperClass: "monster-detail-portrait",
       placeholderLabel: monster.name,
@@ -4682,7 +4691,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       const imageWrap = createEl("div", "formation-slot-image");
       if (unit) {
         const portrait = createImageWithFallback({
-          src: getAssetPath("portraits", unit.portrait),
+          src: getMonsterImageSrc(unit),
           alt: unit.name,
           wrapperClass: "slot-portrait",
           placeholderLabel: unit.name,
@@ -4721,7 +4730,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       row.style.width = `${rect.width}px`;
       row.style.height = `${rect.height}px`;
       const portrait = createImageWithFallback({
-        src: getAssetPath("portraits", unit.portrait),
+        src: getMonsterImageSrc(unit),
         alt: unit.name,
         wrapperClass: "monster-card-portrait",
         placeholderLabel: unit.name,
