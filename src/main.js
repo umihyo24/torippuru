@@ -1460,6 +1460,12 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     enterFormation();
   };
 
+  const resetFormationEditDraft = () => {
+    gameState.ui.formationEdit.draft = createEmptyFormation();
+    gameState.ui.formationEdit.selectedSlotIndex = 0;
+    gameState.ui.formationEdit.scrollOffset = 0;
+  };
+
   const handleHomeMenuConfirm = (index) => {
     if (!Number.isFinite(index) || index < 0) return;
     const hubItems = getHubMenuItems(gameState);
@@ -3962,17 +3968,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return Math.max(0, Math.ceil(itemCount / CONFIG.UI.MONSTER_GRID_COLS) - visibleRows);
   };
 
-  const getFormationEditButtonRects = () => {
-    const y = CONFIG.UI.BUTTON_AREA_Y + Math.floor((CONFIG.UI.BUTTON_AREA_HEIGHT - CONFIG.UI.BUTTON_HEIGHT) / 2);
-    const firstX = CONFIG.UI.BUTTON_AREA_X;
-    const stride = CONFIG.UI.BUTTON_WIDTH + CONFIG.UI.BUTTON_GAP;
-    return {
-      save: { x: firstX, y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT },
-      cancel: { x: firstX + stride, y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT },
-      back: { x: firstX + (stride * 2), y, width: CONFIG.UI.BUTTON_WIDTH, height: CONFIG.UI.BUTTON_HEIGHT }
-    };
-  };
-
   const renderHomeScreen = () => {
     const wrap = createEl("section", "home-screen");
     const hubItems = getHubMenuItems(gameState);
@@ -4453,11 +4448,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const draft = cloneFormation(edit.draft);
     const slotRects = getFormationSlotRects();
     const monsterRects = getMonsterGridItemRects(edit.scrollOffset, gameState.availableMonsters.length);
-    const buttonRects = getFormationEditButtonRects();
     wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
     wrap.style.setProperty("--front-slot-color", CONFIG.UI.FRONT_SLOT_COLOR);
     wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
-    wrap.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
+    const content = createEl("div", "formation-edit-content");
+    content.appendChild(createEl("h2", "formation-title", `Formation Edit: Slot ${getSafeFormationSlot(gameState.currentEditIndex) + 1}`));
     const body = createEl("div", "formation-edit-body");
     const formationArea = createEl("div", "formation-edit-area formation-grid-area");
     formationArea.style.left = `${CONFIG.UI.FORMATION_TOP_X}px`;
@@ -4535,29 +4530,18 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       box.appendChild(row);
     });
 
-    const buttons = createEl("div", "formation-edit-area formation-button-area");
-    buttons.style.left = `${CONFIG.UI.BUTTON_AREA_X}px`;
-    buttons.style.top = `${CONFIG.UI.BUTTON_AREA_Y}px`;
-    buttons.style.width = `${CONFIG.UI.BUTTON_AREA_WIDTH}px`;
-    buttons.style.height = `${CONFIG.UI.BUTTON_AREA_HEIGHT}px`;
-    const saveBtn = createEl("button", "screen-nav-btn", "Save");
-    saveBtn.style.left = `${buttonRects.save.x - CONFIG.UI.BUTTON_AREA_X}px`;
-    saveBtn.style.top = `${buttonRects.save.y - CONFIG.UI.BUTTON_AREA_Y}px`;
-    saveBtn.style.width = `${buttonRects.save.width}px`;
-    saveBtn.style.height = `${buttonRects.save.height}px`;
-    const cancelBtn = createEl("button", "screen-nav-btn", "Cancel");
-    cancelBtn.style.left = `${buttonRects.cancel.x - CONFIG.UI.BUTTON_AREA_X}px`;
-    cancelBtn.style.top = `${buttonRects.cancel.y - CONFIG.UI.BUTTON_AREA_Y}px`;
-    cancelBtn.style.width = `${buttonRects.cancel.width}px`;
-    cancelBtn.style.height = `${buttonRects.cancel.height}px`;
+    body.append(formationArea, divider, box);
+    content.append(body, createEl("div", "formation-help", "スロット選択→モンスター選択 / マウスホイールで一覧スクロール"));
+
+    const footer = createEl("div", "formation-edit-footer");
     const backBtn = createEl("button", "screen-nav-btn", "Back");
-    backBtn.style.left = `${buttonRects.back.x - CONFIG.UI.BUTTON_AREA_X}px`;
-    backBtn.style.top = `${buttonRects.back.y - CONFIG.UI.BUTTON_AREA_Y}px`;
-    backBtn.style.width = `${buttonRects.back.width}px`;
-    backBtn.style.height = `${buttonRects.back.height}px`;
-    buttons.append(saveBtn, cancelBtn, backBtn);
-    body.append(formationArea, divider, box, buttons);
-    wrap.append(body, createEl("div", "formation-help", "スロット選択→モンスター選択 / マウスホイールで一覧スクロール"));
+    backBtn.dataset.action = "formation-edit-back";
+    const saveBtn = createEl("button", "screen-nav-btn primary", "Save");
+    saveBtn.dataset.action = "formation-edit-save";
+    const resetBtn = createEl("button", "screen-nav-btn danger", "Reset");
+    resetBtn.dataset.action = "formation-edit-reset";
+    footer.append(backBtn, saveBtn, resetBtn);
+    wrap.append(content, footer);
     return wrap;
   };
 
@@ -4680,10 +4664,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const getFormationEditLocalPointerPosition = (event) => {
-    const bodyRect = document.querySelector(".formation-edit-body")?.getBoundingClientRect?.();
-    if (!bodyRect) return { x: -1, y: -1 };
+    const body = document.querySelector(".formation-edit-body");
+    const bodyRect = body?.getBoundingClientRect?.();
+    if (!bodyRect || !body) return { x: -1, y: -1 };
     const localX = event.clientX - bodyRect.left;
-    const localY = event.clientY - bodyRect.top;
+    const localY = event.clientY - bodyRect.top + body.scrollTop;
     return {
       x: Number.isFinite(localX) ? localX : -1,
       y: Number.isFinite(localY) ? localY : -1
@@ -4743,15 +4728,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         return true;
       }
     }
-    const buttons = getFormationEditButtonRects();
-    if (isPointInRect(x, y, buttons.save)) {
-      saveFormationEdit();
-      return true;
-    }
-    if (isPointInRect(x, y, buttons.cancel) || isPointInRect(x, y, buttons.back)) {
-      cancelFormationEdit();
-      return true;
-    }
     return false;
   };
 
@@ -4782,6 +4758,21 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       const index = Number(target.dataset.index);
       const safe = getSafeFormationSlot(index);
       handleFormationSelection(safe, true);
+      render();
+      return;
+    }
+    if (a === "formation-edit-save") {
+      saveFormationEdit();
+      render();
+      return;
+    }
+    if (a === "formation-edit-back") {
+      cancelFormationEdit();
+      render();
+      return;
+    }
+    if (a === "formation-edit-reset") {
+      resetFormationEditDraft();
       render();
       return;
     }
