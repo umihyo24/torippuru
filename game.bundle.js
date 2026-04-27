@@ -623,6 +623,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     MESSAGE_AUTO_MS: 1200,
     WAIT_SHORT_MS: 220,
     HP_ANIM_MS: 520,
+    DEFEAT_VANISH_MS: 320,
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
     UI: {
@@ -1278,7 +1279,9 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     },
     displayState: {
       hpAnimations: {},
-      hpDisplay: {}
+      hpDisplay: {},
+      defeatVanish: {},
+      hiddenDefeatedPortraits: {}
     },
     battleHighlight: {
       active: false,
@@ -2902,21 +2905,42 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return true;
   };
 
-  const validateTargetingContext = (actor, target, move, context = "resolve") => {
-    if (!actor || !target || !move) return false;
-    const valid = isRuleMatchForTarget(actor, move, target);
+  const isRuleMatchAtPosition = (actor, move, pos) => {
+    if (!actor || !move || !inBounds(pos)) return false;
+    const targetTeam = inferTeamFromBoardPosition(pos);
+    const actorPos = toBoardPos(actor.team, actor.slot);
+    if (move.targetRule === "selfOnly") {
+      return actorPos.x === pos.x && actorPos.y === pos.y;
+    }
+    if (move.targetRule === "allyOtherSingle") {
+      return targetTeam === actor.team && !(actorPos.x === pos.x && actorPos.y === pos.y);
+    }
+    if (move.targetRule === "anyOtherSingle") {
+      if (actorPos.x === pos.x && actorPos.y === pos.y) return false;
+      if (isEnemyOnlyTargetRule(move)) return targetTeam !== actor.team;
+      return true;
+    }
+    if (move.targetRule === "enemy") return targetTeam !== actor.team;
+    return true;
+  };
+
+  const validateTargetingContext = (actor, target, move, context = "resolve", targetPos = null) => {
+    if (!actor || !move) return false;
+    const valid = target
+      ? isRuleMatchForTarget(actor, move, target)
+      : isRuleMatchAtPosition(actor, move, targetPos);
     debugBattleLog(`${context}:target`, {
       actorName: actor.name,
       actorUid: actor.uid,
       actorTeam: actor.team,
       moveId: move.id,
       moveTargetRule: move.targetRule,
-      targetName: target.name,
-      targetUid: target.uid,
-      targetTeam: target.team,
+      targetName: target?.name || "(empty)",
+      targetUid: target?.uid || null,
+      targetTeam: target?.team || inferTeamFromBoardPosition(targetPos || { x: -1, y: -1 }),
       valid
     });
-    if (isDamageMoveCategory(move.category) && isEnemyOnlyTargetRule(move) && actor.team === target.team) {
+    if (isDamageMoveCategory(move.category) && isEnemyOnlyTargetRule(move) && target && actor.team === target.team) {
       console.warn("[battle-debug] Illegal same-team damaging target rejected", {
         actorName: actor.name,
         actorUid: actor.uid,
@@ -2935,10 +2959,12 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const getValidTargetsForMoveInState = (state, actor, move) => {
     if (!state || !actor || !move) return [];
     if (move.targetMode === "all-enemies") {
-      return collectAllUnits(state)
-        .filter((unit) => unit && isAlive(unit) && isRuleMatchForTarget(actor, move, unit))
-        .map((unit) => ({ x: toBoardPos(unit.team, unit.slot).x, y: toBoardPos(unit.team, unit.slot).y, uid: unit.uid }))
-        .filter((pos) => inBounds(pos));
+      const targetY = actor.team === TEAM.ALLY ? 0 : 1;
+      return Array.from({ length: CONFIG.BOARD_COLS }, (_, x) => {
+        const pos = { x, y: targetY };
+        const unit = getUnitAtFromState(state, pos);
+        return { x, y: targetY, uid: unit?.uid || null };
+      }).filter((pos) => isRuleMatchAtPosition(actor, move, pos));
     }
     const actorPos = toBoardPos(actor.team, actor.slot);
     const orientation = actor.team === TEAM.ALLY ? 1 : -1;
@@ -2946,26 +2972,29 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return offsets
       .map((o) => ({ x: actorPos.x + o.x, y: actorPos.y + (o.y * orientation) }))
       .filter(inBounds)
-      .map((pos) => ({ pos, unit: getUnitAtFromState(state, pos) }))
-      .filter(({ unit }) => isRuleMatchForTarget(actor, move, unit))
-      .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
+      .filter((pos) => isRuleMatchAtPosition(actor, move, pos))
+      .map((pos) => {
+        const unit = getUnitAtFromState(state, pos);
+        return { x: pos.x, y: pos.y, uid: unit?.uid || null };
+      });
   };
 
   const getValidEnemyTargetsForSelection = () => {
-    return (Array.isArray(gameState.teams?.enemy?.active) ? gameState.teams.enemy.active : [])
-      .filter((unit) => unit && isAlive(unit))
-      .map((unit) => ({ x: unit.slot, y: 0, uid: unit.uid }));
+    return Array.from({ length: CONFIG.BOARD_COLS }, (_, x) => {
+      const unit = getUnitAtFromState(gameState, { x, y: 0 });
+      return { x, y: 0, uid: unit?.uid || null };
+    });
   };
 
-  const ensureSelectedEnemyTarget = (preferredUid = null) => {
+  const ensureSelectedEnemyTarget = (preferredSlot = null) => {
     const validTargets = getValidEnemyTargetsForSelection();
-    const validUids = new Set(validTargets.map((entry) => entry.uid));
-    if (preferredUid && validUids.has(preferredUid)) {
-      gameState.battle.selectedTargetKey = preferredUid;
-      return preferredUid;
+    const validSlots = new Set(validTargets.map((entry) => entry.x));
+    if (Number.isInteger(preferredSlot) && validSlots.has(preferredSlot)) {
+      gameState.battle.selectedTargetKey = preferredSlot;
+      return preferredSlot;
     }
-    if (validUids.has(gameState.battle.selectedTargetKey)) return gameState.battle.selectedTargetKey;
-    const next = validTargets[0]?.uid || null;
+    if (validSlots.has(gameState.battle.selectedTargetKey)) return gameState.battle.selectedTargetKey;
+    const next = validTargets[0]?.x ?? null;
     gameState.battle.selectedTargetKey = next;
     return next;
   };
@@ -3033,10 +3062,6 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return (patterns[move.patternId] || [])
       .map((o) => ({ x: actorPos.x + o.x, y: actorPos.y + (o.y * orientation) }))
       .filter(inBounds);
-  };
-
-  const isRuleMatchAtPosition = (actor, move, targetUnit) => {
-    return isRuleMatchForTarget(actor, move, targetUnit);
   };
 
   const canMoveReachTarget = (attacker, defender, moveId) => {
@@ -3277,8 +3302,26 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         if (!inBounds(targetPos)) return;
         if (move.targetMode !== "all-enemies" && !patternPositions.some((p) => p.x === targetPos.x && p.y === targetPos.y)) return;
         const target = getUnitAtFromState(sim, targetPos);
-        if (!validateTargetingContext(actor, target, move, "resolveTurn")) return;
-        const targetResult = { targetId: target.uid, targetName: target.name, hpBefore: target.hp, hpAfter: target.hp, damage: 0, effectiveness: "normal", appliedStatuses: [], defeated: false, isCritical: false };
+        if (!validateTargetingContext(actor, target, move, "resolveTurn", targetPos)) return;
+        const targetLabel = target?.name || `${targetPos.y === 0 ? "敵" : "味方"}${targetPos.x + 1}`;
+        const targetResult = {
+          targetId: target?.uid || null,
+          targetName: targetLabel,
+          targetPos: { x: targetPos.x, y: targetPos.y },
+          hpBefore: target?.hp ?? 0,
+          hpAfter: target?.hp ?? 0,
+          damage: 0,
+          effectiveness: "normal",
+          appliedStatuses: [],
+          defeated: false,
+          isCritical: false,
+          missed: !target || !isAlive(target)
+        };
+
+        if (!target || !isAlive(target)) {
+          actionResult.targets.push(targetResult);
+          return;
+        }
 
         move.beforeDamage.forEach((effect) => {
           if (effect.type === "applyStatus") {
@@ -3498,6 +3541,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       if (a.isCritical) q.push({ type: "message", text: "きゅうしょに あたった！", loggable: true });
       const aoeAnimations = [];
       a.targets.forEach((t) => {
+        if (!t.targetId) return;
         if (t.damage > 0 || t.hpBefore !== t.hpAfter) {
           const anim = { targetId: t.targetId, fromHp: t.hpBefore, toHp: t.hpAfter, duration: CONFIG.HP_ANIM_MS };
           if (isAoe) aoeAnimations.push(anim);
@@ -3506,6 +3550,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       });
       if (isAoe && aoeAnimations.length) q.push({ type: "hpAnimationBatch", animations: aoeAnimations });
       a.targets.forEach((t) => {
+        if (t.missed) {
+          q.push({ type: "message", text: `${t.targetName}には あたらなかった！`, loggable: true });
+          return;
+        }
         t.appliedStatuses.forEach((applied) => {
           const statusId = applied?.statusId;
           if (!statusId) return;
@@ -3636,9 +3684,14 @@ const applyTraitEffect = (ctx, traitKey = "") => {
 
   const syncUnitDefeatedState = (unit) => {
     if (!unit) return;
+    const wasDefeated = unit.defeated === true;
     unit.defeated = Number(unit.hp) <= 0;
-    if (unit.defeated && unit.team === TEAM.ENEMY && unit.uid === gameState?.battle?.selectedTargetKey) {
-      ensureSelectedEnemyTarget();
+    if (unit.defeated && !wasDefeated) {
+      gameState.displayState.defeatVanish[unit.uid] = {
+        startedAt: performance.now(),
+        durationMs: CONFIG.DEFEAT_VANISH_MS
+      };
+      gameState.displayState.hiddenDefeatedPortraits[unit.uid] = false;
     }
   };
 
@@ -3755,6 +3808,17 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       const v = Math.round(anim.fromHp + (anim.toHp - anim.fromHp) * t);
       gameState.displayState.hpDisplay[uid] = v;
       if (t >= 1) delete gameState.displayState.hpAnimations[uid];
+    });
+  };
+
+  const updateDefeatVanishAnimations = (now) => {
+    Object.entries(gameState.displayState.defeatVanish).forEach(([uid, anim]) => {
+      if (!anim) return;
+      const elapsed = now - (Number(anim.startedAt) || 0);
+      const duration = Math.max(1, Number(anim.durationMs) || CONFIG.DEFEAT_VANISH_MS);
+      if (elapsed < duration) return;
+      gameState.displayState.hiddenDefeatedPortraits[uid] = true;
+      delete gameState.displayState.defeatVanish[uid];
     });
   };
 
@@ -3954,10 +4018,6 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       handleBattleFinished(winner);
       return;
     }
-    if (shouldTriggerResetMove(gameState)) {
-      applyResetMove(gameState);
-      appendBattleLogEntry("距離が離れすぎたため、両者は中央へ移動した。");
-    }
     gameState.playing.turnCount += 1;
     if (gameState.playing.turnCount >= 1) gameState.playing.hasCompletedFirstTurn = true;
     initializePlanningTurn();
@@ -4031,7 +4091,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
           if (!best || s.score > best.score) best = { moveId, targetPos: { x: c.x, y: c.y }, score: s.score };
         });
       } else {
-        const score = cands.reduce((sum, c) => sum + calcDamage(actor, getUnitAtFromState(gameState, { x: c.x, y: c.y }), move, { isCritical: isCriticalHit(actor, move) }), 0);
+        const score = cands.reduce((sum, c) => {
+          const target = getUnitAtFromState(gameState, { x: c.x, y: c.y });
+          if (!target || !isAlive(target)) return sum;
+          return sum + calcDamage(actor, target, move, { isCritical: isCriticalHit(actor, move) });
+        }, 0);
         if (!best || score > best.score) best = { moveId, targetPos: null, score };
       }
     });
@@ -4099,32 +4163,38 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     gameState.ui.previewTargets = (Array.isArray(cands) ? cands : []).map((c) => ({ x: c.x, y: c.y }));
     gameState.ui.targetCandidates = Array.isArray(cands) ? cands : [];
     if (move.targetMode === "single") {
-      const preferred = gameState.ui.targetCandidates.find((c) => c.uid === gameState.battle.selectedTargetKey)?.uid || null;
-      ensureSelectedEnemyTarget(preferred || gameState.ui.targetCandidates[0]?.uid || null);
+      const preferred = gameState.ui.targetCandidates.find((c) => c.x === gameState.battle.selectedTargetKey)?.x;
+      ensureSelectedEnemyTarget(preferred ?? gameState.ui.targetCandidates[0]?.x ?? null);
     } else {
       gameState.battle.selectedTargetKey = null;
     }
   };
 
-  const createConfirmedFightCommand = ({ slot, actor, move, targets }) => ({
+  const getBattleSlotLabel = (pos) => {
+    if (!pos || !Number.isInteger(pos.x) || !Number.isInteger(pos.y)) return "不明";
+    const teamLabel = pos.y === 0 ? "敵" : "味方";
+    return `${teamLabel}${pos.x + 1}`;
+  };
+
+  const createConfirmedFightCommand = ({ slot, actor, move, targets, targetPos = null }) => ({
     actorId: actor.uid,
     actorName: actor.name,
     moveId: move.id,
     moveName: move.name,
     targetType: getMoveTargetLabel(move),
-    targetNames: targets.map((t) => t.name),
-    action: { type: "fight", team: TEAM.ALLY, slot, moveId: move.id, targetPos: move.targetMode === "single" ? toBoardPos(targets[0].team, targets[0].slot) : null }
+    targetNames: targets.map((t) => t?.name || getBattleSlotLabel(targetPos)),
+    action: { type: "fight", team: TEAM.ALLY, slot, moveId: move.id, targetPos: move.targetMode === "single" ? targetPos : null }
   });
 
   const confirmCurrentFightAction = ({ slot, move, targetPos }) => {
     const actor = gameState.teams.ally.active[slot];
     if (!actor) return;
     const targets = move.targetMode === "single"
-      ? [getUnitAtFromState(gameState, targetPos)].filter(Boolean)
+      ? [getUnitAtFromState(gameState, targetPos)]
       : gameState.ui.targetCandidates.map((c) => getUnitAtFromState(gameState, { x: c.x, y: c.y })).filter(Boolean);
-    if (!targets.length) return;
+    if (move.targetMode !== "single" && !targets.length) return;
 
-    gameState.confirmedCommands[slot] = createConfirmedFightCommand({ slot, actor, move, targets });
+    gameState.confirmedCommands[slot] = createConfirmedFightCommand({ slot, actor, move, targets, targetPos });
     clearSwitchRequestForSlot(TEAM.ALLY, slot);
     if (!advancePlanningSlot()) queueTurnResolution();
   };
@@ -4161,8 +4231,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     if (!move) return;
     if (!gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y)) return;
     if (move.targetMode === "single") {
-      const selected = getUnitAtFromState(gameState, { x, y });
-      ensureSelectedEnemyTarget(selected?.uid || null);
+      ensureSelectedEnemyTarget(x);
     }
     confirmCurrentFightAction({ slot: gameState.currentActorIndex, move, targetPos: move.targetMode === "single" ? { x, y } : null });
   };
@@ -4451,7 +4520,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     nextState.battle.trialKey = trialKey;
     nextState.battle.turn = 1;
     nextState.battle.log = [];
-    nextState.battle.selectedTargetKey = bossMonster.key;
+    nextState.battle.selectedTargetKey = null;
     nextState.battle.enemyTeam = [bossMonster];
     const enemySlots = getEnemySlotsForCount(nextState.battle.enemyTeam.length);
     nextState.teams.enemy.active = Array.from({ length: CONFIG.BOARD_COLS }, () => null);
@@ -4621,6 +4690,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
 
   const getDisplayHp = (unit) => gameState.displayState.hpDisplay[unit.uid] ?? unit.hp;
   const statusText = (s) => `${STATUS_LABELS[s.kind] || s.kind}（${s.duration}T）`;
+  const isDefeatVanishRunning = (unit) => !!gameState.displayState.defeatVanish?.[unit?.uid];
+  const isUnitPortraitHidden = (unit) => !!gameState.displayState.hiddenDefeatedPortraits?.[unit?.uid];
 
   const getNavigationMessageText = () => {
     if (gameState.phase === PHASE.GAMEOVER) return "バトル終了。";
@@ -4852,6 +4923,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       panel.appendChild(createEl("div", "unit-empty", "待機"));
       return panel;
     }
+    if (isDefeated(unit)) {
+      panel.classList.add("empty", "defeated-slot");
+      panel.appendChild(createEl("div", "unit-empty", "EMPTY ✕"));
+      return panel;
+    }
     if (unit.isBoss === true) panel.classList.add("boss-panel");
 
     const hp = getDisplayHp(unit);
@@ -4884,6 +4960,17 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       slot.appendChild(createEl("div", "unit-empty", "待機"));
       return slot;
     }
+    if (isDefeated(unit)) {
+      slot.classList.add("empty", "defeated-slot");
+      const isVanishing = isDefeatVanishRunning(unit);
+      if (isVanishing) {
+        slot.classList.add("vanishing");
+        slot.appendChild(createEl("div", "unit-empty", "FAINT..."));
+      } else {
+        slot.appendChild(createEl("div", "unit-empty", "EMPTY ✕"));
+      }
+      if (isUnitPortraitHidden(unit)) return slot;
+    }
     slot.classList.add(unit.team === TEAM.ENEMY ? "team-enemy" : "team-ally");
     if (unit.isBoss === true) slot.classList.add("boss-panel");
     const spriteArea = createEl("div", "sprite-portrait-box");
@@ -4908,25 +4995,9 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
     ensureSelectedEnemyTarget();
 
-    const aliveEnemies = (Array.isArray(gameState.teams?.enemy?.active) ? gameState.teams.enemy.active : [])
-      .filter((unit) => unit && isAlive(unit));
-    const enemyCountClass = aliveEnemies.length <= 1 ? "enemy-count-1" : (aliveEnemies.length === 2 ? "enemy-count-2" : "enemy-count-3");
-    const enemyStatusRow = createEl("div", `battle-row enemy-status-row ${enemyCountClass}`);
-    const enemySpriteRow = createEl("div", `battle-row enemy-sprite-row ${enemyCountClass}`);
-    if (!aliveEnemies.length) {
-      const victory = createEl("div", "enemy-victory-state", "敵は全て倒れた！");
-      enemyStatusRow.appendChild(victory);
-      enemySpriteRow.appendChild(createEl("div", "enemy-victory-state-sub", "VICTORY"));
-    } else {
-      aliveEnemies.forEach((unit) => {
-        enemyStatusRow.appendChild(renderStatusPanel(unit.slot, 0));
-        enemySpriteRow.appendChild(renderSpriteSlot(unit.slot, 0));
-      });
-    }
-
     board.append(
-      enemyStatusRow,
-      enemySpriteRow,
+      renderBattleRow("enemy-status-row", renderStatusPanel, 0),
+      renderBattleRow("enemy-sprite-row", renderSpriteSlot, 0),
       renderBattleRow("ally-sprite-row", renderSpriteSlot, 1),
       renderBattleRow("ally-status-row", renderStatusPanel, 1)
     );
@@ -5960,9 +6031,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const update = (now) => {
     gameState.input.mouseClicked = false;
     const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
+    const hasDefeatVanish = Object.keys(gameState.displayState.defeatVanish).length > 0;
     const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
-    if (!hasHpAnimations && !hasPlayback) return;
+    if (!hasHpAnimations && !hasDefeatVanish && !hasPlayback) return;
     updateHpAnimations(now);
+    updateDefeatVanishAnimations(now);
     if (hasPlayback) updateBattlePlayback(now);
     render();    
   };
