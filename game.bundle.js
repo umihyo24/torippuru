@@ -1047,7 +1047,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const backgroundLoadState = new Map();
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const byTeamOrder = (team) => CONFIG.TIEBREAKER_TEAM_ORDER.indexOf(team);
-  const isAlive = (u) => !!u && u.hp > 0;
+  const isAlive = (u) => !!u && u.defeated !== true && u.hp > 0;
   const isDefeated = (u) => !!u && u.hp <= 0;
   const cloneStatus = (kind, duration) => ({ ...STATUSES[kind], duration: duration ?? STATUSES[kind].duration, tags: [...STATUSES[kind].tags] });
   const findStatus = (statuses, kind) => statuses.find((s) => s.kind === kind);
@@ -1090,6 +1090,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       unitId: base.id,
       name: base.name,
       portrait: base.portrait,
+      imageKey: base.imageKey || base.portrait || "",
       team,
       slot,
       hp: base.hp,
@@ -1106,7 +1107,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       statuses: [],
       buffs: { atkStage: 0, defStage: 0, spdStage: 0, critStage: 0, critStageDuration: 0 },
       isSwitching: false,
-      switchTargetId: null
+      switchTargetId: null,
+      isBoss: base.isBoss === true,
+      source: typeof base.source === "string" ? base.source : "monster",
+      defeated: false
     };
   };
 
@@ -1174,6 +1178,9 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     battle: {
         mode: "normal",
         trialKey: null,
+        turn: 1,
+        selectedTargetKey: null,
+        log: [],
         enemyTeam: [],
         player: {
           activeIndex: 0,
@@ -1967,8 +1974,6 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     if (nextTrialId) {
       gameState.progress.unlockedTrials = normalizeTrialIds([...gameState.progress.unlockedTrials, nextTrialId]);
     }
-    writeAutosave();
-    saveMainGame();
   };
 
   const buildTrialRewardChoices = (bossDef) => {
@@ -2946,6 +2951,25 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       .map(({ pos, unit }) => ({ x: pos.x, y: pos.y, uid: unit.uid }));
   };
 
+  const getValidEnemyTargetsForSelection = () => {
+    return (Array.isArray(gameState.teams?.enemy?.active) ? gameState.teams.enemy.active : [])
+      .filter((unit) => unit && isAlive(unit))
+      .map((unit) => ({ x: unit.slot, y: 0, uid: unit.uid }));
+  };
+
+  const ensureSelectedEnemyTarget = (preferredUid = null) => {
+    const validTargets = getValidEnemyTargetsForSelection();
+    const validUids = new Set(validTargets.map((entry) => entry.uid));
+    if (preferredUid && validUids.has(preferredUid)) {
+      gameState.battle.selectedTargetKey = preferredUid;
+      return preferredUid;
+    }
+    if (validUids.has(gameState.battle.selectedTargetKey)) return gameState.battle.selectedTargetKey;
+    const next = validTargets[0]?.uid || null;
+    gameState.battle.selectedTargetKey = next;
+    return next;
+  };
+
   const getActionTargetPositions = ({ state, actor, move, action }) => {
     if (!state || !actor || !move || !action) return [];
     if (move.targetMode === "single") return action.targetPos ? [{ x: action.targetPos.x, y: action.targetPos.y }] : [];
@@ -3287,6 +3311,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
               state: sim
             });
             target.hp = clamp(target.hp - damage, 0, target.maxHp);
+            syncUnitDefeatedState(target);
             targetResult.damage += damage;
             targetResult.hpAfter = target.hp;
             targetResult.isCritical = isCritical;
@@ -3299,6 +3324,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
             const heal = Math.max(1, Math.floor(targetResult.damage * effect.ratio));
             const before = actor.hp;
             actor.hp = clamp(actor.hp + heal, 0, actor.maxHp);
+            syncUnitDefeatedState(actor);
             actionResult.selfHeal += actor.hp - before;
           }
           if (effect.type === "applyStatus") {
@@ -3309,6 +3335,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
             const recoil = Math.max(1, Math.floor(targetResult.damage * (Number(effect.ratio) || 0)));
             const before = actor.hp;
             actor.hp = clamp(actor.hp - recoil, 0, actor.maxHp);
+            syncUnitDefeatedState(actor);
             actionResult.selfHeal -= (before - actor.hp);
           }
         });
@@ -3316,6 +3343,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
           const recoil = Math.max(1, Math.floor(targetResult.damage * moveCtx.recoilRate));
           const before = actor.hp;
           actor.hp = clamp(actor.hp - recoil, 0, actor.maxHp);
+          syncUnitDefeatedState(actor);
           actionResult.selfHeal -= (before - actor.hp);
         }
 
@@ -3370,6 +3398,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
           const hpBefore = unit.hp;
           const dmg = Math.max(1, Math.floor(unit.maxHp * CONFIG.POISON_RATIO));
           unit.hp = clamp(unit.hp - dmg, 0, unit.maxHp);
+          syncUnitDefeatedState(unit);
           turnResult.endStepResults.poisonTicks.push({ targetId: unit.uid, targetName: unit.name, hpBefore, hpAfter: unit.hp, damage: hpBefore - unit.hp, defeated: unit.hp <= 0 });
         }
         unit.statuses.forEach((s) => { s.duration -= 1; });
@@ -3605,6 +3634,14 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     unit.statuses = unit.statuses.filter((s) => s.kind !== statusId);
   };
 
+  const syncUnitDefeatedState = (unit) => {
+    if (!unit) return;
+    unit.defeated = Number(unit.hp) <= 0;
+    if (unit.defeated && unit.team === TEAM.ENEMY && unit.uid === gameState?.battle?.selectedTargetKey) {
+      ensureSelectedEnemyTarget();
+    }
+  };
+
   const applySwitchResult = (event) => {
     const team = event?.playerId ?? event?.team;
     const slot = event?.slotIndex ?? event?.slot;
@@ -3659,7 +3696,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     if (event.type === "hpAnimation") {
       animateHpChange(event.targetId, event.fromHp, event.toHp, event.duration || CONFIG.HP_ANIM_MS);
       const unit = getUnitByUid(event.targetId);
-      if (unit) unit.hp = event.toHp;
+      if (unit) {
+        unit.hp = event.toHp;
+        syncUnitDefeatedState(unit);
+      }
       return;
     }
     if (event.type === "hpAnimationBatch") {
@@ -3668,7 +3708,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         if (!anim?.targetId) return;
         animateHpChange(anim.targetId, anim.fromHp, anim.toHp, anim.duration || CONFIG.HP_ANIM_MS);
         const unit = getUnitByUid(anim.targetId);
-        if (unit) unit.hp = anim.toHp;
+        if (unit) {
+          unit.hp = anim.toHp;
+          syncUnitDefeatedState(unit);
+        }
       });
       return;
     }
@@ -4047,10 +4090,20 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const move = MOVES[moveId];
     if (!move) return;
     const cands = getValidTargetsForMoveInState(gameState, actor, move);
+    if (!cands.length && getValidEnemyTargetsForSelection().length === 0) {
+      handleBattleFinished(TEAM.ALLY);
+      return;
+    }
     gameState.selectedMoveId = moveId;
     gameState.ui.selectedAction = "fight";
     gameState.ui.previewTargets = (Array.isArray(cands) ? cands : []).map((c) => ({ x: c.x, y: c.y }));
     gameState.ui.targetCandidates = Array.isArray(cands) ? cands : [];
+    if (move.targetMode === "single") {
+      const preferred = gameState.ui.targetCandidates.find((c) => c.uid === gameState.battle.selectedTargetKey)?.uid || null;
+      ensureSelectedEnemyTarget(preferred || gameState.ui.targetCandidates[0]?.uid || null);
+    } else {
+      gameState.battle.selectedTargetKey = null;
+    }
   };
 
   const createConfirmedFightCommand = ({ slot, actor, move, targets }) => ({
@@ -4107,6 +4160,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const move = getSelectedMove();
     if (!move) return;
     if (!gameState.ui.targetCandidates.find((c) => c.x === x && c.y === y)) return;
+    if (move.targetMode === "single") {
+      const selected = getUnitAtFromState(gameState, { x, y });
+      ensureSelectedEnemyTarget(selected?.uid || null);
+    }
     confirmCurrentFightAction({ slot: gameState.currentActorIndex, move, targetPos: move.targetMode === "single" ? { x, y } : null });
   };
 
@@ -4272,18 +4329,26 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       spd: Number(template?.spd) || 80
     };
     const id = `hanafuda_${bossDef.id}`;
+    const bossTypes = Array.isArray(bossDef.data?.elementalTyping)
+      ? bossDef.data.elementalTyping.filter((typeKey) => typeof typeKey === "string").slice(0, 2)
+      : [];
+    const maxHp = Math.max(1, Number(baseStats.hp) || 1);
     return {
       key: id,
       id,
       name: bossDef.name || template?.name || bossDef.id,
-      types: Array.isArray(bossDef.data?.elementalTyping) ? bossDef.data.elementalTyping.slice(0, 2) : [],
+      imageKey: template?.imageKey || template?.portrait || "wyvern",
+      types: bossTypes,
       stats: { ...baseStats },
+      currentHp: maxHp,
+      maxHp,
       traits: Array.isArray(template?.traits) ? template.traits.slice(0, 3) : ["battleRhythm", "openingSurge", "intimidate"],
       moves: pickMoveIdsForBoss(bossDef, template),
-      imageKey: template?.imageKey || template?.portrait || "wyvern",
       weaknessTypes: Array.isArray(template?.weaknessTypes) ? template.weaknessTypes.slice(0, 2) : [],
       selectedTraitKey: Array.isArray(template?.traits) && template.traits[0] ? template.traits[0] : "battleRhythm",
-      isBoss: true
+      source: "hanafudaBoss",
+      isBoss: true,
+      defeated: false
     };
   };
 
@@ -4304,9 +4369,16 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       selectedTraitKey: bossMonster.selectedTraitKey,
       moves: bossMonster.moves,
       weaknessTypes: bossMonster.weaknessTypes,
-      isBoss: true
+      isBoss: true,
+      source: "hanafudaBoss"
     };
     return bossMonster.id;
+  };
+
+  const getEnemySlotsForCount = (count) => {
+    if (count <= 1) return [1];
+    if (count === 2) return [0, 2];
+    return [0, 1, 2];
   };
 
   const resolveBattleFormationIndex = () => {
@@ -4333,6 +4405,9 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       .filter((unitId) => MONSTERS[unitId])
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: MONSTERS[unitId].hp, hp: MONSTERS[unitId].hp, statuses: [] }));
     nextState.battle.enemy.activeIndex = 0;
+    nextState.battle.turn = 1;
+    nextState.battle.selectedTargetKey = null;
+    nextState.battle.log = [];
     const selectedFormationId = `formation_${safeIndex}`;
     writeSessionSave({
       startedAt: Date.now(),
@@ -4348,9 +4423,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   };
 
   const startHanafudaTrial = (trialKey) => {
-    if (typeof trialKey !== "string" || !HANAFUDA_BOSSES[trialKey]) return false;
+    if (typeof trialKey !== "string") return false;
+    const bossDef = HANAFUDA_BOSSES?.[trialKey] || null;
+    if (!bossDef) return false;
     if (!gameState.progress.unlockedTrials.includes(trialKey)) return false;
-    const bossDef = HANAFUDA_BOSSES[trialKey];
     const bossMonster = createBossMonsterFromHanafudaBoss(bossDef);
     const bossMonsterId = ensureBossMonsterRegistered(bossMonster);
     if (!bossMonsterId) return false;
@@ -4373,7 +4449,18 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     nextState.progress.selectedTrial = trialKey;
     nextState.battle.mode = "hanafudaTrial";
     nextState.battle.trialKey = trialKey;
+    nextState.battle.turn = 1;
+    nextState.battle.log = [];
+    nextState.battle.selectedTargetKey = bossMonster.key;
     nextState.battle.enemyTeam = [bossMonster];
+    const enemySlots = getEnemySlotsForCount(nextState.battle.enemyTeam.length);
+    nextState.teams.enemy.active = Array.from({ length: CONFIG.BOARD_COLS }, () => null);
+    nextState.battle.enemyTeam.forEach((enemy, index) => {
+      const slot = enemySlots[index] ?? index;
+      if (!enemy?.key) return;
+      nextState.teams.enemy.active[slot] = createUnit(enemy.key, TEAM.ENEMY, slot);
+    });
+    nextState.teams.enemy.reserve = [];
     nextState.trialBattle = {
       bossId: trialKey,
       gimmick: {
@@ -4765,13 +4852,17 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       panel.appendChild(createEl("div", "unit-empty", "待機"));
       return panel;
     }
+    if (unit.isBoss === true) panel.classList.add("boss-panel");
 
     const hp = getDisplayHp(unit);
     const hpRatio = getHpRatio(unit, hp);
     const hpPct = Math.round(hpRatio * 100);
 
     const top = createEl("div", "status-top");
-    top.appendChild(createEl("div", "unit-name", unit.name));
+    const nameWrap = createEl("div", "unit-name-wrap");
+    if (unit.isBoss === true) nameWrap.appendChild(createEl("span", "boss-badge", "BOSS"));
+    nameWrap.appendChild(createEl("div", "unit-name", unit.name));
+    top.appendChild(nameWrap);
     top.appendChild(renderStatusIcons(unit));
 
     const hpBlock = createEl("div", "status-hp");
@@ -4794,7 +4885,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       return slot;
     }
     slot.classList.add(unit.team === TEAM.ENEMY ? "team-enemy" : "team-ally");
+    if (unit.isBoss === true) slot.classList.add("boss-panel");
     const spriteArea = createEl("div", "sprite-portrait-box");
+    if (unit.isBoss === true) spriteArea.classList.add("boss-portrait-box");
+    if (unit.isBoss === true) spriteArea.appendChild(createEl("div", "boss-title", unit.name));
     spriteArea.appendChild(renderBattleSprite(unit));
     slot.appendChild(spriteArea);
     return slot;
@@ -4812,10 +4906,27 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const board = createEl("section", "battlefield shared-content-width");
     applySharedContentRect(board, "battlefield");
     applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
+    ensureSelectedEnemyTarget();
+
+    const aliveEnemies = (Array.isArray(gameState.teams?.enemy?.active) ? gameState.teams.enemy.active : [])
+      .filter((unit) => unit && isAlive(unit));
+    const enemyCountClass = aliveEnemies.length <= 1 ? "enemy-count-1" : (aliveEnemies.length === 2 ? "enemy-count-2" : "enemy-count-3");
+    const enemyStatusRow = createEl("div", `battle-row enemy-status-row ${enemyCountClass}`);
+    const enemySpriteRow = createEl("div", `battle-row enemy-sprite-row ${enemyCountClass}`);
+    if (!aliveEnemies.length) {
+      const victory = createEl("div", "enemy-victory-state", "敵は全て倒れた！");
+      enemyStatusRow.appendChild(victory);
+      enemySpriteRow.appendChild(createEl("div", "enemy-victory-state-sub", "VICTORY"));
+    } else {
+      aliveEnemies.forEach((unit) => {
+        enemyStatusRow.appendChild(renderStatusPanel(unit.slot, 0));
+        enemySpriteRow.appendChild(renderSpriteSlot(unit.slot, 0));
+      });
+    }
 
     board.append(
-      renderBattleRow("enemy-status-row", renderStatusPanel, 0),
-      renderBattleRow("enemy-sprite-row", renderSpriteSlot, 0),
+      enemyStatusRow,
+      enemySpriteRow,
       renderBattleRow("ally-sprite-row", renderSpriteSlot, 1),
       renderBattleRow("ally-status-row", renderStatusPanel, 1)
     );
@@ -5992,6 +6103,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       if (selected) applyTrialRewardChoice(selected);
       gameState.progress.pendingReward = null;
       gameState.progress.selectedTrial = null;
+      writeAutosave();
+      saveMainGame();
       enterHub();
       render();
       return;
