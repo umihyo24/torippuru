@@ -79,6 +79,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       BUTTON_WIDTH: 140,
       BUTTON_HEIGHT: 42,
       BUTTON_GAP: 12,
+      BUTTON_MESSAGE_HEIGHT: 18,
       PARTY_START_X: 0,
       PARTY_START_Y: 0,
       PARTY_SPACING_X: 12,
@@ -590,6 +591,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         mouseX: 0,
         mouseY: 0,
         mouseClicked: false
+      },
+      uiRects: {
+        backButton: null,
+        saveButton: null
       },
     battle: {
         mode: "normal",
@@ -5158,6 +5163,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const selectedMonster = selectedMonsterId ? MONSTERS[selectedMonsterId] : null;
     const slotRects = getFormationSlotRects();
     const monsterRects = getMonsterGridItemRects(edit.scrollOffset, gameState.availableMonsters.length);
+    const saveEnabled = hasAnyValidFormationMember(draft);
+    const disableReason = saveEnabled ? "" : "保存するには1体以上を編成してください";
     wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
     wrap.style.setProperty("--front-slot-color", CONFIG.UI.FRONT_SLOT_COLOR);
     wrap.style.setProperty("--reserve-slot-color", CONFIG.UI.RESERVE_SLOT_COLOR);
@@ -5249,12 +5256,40 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     leftBody.append(formationArea, divider, box);
 
     const footer = createEl("div", "formation-edit-footer");
+    footer.style.left = `${CONFIG.UI.BUTTON_AREA_X}px`;
+    footer.style.top = `${CONFIG.UI.BUTTON_AREA_Y}px`;
+    footer.style.width = `${CONFIG.UI.BUTTON_AREA_WIDTH}px`;
+    footer.style.height = `${CONFIG.UI.BUTTON_AREA_HEIGHT + CONFIG.UI.BUTTON_MESSAGE_HEIGHT}px`;
     const backBtn = createEl("button", "screen-nav-btn", "もどる");
+    backBtn.style.width = `${CONFIG.UI.BUTTON_WIDTH}px`;
+    backBtn.style.height = `${CONFIG.UI.BUTTON_HEIGHT}px`;
+    backBtn.style.left = "0px";
+    backBtn.style.top = "0px";
     backBtn.dataset.action = "formation-edit-back";
     const saveBtn = createEl("button", "screen-nav-btn primary", "保存/確定");
+    saveBtn.style.width = `${CONFIG.UI.BUTTON_WIDTH}px`;
+    saveBtn.style.height = `${CONFIG.UI.BUTTON_HEIGHT}px`;
+    saveBtn.style.left = `${CONFIG.UI.BUTTON_WIDTH + CONFIG.UI.BUTTON_GAP}px`;
+    saveBtn.style.top = "0px";
     saveBtn.dataset.action = "formation-edit-save";
+    saveBtn.disabled = !saveEnabled;
+    const footerMessage = createEl("div", "formation-save-message", disableReason || "\u00a0");
     footer.append(backBtn, saveBtn);
+    footer.appendChild(footerMessage);
     leftPanel.append(leftBody, footer);
+
+    gameState.uiRects.backButton = {
+      x: CONFIG.UI.BUTTON_AREA_X,
+      y: CONFIG.UI.BUTTON_AREA_Y,
+      width: CONFIG.UI.BUTTON_WIDTH,
+      height: CONFIG.UI.BUTTON_HEIGHT
+    };
+    gameState.uiRects.saveButton = {
+      x: CONFIG.UI.BUTTON_AREA_X + CONFIG.UI.BUTTON_WIDTH + CONFIG.UI.BUTTON_GAP,
+      y: CONFIG.UI.BUTTON_AREA_Y,
+      width: CONFIG.UI.BUTTON_WIDTH,
+      height: CONFIG.UI.BUTTON_HEIGHT
+    };
 
     const rightPanel = createEl("section", "formation-edit-right-panel");
     rightPanel.style.left = `${CONFIG.UI.FORMATION_RIGHT_PANEL_X}px`;
@@ -5470,6 +5505,17 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     };
   };
 
+  const getCanvasPoint = (event) => {
+    const app = document.getElementById("app");
+    const rect = app?.getBoundingClientRect?.();
+    const x = rect ? event.clientX - rect.left : 0;
+    const y = rect ? event.clientY - rect.top : 0;
+    return {
+      x: Number.isFinite(x) ? x : 0,
+      y: Number.isFinite(y) ? y : 0
+    };
+  };
+
   const getFormationEditLocalPointerPosition = (event) => {
     const leftMain = document.querySelector(".formation-left-main");
     const panelRect = leftMain?.getBoundingClientRect?.();
@@ -5538,7 +5584,48 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return false;
   };
 
+  const handleFormationButtonAction = (buttonKey) => {
+    if (buttonKey === "back") {
+      cancelFormationEdit();
+      return true;
+    }
+    if (buttonKey === "save") {
+      const draft = cloneFormation(gameState?.ui?.formationEdit?.draft);
+      if (!hasAnyValidFormationMember(draft)) {
+        gameState.systemMessage = "保存するには1体以上を編成してください。";
+        return true;
+      }
+      saveFormationEdit();
+      return true;
+    }
+    return false;
+  };
+
+  const handleFormationButtonClick = (point) => {
+    if (gameState.phase !== PHASE.FORMATION_EDIT) return false;
+    const appRect = document.getElementById("app")?.getBoundingClientRect?.();
+    const leftMain = document.querySelector(".formation-left-main");
+    const panelRect = leftMain?.getBoundingClientRect?.();
+    if (!panelRect || !appRect) return false;
+    const localPoint = {
+      x: point.x - (panelRect.left - appRect.left),
+      y: point.y - (panelRect.top - appRect.top)
+    };
+    if (isPointInRect(localPoint.x, localPoint.y, gameState?.uiRects?.backButton || null)) {
+      return handleFormationButtonAction("back");
+    }
+    if (isPointInRect(localPoint.x, localPoint.y, gameState?.uiRects?.saveButton || null)) {
+      return handleFormationButtonAction("save");
+    }
+    return false;
+  };
+
   document.addEventListener("click", (event) => {
+    const canvasPoint = getCanvasPoint(event);
+    if (handleFormationButtonClick(canvasPoint)) {
+      render();
+      return;
+    }
     if (gameState.phase === PHASE.HOME) {
       const pointer = getHomeLocalPointerPosition(event);
       if (handleHomeCardPointerClick(pointer.x, pointer.y)) {
@@ -5605,12 +5692,12 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       return;
     }
     if (a === "formation-edit-save") {
-      saveFormationEdit();
+      handleFormationButtonAction("save");
       render();
       return;
     }
     if (a === "formation-edit-back") {
-      cancelFormationEdit();
+      handleFormationButtonAction("back");
       render();
       return;
     }
