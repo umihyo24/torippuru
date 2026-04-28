@@ -2,7 +2,7 @@ import { MOVES } from "./data/moves.js";
 import { MONSTERS } from "./data/monsters.js";
 import { TRAITS as TRAIT_LIBRARY } from "./data/traits.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
-import { getAssetPath } from "./data/assets.js";
+import { ASSETS, getAssetPath } from "./data/assets.js";
 import {
   HANAFUDA_BOSSES,
   HANAFUDA_BOSS_ORDER,
@@ -183,6 +183,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         FONT_SIZE_BODY_PX: 12,
         FONT_SIZE_TITLE_PX: 22
       }
+    },
+    DEV: {
+      SHOW_ALL_MONSTERS: true,
+      SHOW_LOCKED_MONSTERS: true,
+      SHOW_MONSTER_DEBUG_BADGES: true
     }
   };
 
@@ -447,8 +452,56 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
   };
 
+  const getMonsterMasterIds = () => Object.keys(MONSTERS || {});
+  const getAllMonsters = () => getMonsterMasterIds()
+    .map((monsterId) => MONSTERS?.[monsterId])
+    .filter((monster) => !!monster && typeof monster === "object");
+  const getMonsterStateMeta = (monsterId, state = gameState) => {
+    const listedInAvailable = Array.isArray(state?.availableMonsters) && state.availableMonsters.includes(monsterId);
+    const stateMeta = (state?.monsterVisibility && typeof state.monsterVisibility === "object")
+      ? state.monsterVisibility?.[monsterId]
+      : null;
+    return {
+      unlocked: typeof stateMeta?.unlocked === "boolean" ? stateMeta.unlocked : listedInAvailable,
+      owned: typeof stateMeta?.owned === "boolean" ? stateMeta.owned : listedInAvailable,
+      formationEligible: typeof stateMeta?.formationEligible === "boolean" ? stateMeta.formationEligible : true
+    };
+  };
+  const getMonsterVisibilityInfo = (monster, context, state = gameState) => {
+    const monsterId = typeof monster?.id === "string" ? monster.id : "";
+    const stateMeta = getMonsterStateMeta(monsterId, state);
+    const unlocked = typeof monster?.unlocked === "boolean" ? monster.unlocked : stateMeta.unlocked;
+    const owned = typeof monster?.owned === "boolean" ? monster.owned : stateMeta.owned;
+    const formationEligible = typeof monster?.formationEligible === "boolean"
+      ? monster.formationEligible
+      : stateMeta.formationEligible;
+    const imageSource = getMonsterImageSrc(monster);
+    const hasAssetMapping = Boolean(ASSETS?.portraits?.[monster?.assetKey || monster?.imageKey || monster?.portrait || ""]);
+    return {
+      locked: !unlocked,
+      notOwned: !owned,
+      notFormationEligible: context === "formation" ? !formationEligible : false,
+      missingImage: !imageSource || !hasAssetMapping
+    };
+  };
+  const getVisibleMonsters = (context, state = gameState) => {
+    const monsters = getAllMonsters();
+    if (CONFIG.DEV.SHOW_ALL_MONSTERS) return monsters.slice();
+    return monsters.filter((monster) => {
+      const info = getMonsterVisibilityInfo(monster, context, state);
+      if (info.missingImage) return true;
+      if (!info.locked) return true;
+      if (CONFIG.DEV.SHOW_LOCKED_MONSTERS) return true;
+      if (!info.notOwned) return true;
+      if (context !== "formation") return false;
+      return !info.notFormationEligible;
+    });
+  };
+  const getVisibleMonsterIds = (context, state = gameState) => getVisibleMonsters(context, state)
+    .map((monster) => monster?.id)
+    .filter((monsterId) => typeof monsterId === "string" && !!MONSTERS?.[monsterId]);
   const getSafeBoxIndex = (state, value) => {
-    const box = Array.isArray(state?.availableMonsters) ? state.availableMonsters : [];
+    const box = getVisibleMonsterIds("formation", state);
     if (!box.length) return 0;
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, box.length - 1);
   };
@@ -1008,7 +1061,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const getUnitName = (unitId) => MONSTERS?.[unitId]?.name || "UNKNOWN";
-  const getMonsterLibraryIds = (state = gameState) => Array.isArray(state?.availableMonsters) ? state.availableMonsters.filter((id) => !!MONSTERS[id]) : [];
+  const getMonsterLibraryIds = (state = gameState) => getVisibleMonsterIds("monsterList", state);
   const getSafeMonsterListIndex = (state, value) => {
     const ids = getMonsterLibraryIds(state);
     if (!ids.length) return -1;
@@ -1795,8 +1848,9 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   };
 
   const assignMonsterToSelectedSlot = (monsterIndex) => {
+    const visibleMonsterIds = getVisibleMonsterIds("formation", gameState);
     const boxIndex = getSafeEditMonsterIndex(gameState, monsterIndex);
-    const unitId = gameState.availableMonsters[boxIndex] || null;
+    const unitId = visibleMonsterIds[boxIndex] || null;
     if (!unitId) return;
     gameState.ui.formationEdit.selectedMonsterKey = unitId;
     const slotIndex = getSelectableIndex(gameState.ui.formationEdit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
@@ -4222,9 +4276,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const getMonsterImageSrc = (unit) => {
     if (!unit || typeof unit !== "object") return "";
-    const imageKey = typeof unit.imageKey === "string" && unit.imageKey.trim()
-      ? unit.imageKey.trim()
-      : (typeof unit.portrait === "string" ? unit.portrait.trim() : "");
+    const rawAssetKey = typeof unit.assetKey === "string" ? unit.assetKey.trim() : "";
+    const normalizedAssetKey = rawAssetKey.startsWith("monsters.") ? rawAssetKey.slice("monsters.".length) : rawAssetKey;
+    const imageKey = normalizedAssetKey
+      || (typeof unit.imageKey === "string" && unit.imageKey.trim() ? unit.imageKey.trim() : "")
+      || (typeof unit.portrait === "string" ? unit.portrait.trim() : "");
     if (!imageKey) return "";
     return getAssetPath("portraits", imageKey);
   };
@@ -4591,6 +4647,18 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       / (CONFIG.UI.MONSTER_CARD_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)));
     return Math.max(0, Math.ceil(itemCount / CONFIG.UI.MONSTER_GRID_COLS) - visibleRows);
   };
+  const appendMonsterDebugBadges = (container, visibilityInfo) => {
+    if (!CONFIG.DEV.SHOW_MONSTER_DEBUG_BADGES || !container || !visibilityInfo) return;
+    const badges = [];
+    if (visibilityInfo.locked) badges.push("LOCKED");
+    if (visibilityInfo.notOwned) badges.push("NOT OWNED");
+    if (visibilityInfo.notFormationEligible) badges.push("NO FORMATION");
+    if (visibilityInfo.missingImage) badges.push("NO IMAGE");
+    if (!badges.length) return;
+    const wrap = createEl("div", "monster-debug-badges");
+    badges.forEach((label) => wrap.appendChild(createEl("span", "monster-debug-badge", label)));
+    container.appendChild(wrap);
+  };
 
   const renderTrialSelectScreen = () => {
     const wrap = createEl("section", "formation-screen hanafuda-trial-select-screen");
@@ -4785,9 +4853,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const wrap = createEl("section", "monster-list-screen");
     wrap.appendChild(createEl("h2", "formation-title", "Monster List"));
     const list = createEl("div", "monster-list-grid");
-    const ids = getMonsterLibraryIds(gameState);
-    ids.forEach((monsterId, index) => {
-      const monster = MONSTERS[monsterId];
+    const monsters = getVisibleMonsters("monsterList", gameState);
+    monsters.forEach((monster, index) => {
+      const monsterId = monster?.id;
+      if (!monsterId || !MONSTERS[monsterId]) return;
       const isSelected = monsterId === gameState.selectedMonsterId || index === gameState.ui.monsterListIndex;
       const card = createEl("button", `monster-list-item${isSelected ? " active" : ""}`);
       card.dataset.action = "monster-open-detail";
@@ -4804,6 +4873,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         createEl("div", "monster-list-name", monster.name),
         createEl("div", "monster-list-sub", `基礎合計 ${MONSTER_STAT_KEYS.reduce((sum, key) => sum + (monster[key] || 0), 0)}`)
       );
+      appendMonsterDebugBadges(card, getMonsterVisibilityInfo(monster, "monsterList", gameState));
       list.appendChild(card);
     });
     const buttons = createEl("div", "screen-button-row");
@@ -5166,10 +5236,11 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const wrap = createEl("section", "formation-edit-screen");
     const edit = gameState.ui.formationEdit;
     const draft = cloneFormation(edit.draft);
+    const visibleFormationMonsters = getVisibleMonsters("formation", gameState);
     const selectedMonsterId = getFormationEditSelectedMonsterId(gameState);
     const selectedMonster = selectedMonsterId ? MONSTERS[selectedMonsterId] : null;
     const slotRects = getFormationSlotRects();
-    const monsterRects = getMonsterGridItemRects(edit.scrollOffset, gameState.availableMonsters.length);
+    const monsterRects = getMonsterGridItemRects(edit.scrollOffset, visibleFormationMonsters.length);
     const saveEnabled = hasAnyValidFormationMember(draft);
     const disableReason = saveEnabled ? "" : "保存するには1体以上を編成してください";
     wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
@@ -5237,8 +5308,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     box.style.height = `${CONFIG.UI.MONSTER_GRID_HEIGHT}px`;
     box.appendChild(createEl("div", "formation-pane-title", "Available Monsters"));
     monsterRects.forEach((rect) => {
-      const unitId = gameState.availableMonsters[rect.index];
-      const unit = MONSTERS[unitId];
+      const unit = visibleFormationMonsters[rect.index];
+      const unitId = unit?.id;
       if (!unit) return;
       const assignedSlot = findMonsterSlotInDraft(draft, unitId);
       const row = createEl("button", `formation-row monster-row${assignedSlot >= 0 ? " assigned" : ""}`);
@@ -5257,6 +5328,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       row.appendChild(createEl("div", "monster-card-name", unit.name));
       const slotLabel = getAssignedSlotLabel(draft, unitId);
       if (slotLabel) row.appendChild(createEl("span", "assigned-badge", slotLabel));
+      appendMonsterDebugBadges(row, getMonsterVisibilityInfo(unit, "formation", gameState));
       box.appendChild(row);
     });
 
@@ -5581,7 +5653,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         return true;
       }
     }
-    const monsterRects = getMonsterGridItemRects(gameState.ui.formationEdit.scrollOffset, gameState.availableMonsters.length);
+    const visibleFormationMonsterCount = getVisibleMonsters("formation", gameState).length;
+    const monsterRects = getMonsterGridItemRects(gameState.ui.formationEdit.scrollOffset, visibleFormationMonsterCount);
     for (const rect of monsterRects) {
       if (isPointInRect(x, y, rect)) {
         assignMonsterToSelectedSlot(rect.index);
@@ -6010,7 +6083,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       height: CONFIG.UI.MONSTER_GRID_HEIGHT
     };
     if (!isPointInRect(pointer.x, pointer.y, gridRect)) return;
-    const maxScroll = getMonsterGridMaxScroll(gameState.availableMonsters.length);
+    const visibleFormationMonsterCount = getVisibleMonsters("formation", gameState).length;
+    const maxScroll = getMonsterGridMaxScroll(visibleFormationMonsterCount);
     if (maxScroll <= 0) return;
     event.preventDefault();
     const direction = event.deltaY > 0 ? 1 : -1;
