@@ -21,6 +21,9 @@ export const ASSETS = {
     duskmoth: "assets/portraits/duskmoth.png",
     inoshissi: "assets/portraits/inoshissi.png",
     tododon: "assets/portraits/tododon.png",
+  },
+  skillCutins: {
+    todonhou: "assets/skill_cutins/todonhou.png"
   }
 };
 
