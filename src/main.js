@@ -561,9 +561,16 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   const createDefaultGameState = (seed = {}) => {
     const seedFormations = Array.isArray(seed.formations) ? seed.formations.slice(0, FORMATION_SLOT_COUNT) : createDefaultFormations();
     while (seedFormations.length < FORMATION_SLOT_COUNT) seedFormations.push(null);
-    const seedAvailableMonsters = Array.isArray(seed.availableMonsters) && seed.availableMonsters.length
-      ? seed.availableMonsters.slice()
-      : Object.keys(MONSTERS);
+    const seedAvailableMonsters = (() => {
+      const allMonsterIds = Object.keys(MONSTERS);
+      if (!Array.isArray(seed.availableMonsters) || seed.availableMonsters.length === 0) return allMonsterIds;
+      const merged = seed.availableMonsters
+        .filter((monsterId, index, src) => typeof monsterId === "string" && !!MONSTERS[monsterId] && src.indexOf(monsterId) === index);
+      allMonsterIds.forEach((monsterId) => {
+        if (!merged.includes(monsterId)) merged.push(monsterId);
+      });
+      return merged;
+    })();
     const battleFormationIndex = getSafeFormationSlot(seed.battleFormationIndex);
     const selectedFormation = cloneFormation(seedFormations[battleFormationIndex] || null);
     const seedMonsterTraitDrafts = (seed?.monsterTraitDrafts && typeof seed.monsterTraitDrafts === "object")
