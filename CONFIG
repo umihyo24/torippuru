@@ -635,20 +635,23 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     DEFEAT_VANISH_MS: 320,
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
-    CUTIN: {
-      DEFAULT_DURATION: 45,
-      SLIDE_IN_FRAMES: 14,
-      HOLD_FRAMES: 22,
-      SLIDE_OUT_FRAMES: 9,
-      WIDTH: 520,
-      HEIGHT: 280,
-      Y: 120,
-      FROM_X: -560,
-      TARGET_X: 80,
-      OUT_X: 1280,
-      OVERLAY_ALPHA: 0.45,
-      TEXT_SIZE: 28
-    },
+    CUTIN:  {
+  DEFAULT_DURATION: 120,
+  SLIDE_IN_FRAMES: 30,
+  HOLD_FRAMES: 70,
+  SLIDE_OUT_FRAMES: 20,
+
+  WIDTH: 640,
+  HEIGHT: 640,
+
+  Y: 40,
+  FROM_X: -700,
+  TARGET_X: 80,
+  OUT_X: 1280,
+
+  OVERLAY_ALPHA: 0.45,
+  TEXT_SIZE: 28
+},
     UI: {
       FORMATION_EDIT_PADDING: 20,
       FORMATION_LEFT_PANEL_X: 20,
