@@ -1385,6 +1385,7 @@ button:disabled {
 .formation-left-main {
   position: relative;
   min-height: 0;
+  padding-bottom: 70px;
 }
 
 .formation-pane-title {
@@ -1553,15 +1554,29 @@ button:disabled {
 }
 
 .formation-edit-footer {
+  position: absolute;
   height: 54px;
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  justify-content: flex-start;
+  align-items: flex-start;
   gap: 10px;
   padding: 0;
   background: transparent;
   border-top: none;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.formation-edit-footer .screen-nav-btn {
+  position: absolute;
+}
+
+.formation-save-message {
+  width: 100%;
+  margin-top: 46px;
+  min-height: 16px;
+  font-size: 12px;
+  color: #ffd08e;
 }
 
 .formation-row-tag {
