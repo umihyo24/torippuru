@@ -8,27 +8,6 @@
 </head>
 <body>
   <div id="app"></div>
-  <script type="module">
-    const showBootError = (message) => {
-      const host = document.getElementById("app") || document.body;
-      const box = document.createElement("div");
-      box.style.margin = "24px";
-      box.style.padding = "16px";
-      box.style.border = "1px solid #ff7b7b";
-      box.style.borderRadius = "8px";
-      box.style.background = "rgba(40, 10, 10, 0.85)";
-      box.style.color = "#ffd6d6";
-      box.style.fontFamily = "sans-serif";
-      box.style.lineHeight = "1.5";
-      box.textContent = message;
-      host.replaceChildren(box);
-    };
-
-    import("./src/main.js")
-      .catch(() => import("./game.bundle.js"))
-      .catch(() => {
-        showBootError("ゲームの読み込みに失敗しました。`src/main.js` または `game.bundle.js` が存在することを確認し、ローカルサーバー経由で開いてください。");
-      });
-  </script>
+  <script src="./game.bundle.js"></script>
 </body>
 </html>
