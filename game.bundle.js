@@ -684,8 +684,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       BUTTON_AREA_Y: 710,
       BUTTON_AREA_WIDTH: 736,
       BUTTON_AREA_HEIGHT: 42,
-      BUTTON_WIDTH: 140,
-      BUTTON_HEIGHT: 42,
+      BUTTON_WIDTH: 180,
+      BUTTON_HEIGHT: 44,
       BUTTON_GAP: 12,
       BUTTON_MESSAGE_HEIGHT: 18,
       PARTY_START_X: 0,
@@ -721,6 +721,22 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       BATTLE_PREPARE_SUMMARY_HEIGHT: 16,
       FRONT_SLOT_COLOR: "rgba(74, 113, 166, 0.28)",
       RESERVE_SLOT_COLOR: "rgba(89, 122, 96, 0.26)"
+    },
+    SCREENS: {
+      HOME: "home",
+      MONSTER_LIST: "monsterList",
+      FORMATION: "formation",
+      BATTLE: "battle",
+      RESULT: "result"
+    },
+    STAGES: {
+      stage_001: {
+        id: "stage_001",
+        name: "はじまりの訓練場",
+        enemyMonsterIds: ["emberlynx", "rockgolem"],
+        firstClearUnlockMonsterIds: ["tododon"],
+        rewardGold: 100
+      }
     },
     UI_LAYOUT: {
       SHARED_CONTENT_COLUMN: {
@@ -823,7 +839,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     TRIAL_INTRO: "trial_intro"
   };
   const HOME_MENU_ITEMS = [
-    { key: "battle", label: "Battle", icon: "⚔" },
+    { key: "battle", label: "Start Battle", icon: "⚔" },
     { key: "formation", label: "Formation", icon: "☷" },
     { key: "monsters", label: "Monster List", icon: "🐾" },
     { key: "hanafudaTrials", label: "十二札試練", icon: "🃏" },
@@ -1237,21 +1253,30 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     })();
     const battleFormationIndex = getSafeFormationSlot(seed.battleFormationIndex);
     const selectedFormation = cloneFormation(seedFormations[battleFormationIndex] || null);
+    const savedFormation = cloneFormation(seed?.savedFormation || seedFormations.find((formation) => hasAnyValidFormationMember(formation)) || null);
     const seedMonsterTraitDrafts = (seed?.monsterTraitDrafts && typeof seed.monsterTraitDrafts === "object")
       ? { ...seed.monsterTraitDrafts }
       : {};
     const allyTeam = createAllyTeamFromFormation(selectedFormation, { selectedTraitByMonsterId: seedMonsterTraitDrafts });
     return ({
       phase: PHASE.HOME,
+      screen: CONFIG.SCREENS.HOME,
       turn: 1,
       winner: null,
       systemMessage: "",
+      result: null,
+      currentStageId: CONFIG.STAGES.stage_001.id,
+      stageProgress: {
+        clearedStageIds: []
+      },
+      gold: Math.max(0, Number(seed?.gold) || 0),
       progressionMeta: {
         balanceAssumptions: HANAFUDA_BALANCE_ASSUMPTIONS,
         testCases: HANAFUDA_TEST_CASES
       },
       progress: createProgressState(seed?.progress),
       formations: seedFormations,
+      savedFormation,
       availableMonsters: seedAvailableMonsters,
       autosaveSlots: [],
       settings: (seed?.settings && typeof seed.settings === "object") ? { ...seed.settings } : {},
@@ -2063,6 +2088,18 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     ensureUiSafety();
   };
 
+  const setScreen = (screen) => {
+    const screens = Object.values(CONFIG.SCREENS);
+    gameState.screen = screens.includes(screen) ? screen : CONFIG.SCREENS.HOME;
+  };
+
+  const hasValidSavedFormation = () => hasAnyValidFormationMember(gameState?.savedFormation);
+
+  const getCurrentStageConfig = () => {
+    const stageId = gameState?.currentStageId || CONFIG.STAGES.stage_001.id;
+    return CONFIG.STAGES?.[stageId] || CONFIG.STAGES.stage_001;
+  };
+
   const getSelectedTrialBoss = () => {
     const trialId = gameState?.progress?.selectedTrial;
     return (typeof trialId === "string" && HANAFUDA_BOSSES[trialId]) ? HANAFUDA_BOSSES[trialId] : null;
@@ -2167,11 +2204,13 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const enterHome = () => {
     gameState.ui.startView = START_VIEW.HUB;
     gameState.progress.selectedTrial = null;
+    setScreen(CONFIG.SCREENS.HOME);
     setPhase(PHASE.HOME);
   };
 
   const enterFormation = () => {
     gameState.ui.formationIndex = -1;
+    setScreen(CONFIG.SCREENS.FORMATION);
     setPhase(PHASE.FORMATION);
   };
 
@@ -2202,6 +2241,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     }
     gameState.ui.returnTo = null;
     gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
+    setScreen(CONFIG.SCREENS.MONSTER_LIST);
     setPhase(PHASE.MONSTER_LIST);
   };
 
@@ -2383,6 +2423,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const draft = cloneFormation(gameState.ui.formationEdit.draft);
     const isEmpty = draft.every((unitId) => !unitId);
     gameState.formations[index] = isEmpty ? null : draft;
+    gameState.savedFormation = isEmpty ? null : cloneFormation(draft);
+    gameState.systemMessage = isEmpty ? "保存できる編成がありません。" : "編成を保存しました。";
     gameState.ui.formationEdit.returnScreenAfterMonsterEdit = null;
     gameState.ui.returnTo = null;
     gameState.currentEditIndex = null;
@@ -2415,7 +2457,12 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const selectedKey = hubItems[safeIndex]?.key;
     gameState.ui.currentHubSection = selectedKey || hubItems[0]?.key || "battle";
     if (selectedKey === "battle") {
-      enterBattlePrepare();
+      if (!hasValidSavedFormation()) {
+        gameState.systemMessage = "先に編成を保存してください。";
+        enterFormation();
+        return;
+      }
+      startBattleFromFormation(0, gameState.savedFormation);
       return;
     }
     if (selectedKey === "hanafudaTrials") {
@@ -3986,6 +4033,26 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const trialId = gameState?.progress?.selectedTrial;
     const bossDef = (trialId && HANAFUDA_BOSSES[trialId]) ? HANAFUDA_BOSSES[trialId] : null;
     if (!bossDef) {
+      const stage = getCurrentStageConfig();
+      const cleared = Array.isArray(gameState?.stageProgress?.clearedStageIds) ? gameState.stageProgress.clearedStageIds : [];
+      const firstClear = !cleared.includes(stage.id);
+      const unlockedMonsterIds = firstClear
+        ? (Array.isArray(stage.firstClearUnlockMonsterIds) ? stage.firstClearUnlockMonsterIds.filter((id) => !!MONSTERS[id]) : [])
+        : [];
+      if (winner === TEAM.ALLY) {
+        gameState.gold = Math.max(0, Number(gameState.gold) || 0) + (Number(stage.rewardGold) || 0);
+        unlockedMonsterIds.forEach((monsterId) => {
+          if (!gameState.availableMonsters.includes(monsterId)) gameState.availableMonsters.push(monsterId);
+        });
+        if (firstClear) gameState.stageProgress.clearedStageIds = [...cleared, stage.id];
+      }
+      gameState.result = {
+        stageName: stage.name,
+        isWin: winner === TEAM.ALLY,
+        rewardGold: winner === TEAM.ALLY ? (Number(stage.rewardGold) || 0) : 0,
+        unlockedMonsterIds: winner === TEAM.ALLY ? unlockedMonsterIds : []
+      };
+      setScreen(CONFIG.SCREENS.RESULT);
       setPhase(PHASE.GAMEOVER);
       return;
     }
@@ -4528,6 +4595,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: MONSTERS[unitId].hp, hp: MONSTERS[unitId].hp, statuses: [] }));
   };
 
+  const createBattlePartyFromFormationArray = (formation) => getFormationUnitIds(formation)
+    .filter((unitId) => MONSTERS[unitId])
+    .map((unitId, idx) => ({ unitId, slot: idx, maxHp: MONSTERS[unitId].hp, hp: MONSTERS[unitId].hp, statuses: [] }));
+
   const selectBossTemplateMonsterId = (bossDef) => {
     const library = Object.keys(MONSTERS);
     if (!library.length) return null;
@@ -4615,22 +4686,27 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return selected ? selected.index : 0;
   };
 
-  const startBattleFromFormation = (formationIndex) => {
+  const startBattleFromFormation = (formationIndex, formationOverride = null) => {
     const safeIndex = getSafeFormationSlot(formationIndex);
-    const formation = getFormationAt(gameState, safeIndex);
+    const formation = Array.isArray(formationOverride) ? cloneFormation(formationOverride) : getFormationAt(gameState, safeIndex);
     if (!hasAnyValidFormationMember(formation)) return;
-    const playerParty = createBattlePartyFromFormation(safeIndex);
+    const stage = getCurrentStageConfig();
+    const enemyMonsterIds = Array.isArray(stage?.enemyMonsterIds) ? stage.enemyMonsterIds.filter((monsterId) => !!MONSTERS[monsterId]) : [];
+    const playerParty = Array.isArray(formationOverride) ? createBattlePartyFromFormationArray(formation) : createBattlePartyFromFormation(safeIndex);
     const nextState = createInitialState({
       formations: gameState.formations,
+      savedFormation: formation,
       availableMonsters: gameState.availableMonsters,
       battleFormationIndex: safeIndex,
       monsterTraitDrafts: gameState.monsterTraitDrafts,
-      progress: gameState.progress
+      progress: gameState.progress,
+      gold: gameState.gold
     });
+    nextState.currentStageId = stage.id;
+    nextState.stageProgress = gameState.stageProgress || { clearedStageIds: [] };
     nextState.battle.player.party = playerParty;
     nextState.battle.player.activeIndex = 0;
-    nextState.battle.enemy.party = INITIAL_PARTY.enemy
-      .filter((unitId) => MONSTERS[unitId])
+    nextState.battle.enemy.party = enemyMonsterIds
       .map((unitId, idx) => ({ unitId, slot: idx, maxHp: MONSTERS[unitId].hp, hp: MONSTERS[unitId].hp, statuses: [] }));
     nextState.battle.enemy.activeIndex = 0;
     nextState.battle.turn = 1;
@@ -4645,6 +4721,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     });
     gameState = nextState;
     debugLogBattleTeams(gameState, "battle-start");
+    setScreen(CONFIG.SCREENS.BATTLE);
     setPhase(PHASE.PLAYING);
     applyBattleStartTraitEffects(gameState);
     initializePlanningTurn();
@@ -5490,11 +5567,28 @@ const applyTraitEffect = (ctx, traitKey = "") => {
 
   const renderBattleResultScreen = () => {
     const wrap = createEl("section", "formation-screen");
-    wrap.appendChild(createEl("h2", "formation-title", gameState.winner === TEAM.ALLY ? "Victory" : "Trial Failed"));
-    wrap.appendChild(createEl("p", "home-info-description", gameState.systemMessage || "敗北しても試練進行は失われません。"));
-    const back = createEl("button", "screen-nav-btn primary", "Hubへ戻る");
+    const result = gameState?.result || {};
+    const unlockedNames = (Array.isArray(result.unlockedMonsterIds) ? result.unlockedMonsterIds : [])
+      .map((monsterId) => MONSTERS?.[monsterId]?.name || monsterId)
+      .filter((name) => !!name);
+    wrap.appendChild(createEl("h2", "formation-title", result.isWin ? "WIN" : "LOSE"));
+    wrap.appendChild(createEl("p", "home-info-description", result.stageName || "バトル結果"));
+    wrap.appendChild(createEl("p", "home-info-description", result.isWin ? `獲得ゴールド: ${result.rewardGold || 0}` : "次は編成を見直して再挑戦しましょう。"));
+    if (unlockedNames.length > 0) {
+      wrap.appendChild(createEl("p", "home-info-description", `解放: ${unlockedNames.join(", ")}`));
+    }
+    const row = createEl("div", "screen-button-row");
+    const back = createEl("button", "screen-nav-btn primary", "Back HOME");
     back.dataset.action = "go-home";
-    wrap.appendChild(back);
+    const edit = createEl("button", "screen-nav-btn", "Edit Formation");
+    edit.dataset.action = "go-formation";
+    row.append(back, edit);
+    if (!result.isWin) {
+      const retry = createEl("button", "screen-nav-btn", "Retry");
+      retry.dataset.action = "retry-battle";
+      row.appendChild(retry);
+    }
+    wrap.appendChild(row);
     return wrap;
   };
 
@@ -6267,18 +6361,27 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     }
 
     const main = createEl("div", "main");
-    if (gameState.phase === PHASE.START) {
+    if (gameState.phase === PHASE.PLAYING || gameState.screen === CONFIG.SCREENS.BATTLE) {
+      const battleStage = createEl("div", "battle-stage");
+      battleStage.appendChild(renderBattleTopHeader());
+      battleStage.appendChild(renderBattlefield());
+      battleStage.appendChild(renderBattleMessageBox());
+      main.appendChild(battleStage);
+      main.appendChild(renderCommandArea());
+    } else if (gameState.phase === PHASE.GAMEOVER || gameState.screen === CONFIG.SCREENS.RESULT) {
+      main.appendChild(renderBattleResultScreen());
+    } else if (gameState.screen === CONFIG.SCREENS.HOME) {
+      main.appendChild(renderHomeScreen());
+    } else if (gameState.screen === CONFIG.SCREENS.FORMATION) {
+      if (gameState.phase === PHASE.FORMATION_EDIT) main.appendChild(renderFormationEditScreen());
+      else main.appendChild(renderFormationScreen());
+    } else if (gameState.screen === CONFIG.SCREENS.MONSTER_LIST) {
+      if (gameState.phase === PHASE.MONSTER_DETAIL) main.appendChild(renderMonsterDetailScreen());
+      else main.appendChild(renderMonsterListScreen());
+    } else if (gameState.phase === PHASE.START) {
       main.appendChild(renderStartPhaseScreen());
     } else if (gameState.phase === PHASE.REWARD) {
       main.appendChild(renderRewardScreen());
-    } else if (gameState.phase === PHASE.GAMEOVER) {
-      main.appendChild(renderBattleResultScreen());
-    } else if (gameState.phase === PHASE.HOME) {
-      main.appendChild(renderHomeScreen());
-    } else if (gameState.phase === PHASE.FORMATION) {
-      main.appendChild(renderFormationScreen());
-    } else if (gameState.phase === PHASE.MONSTER_LIST) {
-      main.appendChild(renderMonsterListScreen());
     } else if (gameState.phase === PHASE.MONSTER_DETAIL) {
       main.appendChild(renderMonsterDetailScreen());
     } else if (gameState.phase === PHASE.TRAINER_CARD) {
@@ -6289,14 +6392,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       main.appendChild(renderBattlePrepareScreen());
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
       main.appendChild(renderFormationEditScreen());
-    } else {
-      const battleStage = createEl("div", "battle-stage");
-      battleStage.appendChild(renderBattleTopHeader());
-      battleStage.appendChild(renderBattlefield());
-      battleStage.appendChild(renderBattleMessageBox());
-      main.appendChild(battleStage);
-      main.appendChild(renderCommandArea());
-    }
+    } else main.appendChild(renderHomeScreen());
     app.append(main);
     const logModal = renderLogModal();
     if (logModal) app.appendChild(logModal);
@@ -6599,7 +6695,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       return;
     }
     if (a === "battle-start") {
-      if (gameState.ui.battlePrepareIndex >= 0) startBattleFromFormation(gameState.ui.battlePrepareIndex);
+      const selectedFormation = gameState.ui.battlePrepareIndex >= 0 ? getFormationAt(gameState, gameState.ui.battlePrepareIndex) : null;
+      if (hasAnyValidFormationMember(selectedFormation)) {
+        gameState.savedFormation = cloneFormation(selectedFormation);
+        startBattleFromFormation(gameState.ui.battlePrepareIndex, gameState.savedFormation);
+      }
       render();
       return;
     }
@@ -6625,6 +6725,16 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     }
     if (a === "go-home") {
       enterHome();
+      render();
+      return;
+    }
+    if (a === "go-formation") {
+      enterFormation();
+      render();
+      return;
+    }
+    if (a === "retry-battle") {
+      if (hasValidSavedFormation()) startBattleFromFormation(0, gameState.savedFormation);
       render();
       return;
     }
