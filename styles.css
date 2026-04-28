@@ -198,6 +198,64 @@ body {
   gap: 10px;
 }
 
+.skill-cutin-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.skill-cutin-overlay {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.skill-cutin-card {
+  position: absolute;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(16, 20, 30, 0.92);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+
+.skill-cutin-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.skill-cutin-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  background: linear-gradient(145deg, #2a405d 0%, #181f33 100%);
+  color: #ecf4ff;
+}
+
+.skill-cutin-fallback-title {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.skill-cutin-fallback-sub {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}
+
+.skill-cutin-title {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.9);
+}
+
 .battle-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -112,6 +112,9 @@ const ASSETS = {
     duskmoth: "assets/portraits/duskmoth.png",
     inoshissi: "assets/portraits/inoshissi.png",
     tododon: "assets/portraits/tododon.png",
+  },
+  skillCutins: {
+    todonhou: "assets/skill_cutins/todonhou.png"
   }
 };
 const getAssetPath = (type, key) => {
@@ -632,6 +635,20 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     DEFEAT_VANISH_MS: 320,
     HIGHLIGHT_MS: 220,
     SPEED_BASE: 1,
+    CUTIN: {
+      DEFAULT_DURATION: 45,
+      SLIDE_IN_FRAMES: 14,
+      HOLD_FRAMES: 22,
+      SLIDE_OUT_FRAMES: 9,
+      WIDTH: 520,
+      HEIGHT: 280,
+      Y: 120,
+      FROM_X: -560,
+      TARGET_X: 80,
+      OUT_X: 1280,
+      OVERLAY_ALPHA: 0.45,
+      TEXT_SIZE: 28
+    },
     UI: {
       FORMATION_EDIT_PADDING: 20,
       FORMATION_LEFT_PANEL_X: 20,
@@ -902,6 +919,9 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const MOVE_TARGET_LABELS = {
     single: "単体",
     "all-enemies": "敵全体"
+  };
+  const CUTIN_MOVE_TO_ASSET = {
+    トドドン砲: "skillCutins.todonhou"
   };
 
   const getMoveRole = (move) => move?.role || (move?.category === "status" ? "support" : "attack");
@@ -1362,6 +1382,19 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       statusKind: null,
       traitKind: null,
       removeKind: null
+    },
+    cutIn: {
+      active: false,
+      assetKey: null,
+      title: "",
+      timer: 0,
+      duration: CONFIG.CUTIN.DEFAULT_DURATION,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      fromX: 0,
+      targetX: 0
     },
       log: [],
       monsterTrainingDrafts: {},
@@ -3609,6 +3642,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         targets: targetIds,
         effectType: isAoe ? "aoe" : "attack"
       });
+      const cutInAssetKey = CUTIN_MOVE_TO_ASSET[a.moveName] || null;
+      if (cutInAssetKey) q.push({ type: "cutInStart", assetKey: cutInAssetKey, title: a.moveName });
       q.push({ type: "message", text: `${a.actorName}の ${a.moveName}！`, loggable: true });
       if (a.isCritical) q.push({ type: "message", text: "きゅうしょに あたった！", loggable: true });
       const aoeAnimations = [];
@@ -3706,6 +3741,53 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     gameState.battleFlow.pendingTurnResult = turnResult;
     gameState.battleFlow.activeEvent = null;
     gameState.ui.fastForwardRequested = false;
+  };
+
+  const startCutIn = ({ assetKey, title }) => {
+    const cutIn = gameState.cutIn || {};
+    const duration = Number(CONFIG.CUTIN?.DEFAULT_DURATION) || 45;
+    cutIn.active = true;
+    cutIn.assetKey = typeof assetKey === "string" ? assetKey : null;
+    cutIn.title = typeof title === "string" ? title : "";
+    cutIn.timer = 0;
+    cutIn.duration = duration;
+    cutIn.x = Number(CONFIG.CUTIN?.FROM_X) || 0;
+    cutIn.y = Number(CONFIG.CUTIN?.Y) || 0;
+    cutIn.width = Number(CONFIG.CUTIN?.WIDTH) || 0;
+    cutIn.height = Number(CONFIG.CUTIN?.HEIGHT) || 0;
+    cutIn.fromX = Number(CONFIG.CUTIN?.FROM_X) || 0;
+    cutIn.targetX = Number(CONFIG.CUTIN?.TARGET_X) || 0;
+    gameState.cutIn = cutIn;
+  };
+
+  const updateCutIn = () => {
+    const cutIn = gameState?.cutIn;
+    if (!cutIn?.active) return;
+    const frame = (Number(cutIn.timer) || 0) + 1;
+    cutIn.timer = frame;
+    const slideInFrames = Math.max(1, Number(CONFIG.CUTIN?.SLIDE_IN_FRAMES) || 1);
+    const holdFrames = Math.max(0, Number(CONFIG.CUTIN?.HOLD_FRAMES) || 0);
+    const slideOutFrames = Math.max(1, Number(CONFIG.CUTIN?.SLIDE_OUT_FRAMES) || 1);
+    const fromX = Number(cutIn.fromX);
+    const targetX = Number(cutIn.targetX);
+    const outX = Number(CONFIG.CUTIN?.OUT_X) || targetX;
+    const total = slideInFrames + holdFrames + slideOutFrames;
+    if (frame <= slideInFrames) {
+      const t = clamp(frame / slideInFrames, 0, 1);
+      cutIn.x = fromX + (targetX - fromX) * t;
+      return;
+    }
+    if (frame <= slideInFrames + holdFrames) {
+      cutIn.x = targetX;
+      return;
+    }
+    if (frame <= total) {
+      const outFrame = frame - (slideInFrames + holdFrames);
+      const t = clamp(outFrame / slideOutFrames, 0, 1);
+      cutIn.x = targetX + (outX - targetX) * t;
+      return;
+    }
+    cutIn.active = false;
   };
 
   const finishCurrentEvent = () => {
@@ -3816,6 +3898,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         removeKind: event.removeKind || null
       });
       gameState.battleFlow.waitUntil = now + (CONFIG.HIGHLIGHT_MS / gameState.battleFlow.playbackSpeed);
+      return;
+    }
+    if (event.type === "cutInStart") {
+      startCutIn({ assetKey: event.assetKey, title: event.title });
+      finishCurrentEvent();
       return;
     }
     if (event.type === "hpAnimation") {
@@ -4672,6 +4759,28 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     el.style.setProperty("--section-offset-x-px", `${rect.offsetXPx}px`);
   };
 
+  const imageCache = {};
+  const resolveAssetPath = (assetKey) => {
+    const key = typeof assetKey === "string" ? assetKey.trim() : "";
+    if (!key) return "";
+    const [assetType, ...rest] = key.split(".");
+    if (!assetType || rest.length === 0) return "";
+    return getAssetPath(assetType, rest.join("."));
+  };
+  const createImage = (assetKey) => {
+    const key = typeof assetKey === "string" ? assetKey.trim() : "";
+    if (!key) return null;
+    if (imageCache[key]) return imageCache[key];
+    const path = resolveAssetPath(key);
+    if (!path) return null;
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = "eager";
+    img.src = path;
+    imageCache[key] = img;
+    return img;
+  };
+
   const createImageWithFallback = ({ src, alt, mirror = false, wrapperClass = "portrait-wrap", placeholderLabel = "画像なし", placeholderSubLabel = "NO SIGNAL" }) => {
     const baseClass = "portrait-wrap";
     const normalizedWrapperClass = typeof wrapperClass === "string" && wrapperClass.trim() ? wrapperClass.trim() : baseClass;
@@ -5063,6 +5172,51 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return row;
   };
 
+  const canDrawImage = (img) => {
+    if (!img) return false;
+    if (img.complete !== true) return false;
+    return Number(img.naturalWidth) > 0 && Number(img.naturalHeight) > 0;
+  };
+
+  const renderBattleCutIn = () => {
+    const cutIn = gameState?.cutIn;
+    if (!cutIn?.active) return null;
+    const root = createEl("div", "skill-cutin-layer");
+    const overlay = createEl("div", "skill-cutin-overlay");
+    overlay.style.opacity = String(Number(CONFIG.CUTIN?.OVERLAY_ALPHA) || 0);
+    root.appendChild(overlay);
+
+    const card = createEl("div", "skill-cutin-card");
+    card.style.left = `${Math.round(Number(cutIn.x) || 0)}px`;
+    card.style.top = `${Math.round(Number(cutIn.y) || 0)}px`;
+    card.style.width = `${Math.max(1, Number(cutIn.width) || 1)}px`;
+    card.style.height = `${Math.max(1, Number(cutIn.height) || 1)}px`;
+    const image = createImage(cutIn.assetKey);
+    if (canDrawImage(image)) {
+      const canvas = createEl("canvas", "skill-cutin-canvas");
+      const width = Math.max(1, Math.trunc(Number(cutIn.width) || 1));
+      const height = Math.max(1, Math.trunc(Number(cutIn.height) || 1));
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(image, 0, 0, width, height);
+      }
+      card.appendChild(canvas);
+    } else {
+      const fallback = createEl("div", "skill-cutin-fallback");
+      fallback.appendChild(createEl("div", "skill-cutin-fallback-title", cutIn.title || "スキル発動"));
+      fallback.appendChild(createEl("div", "skill-cutin-fallback-sub", "CUT-IN"));
+      card.appendChild(fallback);
+    }
+    const title = createEl("div", "skill-cutin-title", cutIn.title || "");
+    title.style.fontSize = `${Math.max(12, Number(CONFIG.CUTIN?.TEXT_SIZE) || 12)}px`;
+    card.appendChild(title);
+    root.appendChild(card);
+    return root;
+  };
+
   const renderBattlefield = () => {
     const board = createEl("section", "battlefield shared-content-width");
     applySharedContentRect(board, "battlefield");
@@ -5075,6 +5229,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       renderBattleRow("ally-sprite-row", renderSpriteSlot, 1),
       renderBattleRow("ally-status-row", renderStatusPanel, 1)
     );
+    const cutInLayer = renderBattleCutIn();
+    if (cutInLayer) board.appendChild(cutInLayer);
     return board;
   };
 
@@ -6153,10 +6309,12 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
     const hasDefeatVanish = Object.keys(gameState.displayState.defeatVanish).length > 0;
     const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
-    if (!hasHpAnimations && !hasDefeatVanish && !hasPlayback) return;
+    const hasCutIn = gameState?.cutIn?.active === true;
+    if (!hasHpAnimations && !hasDefeatVanish && !hasPlayback && !hasCutIn) return;
     updateHpAnimations(now);
     updateDefeatVanishAnimations(now);
     if (hasPlayback) updateBattlePlayback(now);
+    if (hasCutIn) updateCutIn();
     render();    
   };
 
