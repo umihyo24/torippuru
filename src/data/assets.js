@@ -19,7 +19,7 @@ export const ASSETS = {
     shinju: "assets/portraits/shinju.png",
     venomtoad: "assets/portraits/venomtoad.png",
     duskmoth: "assets/portraits/duskmoth.png",
-    inoshissi: "assets/monsters/inoshissi.png",
+    inoshissi: "assets/portraits/inoshissi.png",
     tododon: "assets/portraits/tododon.png",
   }
 };
