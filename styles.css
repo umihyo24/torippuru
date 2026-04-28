@@ -1642,6 +1642,24 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.monster-debug-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.monster-debug-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 204, 145, 0.88);
+  background: rgba(49, 22, 13, 0.85);
+  color: #ffd7ac;
+  letter-spacing: 0.02em;
+}
 
 .formation-edit-right-panel {
   padding: 12px;

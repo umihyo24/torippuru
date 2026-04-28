@@ -30,7 +30,11 @@ const MOVES = {
   chototsu_moshin: { id: "chototsu_moshin", name: "ちょとつもうしん", category: "physical", role: "attack", type: "nature", target: "single", power: 46, description: "強力だが隙ができる突進", effectKey: "self_def_down", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
   abareru: { id: "abareru", name: "あばれる", category: "physical", role: "attack", type: "nature", target: "single", power: 22, description: "2回連続攻撃", effectKey: "multi_hit_2", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
   bakajikara: { id: "bakajikara", name: "ばかぢから", category: "physical", role: "attack", type: "nature", target: "single", power: 56, description: "超火力だが反動が大きい", effectKey: "self_atk_def_down", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
-  tossin: { id: "tossin", name: "とっしん", category: "physical", role: "attack", type: "nature", target: "single", power: 30, description: "反動付き攻撃", effectKey: "recoil_20", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] }
+  tossin: { id: "tossin", name: "とっしん", category: "physical", role: "attack", type: "nature", target: "single", power: 30, description: "反動付き攻撃", effectKey: "recoil_20", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  tododon_ho: { id: "tododon_ho", name: "トドドン砲", category: "special", role: "attack", type: "water", target: "single", power: 52, description: "巨肺で圧縮した轟弾を収束して撃ち放つ（轟首領砲）", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  tododonpa: { id: "tododonpa", name: "トドドンパ", category: "special", role: "attack", type: "water", target: "all-enemies", power: 34, description: "圧縮轟気を一息に放ち空間を震撼させる（轟首領波）", patternId: "front3", targetRule: "enemy", targetMode: "all-enemies", beforeDamage: [], afterDamage: [] },
+  buchikamashi: { id: "buchikamashi", name: "ぶちかまし", category: "physical", role: "attack", type: "nature", target: "single", power: 44, description: "全体重を乗せてぶつかる強烈な体当たり", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  hirune: { id: "hirune", name: "ひるね", category: "status", role: "support", type: "water", target: "self", power: 0, description: "ひと休みして防御を立て直す", patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "applyStatus", status: "defUp", duration: 2 }], afterDamage: [] }
 };
 
 // ---- src/data/monsters.js ----
@@ -46,7 +50,8 @@ const MONSTERS = {
   wyvern: { id: "wyvern", name: "ブルーワイバーン", portrait: "wyvern", hp: 85, atk: 95, mag: 70, def: 65, res: 65, spd: 100, weaknessTypes: ["light", "water"], traits: ["intimidate", "battleRhythm", "openingSurge"], selectedTraitKey: "intimidate", moves: ["clawStrike", "drainBite", "rallyHowl", "shellStance"] },
   golem: { id: "golem", name: "ロックゴーレム", portrait: "golem", hp: 110, atk: 90, mag: 40, def: 110, res: 50, spd: 40, weaknessTypes: ["water", "nature"], traits: ["battleRhythm", "openingSurge", "intimidate"], selectedTraitKey: "battleRhythm", moves: ["quakeWave", "ironGuard", "shellStance", "clawStrike"] },
   shinju: { id: "shinju", name: "しんじゅう", portrait: "shinju", hp: 80, atk: 55, mag: 100, def: 55, res: 70, spd: 120, weaknessTypes: ["shadow", "earth"], traits: ["intimidate", "wonder_guard", "no_guard"], selectedTraitKey: "intimidate", moves: ["frostLance", "clawStrike", "toxicSpit", "venomBless"] },
-  inoshissi: { id: "inoshissi", name: "イノシッシ", portrait: "inoshissi", imageKey: "inoshissi", hp: 94, atk: 128, mag: 30, def: 52, res: 48, spd: 74, weaknessTypes: ["water", "earth"], traits: ["ino_ichiban", "innocence", "innovation"], selectedTraitKey: "ino_ichiban", moves: ["chototsu_moshin", "abareru", "bakajikara", "tossin"] }
+  inoshissi: { id: "inoshissi", name: "イノシッシ", portrait: "inoshissi", imageKey: "inoshissi", hp: 94, atk: 128, mag: 30, def: 52, res: 48, spd: 74, weaknessTypes: ["water", "earth"], traits: ["ino_ichiban", "innocence", "innovation"], selectedTraitKey: "ino_ichiban", moves: ["chototsu_moshin", "abareru", "bakajikara", "tossin"] },
+  tododon: { id: "tododon", name: "トドドン", portrait: "tododon", imageKey: "tododon", assetKey: "monsters.tododon", unlocked: false, owned: false, formationEligible: true, hp: 128, atk: 92, mag: 106, def: 98, res: 104, spd: 42, weaknessTypes: ["light", "nature"], traits: ["battleRhythm", "openingSurge", "intimidate"], selectedTraitKey: "battleRhythm", moves: ["tododon_ho", "tododonpa", "buchikamashi", "hirune"] }
 };
 
 // ---- src/data/traits.js ----
@@ -105,7 +110,8 @@ const ASSETS = {
     shinju: "assets/portraits/shinju.png",
     venomtoad: "assets/portraits/venomtoad.png",
     duskmoth: "assets/portraits/duskmoth.png",
-    inoshissi: "assets/monsters/inoshissi.png",
+    inoshissi: "assets/portraits/inoshissi.png",
+    tododon: "assets/portraits/tododon.png",
   }
 };
 const getAssetPath = (type, key) => {
@@ -768,6 +774,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         FONT_SIZE_BODY_PX: 12,
         FONT_SIZE_TITLE_PX: 22
       }
+    },
+    DEV: {
+      SHOW_ALL_MONSTERS: true,
+      SHOW_LOCKED_MONSTERS: true,
+      SHOW_MONSTER_DEBUG_BADGES: true
     }
   };
 
@@ -1032,8 +1043,56 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, max);
   };
 
+  const getMonsterMasterIds = () => Object.keys(MONSTERS || {});
+  const getAllMonsters = () => getMonsterMasterIds()
+    .map((monsterId) => MONSTERS?.[monsterId])
+    .filter((monster) => !!monster && typeof monster === "object");
+  const getMonsterStateMeta = (monsterId, state = gameState) => {
+    const listedInAvailable = Array.isArray(state?.availableMonsters) && state.availableMonsters.includes(monsterId);
+    const stateMeta = (state?.monsterVisibility && typeof state.monsterVisibility === "object")
+      ? state.monsterVisibility?.[monsterId]
+      : null;
+    return {
+      unlocked: typeof stateMeta?.unlocked === "boolean" ? stateMeta.unlocked : listedInAvailable,
+      owned: typeof stateMeta?.owned === "boolean" ? stateMeta.owned : listedInAvailable,
+      formationEligible: typeof stateMeta?.formationEligible === "boolean" ? stateMeta.formationEligible : true
+    };
+  };
+  const getMonsterVisibilityInfo = (monster, context, state = gameState) => {
+    const monsterId = typeof monster?.id === "string" ? monster.id : "";
+    const stateMeta = getMonsterStateMeta(monsterId, state);
+    const unlocked = typeof monster?.unlocked === "boolean" ? monster.unlocked : stateMeta.unlocked;
+    const owned = typeof monster?.owned === "boolean" ? monster.owned : stateMeta.owned;
+    const formationEligible = typeof monster?.formationEligible === "boolean"
+      ? monster.formationEligible
+      : stateMeta.formationEligible;
+    const imageSource = getMonsterImageSrc(monster);
+    const hasAssetMapping = Boolean(ASSETS?.portraits?.[monster?.assetKey || monster?.imageKey || monster?.portrait || ""]);
+    return {
+      locked: !unlocked,
+      notOwned: !owned,
+      notFormationEligible: context === "formation" ? !formationEligible : false,
+      missingImage: !imageSource || !hasAssetMapping
+    };
+  };
+  const getVisibleMonsters = (context, state = gameState) => {
+    const monsters = getAllMonsters();
+    if (CONFIG.DEV.SHOW_ALL_MONSTERS) return monsters.slice();
+    return monsters.filter((monster) => {
+      const info = getMonsterVisibilityInfo(monster, context, state);
+      if (info.missingImage) return true;
+      if (!info.locked) return true;
+      if (CONFIG.DEV.SHOW_LOCKED_MONSTERS) return true;
+      if (!info.notOwned) return true;
+      if (context !== "formation") return false;
+      return !info.notFormationEligible;
+    });
+  };
+  const getVisibleMonsterIds = (context, state = gameState) => getVisibleMonsters(context, state)
+    .map((monster) => monster?.id)
+    .filter((monsterId) => typeof monsterId === "string" && !!MONSTERS?.[monsterId]);
   const getSafeBoxIndex = (state, value) => {
-    const box = Array.isArray(state?.availableMonsters) ? state.availableMonsters : [];
+    const box = getVisibleMonsterIds("formation", state);
     if (!box.length) return 0;
     return clamp(Number.isFinite(value) ? Math.trunc(value) : 0, 0, box.length - 1);
   };
@@ -1146,9 +1205,16 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const createDefaultGameState = (seed = {}) => {
     const seedFormations = Array.isArray(seed.formations) ? seed.formations.slice(0, FORMATION_SLOT_COUNT) : createDefaultFormations();
     while (seedFormations.length < FORMATION_SLOT_COUNT) seedFormations.push(null);
-    const seedAvailableMonsters = Array.isArray(seed.availableMonsters) && seed.availableMonsters.length
-      ? seed.availableMonsters.slice()
-      : Object.keys(MONSTERS);
+    const seedAvailableMonsters = (() => {
+      const allMonsterIds = Object.keys(MONSTERS);
+      if (!Array.isArray(seed.availableMonsters) || seed.availableMonsters.length === 0) return allMonsterIds;
+      const merged = seed.availableMonsters
+        .filter((monsterId, index, src) => typeof monsterId === "string" && !!MONSTERS[monsterId] && src.indexOf(monsterId) === index);
+      allMonsterIds.forEach((monsterId) => {
+        if (!merged.includes(monsterId)) merged.push(monsterId);
+      });
+      return merged;
+    })();
     const battleFormationIndex = getSafeFormationSlot(seed.battleFormationIndex);
     const selectedFormation = cloneFormation(seedFormations[battleFormationIndex] || null);
     const seedMonsterTraitDrafts = (seed?.monsterTraitDrafts && typeof seed.monsterTraitDrafts === "object")
@@ -1586,7 +1652,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   };
 
   const getUnitName = (unitId) => MONSTERS?.[unitId]?.name || "UNKNOWN";
-  const getMonsterLibraryIds = (state = gameState) => Array.isArray(state?.availableMonsters) ? state.availableMonsters.filter((id) => !!MONSTERS[id]) : [];
+  const getMonsterLibraryIds = (state = gameState) => getVisibleMonsterIds("monsterList", state);
   const getSafeMonsterListIndex = (state, value) => {
     const ids = getMonsterLibraryIds(state);
     if (!ids.length) return -1;
@@ -2373,8 +2439,9 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   };
 
   const assignMonsterToSelectedSlot = (monsterIndex) => {
+    const visibleMonsterIds = getVisibleMonsterIds("formation", gameState);
     const boxIndex = getSafeEditMonsterIndex(gameState, monsterIndex);
-    const unitId = gameState.availableMonsters[boxIndex] || null;
+    const unitId = visibleMonsterIds[boxIndex] || null;
     if (!unitId) return;
     gameState.ui.formationEdit.selectedMonsterKey = unitId;
     const slotIndex = getSelectableIndex(gameState.ui.formationEdit.selectedSlotIndex, FORMATION_MEMBER_COUNT - 1);
@@ -4800,9 +4867,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
 
   const getMonsterImageSrc = (unit) => {
     if (!unit || typeof unit !== "object") return "";
-    const imageKey = typeof unit.imageKey === "string" && unit.imageKey.trim()
-      ? unit.imageKey.trim()
-      : (typeof unit.portrait === "string" ? unit.portrait.trim() : "");
+    const rawAssetKey = typeof unit.assetKey === "string" ? unit.assetKey.trim() : "";
+    const normalizedAssetKey = rawAssetKey.startsWith("monsters.") ? rawAssetKey.slice("monsters.".length) : rawAssetKey;
+    const imageKey = normalizedAssetKey
+      || (typeof unit.imageKey === "string" && unit.imageKey.trim() ? unit.imageKey.trim() : "")
+      || (typeof unit.portrait === "string" ? unit.portrait.trim() : "");
     if (!imageKey) return "";
     return getAssetPath("portraits", imageKey);
   };
@@ -5169,6 +5238,18 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       / (CONFIG.UI.MONSTER_CARD_HEIGHT + CONFIG.UI.MONSTER_GRID_GAP_Y)));
     return Math.max(0, Math.ceil(itemCount / CONFIG.UI.MONSTER_GRID_COLS) - visibleRows);
   };
+  const appendMonsterDebugBadges = (container, visibilityInfo) => {
+    if (!CONFIG.DEV.SHOW_MONSTER_DEBUG_BADGES || !container || !visibilityInfo) return;
+    const badges = [];
+    if (visibilityInfo.locked) badges.push("LOCKED");
+    if (visibilityInfo.notOwned) badges.push("NOT OWNED");
+    if (visibilityInfo.notFormationEligible) badges.push("NO FORMATION");
+    if (visibilityInfo.missingImage) badges.push("NO IMAGE");
+    if (!badges.length) return;
+    const wrap = createEl("div", "monster-debug-badges");
+    badges.forEach((label) => wrap.appendChild(createEl("span", "monster-debug-badge", label)));
+    container.appendChild(wrap);
+  };
 
   const renderTrialSelectScreen = () => {
     const wrap = createEl("section", "formation-screen hanafuda-trial-select-screen");
@@ -5363,9 +5444,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const wrap = createEl("section", "monster-list-screen");
     wrap.appendChild(createEl("h2", "formation-title", "Monster List"));
     const list = createEl("div", "monster-list-grid");
-    const ids = getMonsterLibraryIds(gameState);
-    ids.forEach((monsterId, index) => {
-      const monster = MONSTERS[monsterId];
+    const monsters = getVisibleMonsters("monsterList", gameState);
+    monsters.forEach((monster, index) => {
+      const monsterId = monster?.id;
+      if (!monsterId || !MONSTERS[monsterId]) return;
       const isSelected = monsterId === gameState.selectedMonsterId || index === gameState.ui.monsterListIndex;
       const card = createEl("button", `monster-list-item${isSelected ? " active" : ""}`);
       card.dataset.action = "monster-open-detail";
@@ -5382,6 +5464,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         createEl("div", "monster-list-name", monster.name),
         createEl("div", "monster-list-sub", `基礎合計 ${MONSTER_STAT_KEYS.reduce((sum, key) => sum + (monster[key] || 0), 0)}`)
       );
+      appendMonsterDebugBadges(card, getMonsterVisibilityInfo(monster, "monsterList", gameState));
       list.appendChild(card);
     });
     const buttons = createEl("div", "screen-button-row");
@@ -5744,10 +5827,11 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const wrap = createEl("section", "formation-edit-screen");
     const edit = gameState.ui.formationEdit;
     const draft = cloneFormation(edit.draft);
+    const visibleFormationMonsters = getVisibleMonsters("formation", gameState);
     const selectedMonsterId = getFormationEditSelectedMonsterId(gameState);
     const selectedMonster = selectedMonsterId ? MONSTERS[selectedMonsterId] : null;
     const slotRects = getFormationSlotRects();
-    const monsterRects = getMonsterGridItemRects(edit.scrollOffset, gameState.availableMonsters.length);
+    const monsterRects = getMonsterGridItemRects(edit.scrollOffset, visibleFormationMonsters.length);
     const saveEnabled = hasAnyValidFormationMember(draft);
     const disableReason = saveEnabled ? "" : "保存するには1体以上を編成してください";
     wrap.style.padding = `${CONFIG.UI.FORMATION_EDIT_PADDING}px`;
@@ -5815,8 +5899,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     box.style.height = `${CONFIG.UI.MONSTER_GRID_HEIGHT}px`;
     box.appendChild(createEl("div", "formation-pane-title", "Available Monsters"));
     monsterRects.forEach((rect) => {
-      const unitId = gameState.availableMonsters[rect.index];
-      const unit = MONSTERS[unitId];
+      const unit = visibleFormationMonsters[rect.index];
+      const unitId = unit?.id;
       if (!unit) return;
       const assignedSlot = findMonsterSlotInDraft(draft, unitId);
       const row = createEl("button", `formation-row monster-row${assignedSlot >= 0 ? " assigned" : ""}`);
@@ -5835,6 +5919,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       row.appendChild(createEl("div", "monster-card-name", unit.name));
       const slotLabel = getAssignedSlotLabel(draft, unitId);
       if (slotLabel) row.appendChild(createEl("span", "assigned-badge", slotLabel));
+      appendMonsterDebugBadges(row, getMonsterVisibilityInfo(unit, "formation", gameState));
       box.appendChild(row);
     });
 
@@ -6159,7 +6244,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
         return true;
       }
     }
-    const monsterRects = getMonsterGridItemRects(gameState.ui.formationEdit.scrollOffset, gameState.availableMonsters.length);
+    const visibleFormationMonsterCount = getVisibleMonsters("formation", gameState).length;
+    const monsterRects = getMonsterGridItemRects(gameState.ui.formationEdit.scrollOffset, visibleFormationMonsterCount);
     for (const rect of monsterRects) {
       if (isPointInRect(x, y, rect)) {
         assignMonsterToSelectedSlot(rect.index);
@@ -6588,7 +6674,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       height: CONFIG.UI.MONSTER_GRID_HEIGHT
     };
     if (!isPointInRect(pointer.x, pointer.y, gridRect)) return;
-    const maxScroll = getMonsterGridMaxScroll(gameState.availableMonsters.length);
+    const visibleFormationMonsterCount = getVisibleMonsters("formation", gameState).length;
+    const maxScroll = getMonsterGridMaxScroll(visibleFormationMonsterCount);
     if (maxScroll <= 0) return;
     event.preventDefault();
     const direction = event.deltaY > 0 ? 1 : -1;
