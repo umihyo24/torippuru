@@ -184,7 +184,16 @@ body {
   font-size: 11px;
 }
 
+
+.battle-background-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .battlefield {
+  isolation: isolate;
   border: 2px solid #83704b;
   border-radius: 12px;
   background: linear-gradient(180deg, #68422f 0%, #83624f 52%, #5a7b4b 100%);
@@ -2356,3 +2365,8 @@ button:disabled {
   background: rgba(18, 26, 42, 0.8);
 }
 .trainer-unlock-item.locked { opacity: 0.55; }
+
+.battlefield > * {
+  position: relative;
+  z-index: 1;
+}
