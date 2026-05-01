@@ -56,6 +56,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       TEXT_SIZE: 28
     },
     UI: {
+      HEADER_BACK_X: 20,
+      HEADER_BACK_Y: 20,
+      HEADER_BACK_W: 180,
+      HEADER_BACK_H: 44,
       FORMATION_EDIT_PADDING: 20,
       FORMATION_LEFT_PANEL_X: 20,
       FORMATION_LEFT_PANEL_Y: 60,
@@ -5087,6 +5091,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const renderMonsterListScreen = () => {
     const wrap = createEl("section", "monster-list-screen");
+    wrap.style.paddingTop = `${CONFIG.UI.HEADER_BACK_Y + CONFIG.UI.HEADER_BACK_H}px`;
     wrap.appendChild(createEl("h2", "formation-title", "Monster List"));
     const list = createEl("div", "monster-list-grid");
     const monsters = getVisibleMonsters("monsterList", gameState);
@@ -5112,12 +5117,22 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       appendMonsterDebugBadges(card, getMonsterVisibilityInfo(monster, "monsterList", gameState));
       list.appendChild(card);
     });
-    const buttons = createEl("div", "screen-button-row");
-    const back = createEl("button", "screen-nav-btn", "Back HOME");
-    back.dataset.action = "go-home";
-    buttons.append(back);
-    wrap.append(list, buttons);
+    wrap.append(list);
     return wrap;
+  };
+
+  const renderHeader = (ctx, currentGameState) => {
+    if (!ctx || !currentGameState) return null;
+    if (currentGameState.phase !== PHASE.MONSTER_LIST) return null;
+    const layer = createEl("div", "header-layer");
+    const back = createEl("button", "screen-nav-btn header-back-btn", "Back HOME");
+    back.dataset.action = "go-home";
+    back.style.left = `${CONFIG.UI.HEADER_BACK_X}px`;
+    back.style.top = `${CONFIG.UI.HEADER_BACK_Y}px`;
+    back.style.width = `${CONFIG.UI.HEADER_BACK_W}px`;
+    back.style.height = `${CONFIG.UI.HEADER_BACK_H}px`;
+    layer.appendChild(back);
+    return layer;
   };
 
   const renderMonsterStatEditingSection = (monster, draft, unlocks) => {
@@ -5788,6 +5803,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
       main.appendChild(renderFormationEditScreen());
     } else main.appendChild(renderHomeScreen());
+    const headerLayer = renderHeader(app, gameState);
+    if (headerLayer) app.appendChild(headerLayer);
     app.append(main);
     const logModal = renderLogModal();
     if (logModal) app.appendChild(logModal);
