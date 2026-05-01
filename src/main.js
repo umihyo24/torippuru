@@ -547,7 +547,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   const getSafeEditMonsterIndex = (state, value) => getSafeBoxIndex(state, value);
 
   let UID_COUNTER = 1;
-  const backgroundLoadState = new Map();
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const byTeamOrder = (team) => CONFIG.TIEBREAKER_TEAM_ORDER.indexOf(team);
   const isAlive = (u) => !!u && u.defeated !== true && u.hp > 0;
@@ -4302,25 +4301,15 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return wrap;
   };
 
-  const applyBoardBackgroundWithFallback = (boardEl, src) => {
-    if (!boardEl) return;
+  const renderBackground = (state = gameState) => {
+    const layer = createEl("div", "battle-background-layer");
     const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
-    const normalizedSrc = typeof src === "string" ? src.trim() : "";
-    boardEl.style.backgroundImage = gradient;
-    if (!normalizedSrc) return;
-    const cachedStatus = backgroundLoadState.get(normalizedSrc);
-    if (cachedStatus === "loaded") {
-      boardEl.style.backgroundImage = `${gradient}, url('${normalizedSrc}')`;
-      return;
-    }
-    if (cachedStatus === "loading" || cachedStatus === "error") return;
-    backgroundLoadState.set(normalizedSrc, "loading");
-    const bg = new Image();
-    bg.onload = () => {
-      backgroundLoadState.set(normalizedSrc, "loaded");
-    };
-    bg.onerror = () => { backgroundLoadState.set(normalizedSrc, "error"); };
-    bg.src = normalizedSrc;
+    const fallbackColor = "#1b2432";
+    const bgImage = createImage("backgrounds.battle");
+    const canDrawImage = !!(bgImage && bgImage.complete && bgImage.naturalWidth > 0 && bgImage.naturalHeight > 0);
+    layer.style.backgroundColor = fallbackColor;
+    layer.style.backgroundImage = canDrawImage ? `${gradient}, url('${bgImage.src}')` : gradient;
+    return layer;
   };
 
   const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
@@ -4703,7 +4692,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   const renderBattlefield = () => {
     const board = createEl("section", "battlefield shared-content-width");
     applySharedContentRect(board, "battlefield");
-    applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
+    board.appendChild(renderBackground(gameState));
     ensureSelectedEnemyTarget();
 
     board.append(
@@ -5769,8 +5758,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const main = createEl("div", "main");
     if (gameState.phase === PHASE.PLAYING || gameState.screen === CONFIG.SCREENS.BATTLE) {
       const battleStage = createEl("div", "battle-stage");
-      battleStage.appendChild(renderBattleTopHeader());
       battleStage.appendChild(renderBattlefield());
+      battleStage.appendChild(renderBattleTopHeader());
       battleStage.appendChild(renderBattleMessageBox());
       main.appendChild(battleStage);
       main.appendChild(renderCommandArea());
