@@ -34,6 +34,18 @@ body {
   --shared-content-offset-x: 0px;
 }
 
+.header-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.header-back-btn {
+  position: absolute;
+  pointer-events: auto;
+}
+
 .main {
   display: grid;
   grid-template-rows: auto 1fr auto auto;
