@@ -11,7 +11,7 @@ import {
   HANAFUDA_TEST_CASES
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
-import { calcDamage as calculateDamage } from "./battle/damage.js";
+import { calculateDamageCore } from "./battle/damage.js";
 
 (() => {
   "use strict";
@@ -2262,7 +2262,7 @@ import { calcDamage as calculateDamage } from "./battle/damage.js";
 
   const calcDamage = (attacker, defender, move, options = {}) => {
     const { isCritical = false } = options;
-    return calculateDamage({
+    return calculateDamageCore({
       attacker,
       defender,
       move,
