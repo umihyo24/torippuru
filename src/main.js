@@ -5787,8 +5787,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const main = createEl("div", "main");
     if (gameState.phase === PHASE.PLAYING || gameState.screen === CONFIG.SCREENS.BATTLE) {
       const battleStage = createEl("div", "battle-stage");
-      battleStage.appendChild(renderBattlefield());
       battleStage.appendChild(renderBattleTopHeader());
+      battleStage.appendChild(renderBattlefield());
       battleStage.appendChild(renderBattleMessageBox());
       main.appendChild(battleStage);
       main.appendChild(renderCommandArea());
