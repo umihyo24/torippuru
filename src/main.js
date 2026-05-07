@@ -4412,7 +4412,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const overlay = createEl("section", "overlay");
     overlay.dataset.action = "close-panels";
     const modal = createEl("div", "modal");
-    modal.addEventListener("click", (event) => event.stopPropagation());
     const header = createEl("div", "modal-header");
     header.append(createEl("div", "", "バトルログ"), createEl("button", "action-btn", "閉じる"));
     header.lastChild.dataset.action = "toggle-log";
@@ -4428,7 +4427,6 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     const overlay = createEl("section", "overlay");
     overlay.dataset.action = "close-panels";
     const modal = createEl("div", "modal");
-    modal.addEventListener("click", (event) => event.stopPropagation());
 
     const header = createEl("div", "modal-header");
     header.append(createEl("div", "", "メニュー"), createEl("button", "action-btn", "戻る"));
