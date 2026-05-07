@@ -9,7 +9,7 @@ export const applyPassivePowerModifiers = ({ attacker, move, basePower, getSelec
   return Number(basePower) || 0;
 };
 
-export const calcDamage = ({ attacker, defender, move, isCritical = false, applyTraitEffects, getAttackStatForMove, getDefenseStatForMove, findStatus, CONFIG, getSelectedTrait, TRAIT_LIBRARY }) => {
+export const calculateDamageCore = ({ attacker, defender, move, isCritical = false, applyTraitEffects, getAttackStatForMove, getDefenseStatForMove, findStatus, CONFIG, getSelectedTrait, TRAIT_LIBRARY }) => {
   const beforeDamageTrait = applyTraitEffects('beforeDamage', { actor: attacker, target: defender, move });
   if (beforeDamageTrait.overrideDamage === 0) return 0;
   const modifiedPower = applyPassivePowerModifiers({ attacker, move, basePower: move.power, getSelectedTrait, TRAIT_LIBRARY, CONFIG });
