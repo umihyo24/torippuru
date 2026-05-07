@@ -33,6 +33,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     CRIT_BASE_RATE: 0.08,
     CRIT_STAGE_RATE: 0.18,
     CRIT_STAGE_MAX: 3,
+    IRON_FIST_MULTIPLIER: 1.5,
+    BAKURETSUKEN_HITS: 8,
     MOVE_DETAIL_PANEL_HEIGHT: 72,
     MESSAGE_MIN_MS: 480,
     MESSAGE_AUTO_MS: 1200,
@@ -292,7 +294,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
   const TRAIT_LIBRARY = {
     venomTouch: { key: "venomTouch", name: "ベノムタッチ", description: "攻撃を当てた後、相手をどくにする。", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
     battleRhythm: { key: "battleRhythm", name: "バトルリズム", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
-    openingSurge: { key: "openingSurge", name: "オープニングサージ", description: "登場時、こうげき段階が2上がる。", onSwitchIn: [{ type: "addAtkStage", amount: 2, target: "self" }] },
+    openingSurge: { key: "openingSurge", name: "オープニングサージ", description: "登場時、こうげき段階が2上がる。", triggerType: "onEnter", onEnter: [{ type: "addAtkStage", amount: 2, target: "self" }] },
     gyakkyo_maru: { key: "gyakkyo_maru", name: "ぎゃっきょう○", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
     intimidate: { key: "intimidate", name: "いあつかん", description: "登場時、正面の相手のこうげきを1段階さげる" },
     wonder_guard: { key: "wonder_guard", name: "ふしぎなまもり", description: "弱点以外の攻撃を受けない" },
@@ -300,7 +302,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     no_guard: { key: "no_guard", name: "ノーガード", description: "お互いのすべての技が必中になる" },
     ino_ichiban: { key: "ino_ichiban", name: "いのいちばん", description: "1ターン目だけ先制しやすくなる", traitKey: "first_turn_priority" },
     innocence: { key: "innocence", name: "イノセンス", description: "能力低下を受けない", traitKey: "ignore_stat_down" },
-    innovation: { key: "innovation", name: "イノベーション", description: "攻撃後に攻撃↑防御↓", traitKey: "atk_up_def_down" }
+    innovation: { key: "innovation", name: "イノベーション", description: "攻撃後に攻撃↑防御↓", traitKey: "atk_up_def_down" },
+    iron_fist: { key: "iron_fist", name: "アイアンフィスト", description: "パンチわざの威力が上がる。", triggerType: "passive" }
   };
 
   const INITIAL_PARTY = {
@@ -616,7 +619,8 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       switchTargetId: null,
       isBoss: base.isBoss === true,
       source: typeof base.source === "string" ? base.source : "monster",
-      defeated: false
+      defeated: false,
+      needsOnEnterResolution: true
     };
   };
 
@@ -2255,11 +2259,22 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return true;
   };
 
+  const hasMoveTag = (move, tag) => Array.isArray(move?.tags) && move.tags.includes(tag);
+  const applyPassivePowerModifiers = (attacker, move, basePower) => {
+    const selectedTrait = getSelectedTrait(attacker);
+    const traitDef = TRAIT_LIBRARY[selectedTrait?.key];
+    if (traitDef?.triggerType === "passive" && selectedTrait?.key === "iron_fist" && hasMoveTag(move, "punch")) {
+      return Math.floor((Number(basePower) || 0) * CONFIG.IRON_FIST_MULTIPLIER);
+    }
+    return Number(basePower) || 0;
+  };
+
   const calcDamage = (attacker, defender, move, options = {}) => {
     const { isCritical = false } = options;
     const beforeDamageTrait = applyTraitEffects("beforeDamage", { actor: attacker, target: defender, move });
     if (beforeDamageTrait.overrideDamage === 0) return 0;
-    const atk = getAttackStatForMove(attacker, move) + Math.floor(move.power / 10);
+    const modifiedPower = applyPassivePowerModifiers(attacker, move, move.power);
+    const atk = getAttackStatForMove(attacker, move) + Math.floor(modifiedPower / 10);
     const def = getDefenseStatForMove(defender, move, { ignoreDefUp: isCritical });
     let dmg = Math.max(1, atk - def);
     if (!isCritical && findStatus(defender.statuses, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
@@ -2439,8 +2454,10 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     (state.teams[team].tileEffects?.[slot] || []).forEach((tileEffect) => applyEffects(tileEffect.onEnter, tileEffect.name || tileEffect.kind || "tile effect"));
     const selectedTrait = getSelectedTrait(unit);
     const traitDef = TRAIT_LIBRARY[selectedTrait?.key];
-    applyEffects(traitDef?.onSwitchIn, selectedTrait?.name || selectedTrait?.key || "trait", true);
-    applyStatEffects(traitDef?.onSwitchIn, selectedTrait?.name || selectedTrait?.key || "trait", false);
+    if (traitDef?.triggerType === "onEnter") {
+      applyEffects(traitDef?.onEnter, null, false);
+      applyStatEffects(traitDef?.onEnter, null, false);
+    }
     const opponent = state?.teams?.[team === TEAM.ALLY ? TEAM.ENEMY : TEAM.ALLY]?.active?.[slot] || null;
     const traitResult = applyTraitEffects("onSwitchIn", { source: unit, opponent, state, team, slot });
     messages.push(...traitResult.messages);
@@ -2577,6 +2594,7 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
 
   const getMoveHitCount = ({ state, actor, move, defender = null }) => {
     if (!state || !actor || !move) return 1;
+    if (move.id === "bakuretsuken") return CONFIG.BAKURETSUKEN_HITS;
     const ctx = applyMoveEffect(createAttackContext({ attacker: actor, defender, move, aliveAllies: getAliveAlliesCount(state, actor.team) }));
     return Math.max(1, Number(ctx.hitCount) || 1);
   };
@@ -2747,24 +2765,21 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
         const enter = resolveUnitOnEnterEffects({ state: sim, team: entry.team, slot: entry.slot, unit });
         entry.enterEffects = enter.messages;
         entry.enterStatusApplies = enter.statusApplies;
+        unit.needsOnEnterResolution = false;
       });
     };
 
-    const processTurnStartPassives = () => {
-      getCurrentFieldMonsters().forEach((unit) => {
-        const selectedTrait = getSelectedTrait(unit);
-        if (!selectedTrait) return;
-        const traitResult = applyTraitEffects("onTurnStart", { source: unit, state: sim });
-        traitResult.effects.forEach((effect) => {
-          if (effect.type !== "addAtkStage") return;
-          turnResult.turnStartStepResults.statBoosts.push({
-            sourceId: unit.uid,
-            sourceName: unit.name,
-            traitKind: selectedTrait.key || "trait",
-            targetId: unit.uid,
-            targetName: unit.name,
-            amount: effect.amount
-          });
+    const markActiveMonsterEntered = (team, slot) => {
+      const unit = sim?.teams?.[team]?.active?.[slot];
+      if (unit) unit.needsOnEnterResolution = true;
+    };
+    const resolveOnEnterAbilities = () => {
+      [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+        (sim?.teams?.[team]?.active || []).forEach((unit, slot) => {
+          if (!unit || !isAlive(unit) || !unit.needsOnEnterResolution) return;
+          const enter = resolveUnitOnEnterEffects({ state: sim, team, slot, unit });
+          turnResult.turnStartStepResults.abilityStatuses.push(...enter.statusApplies);
+          unit.needsOnEnterResolution = false;
         });
       });
     };
@@ -2818,12 +2833,13 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
       };
       switchInsThisTurn.push(actionResult);
       turnResult.switchStepResults.push(actionResult);
+      markActiveMonsterEntered(action.team, slot);
     };
 
     switchActions.forEach(runSwitchAction);
     processForcedSwitchIfNeeded();
     processSwitchInEffects();
-    processTurnStartPassives();
+    resolveOnEnterAbilities();
 
     const actedThisTurn = new Set();
     const attackingActorUids = new Set(
