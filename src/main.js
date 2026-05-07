@@ -11,6 +11,7 @@ import {
   HANAFUDA_TEST_CASES
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
+import { calcDamage as calculateDamage } from "./battle/damage.js";
 
 (() => {
   "use strict";
@@ -2259,27 +2260,21 @@ import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle
     return true;
   };
 
-  const hasMoveTag = (move, tag) => Array.isArray(move?.tags) && move.tags.includes(tag);
-  const applyPassivePowerModifiers = (attacker, move, basePower) => {
-    const selectedTrait = getSelectedTrait(attacker);
-    const traitDef = TRAIT_LIBRARY[selectedTrait?.key];
-    if (traitDef?.triggerType === "passive" && selectedTrait?.key === "iron_fist" && hasMoveTag(move, "punch")) {
-      return Math.floor((Number(basePower) || 0) * CONFIG.IRON_FIST_MULTIPLIER);
-    }
-    return Number(basePower) || 0;
-  };
-
   const calcDamage = (attacker, defender, move, options = {}) => {
     const { isCritical = false } = options;
-    const beforeDamageTrait = applyTraitEffects("beforeDamage", { actor: attacker, target: defender, move });
-    if (beforeDamageTrait.overrideDamage === 0) return 0;
-    const modifiedPower = applyPassivePowerModifiers(attacker, move, move.power);
-    const atk = getAttackStatForMove(attacker, move) + Math.floor(modifiedPower / 10);
-    const def = getDefenseStatForMove(defender, move, { ignoreDefUp: isCritical });
-    let dmg = Math.max(1, atk - def);
-    if (!isCritical && findStatus(defender.statuses, "barrier")) dmg = Math.max(1, Math.floor(dmg * CONFIG.BARRIER_RATIO));
-    if (isCritical) dmg = Math.max(1, Math.floor(dmg * CONFIG.CRIT_MULTIPLIER));
-    return Math.min(dmg, defender.hp);
+    return calculateDamage({
+      attacker,
+      defender,
+      move,
+      isCritical,
+      applyTraitEffects,
+      getAttackStatForMove,
+      getDefenseStatForMove,
+      findStatus,
+      CONFIG,
+      getSelectedTrait,
+      TRAIT_LIBRARY
+    });
   };
 
   validateUnitLibraryStats();
