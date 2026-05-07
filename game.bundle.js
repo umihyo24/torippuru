@@ -218,11 +218,268 @@ function createModalController() {
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) this.close();
       });
-      document.body.append(overlay);
-    },
-    close() {
-      if (overlay) overlay.remove();
-      overlay = null;
+      const editBtn = createEl("button", "screen-nav-btn primary formation-open-build-btn", "能力設定へ");
+      editBtn.dataset.action = "formation-edit-open-monster-detail";
+      rightPanel.append(detailTop, traitBox, statGrid, moveSection, editBtn);
+    }
+
+    body.append(leftPanel, rightPanel);
+    wrap.append(body);
+    return wrap;
+  };
+
+  const renderBattlePrepareScreen = () => {
+    const wrap = createEl("section", "formation-screen battle-prepare-screen");
+    wrap.style.setProperty("--formation-list-x", `${CONFIG.UI.FORMATION_LIST_X}px`);
+    wrap.style.setProperty("--formation-list-y", `${CONFIG.UI.FORMATION_LIST_Y}px`);
+    wrap.style.setProperty("--formation-list-width", `${CONFIG.UI.FORMATION_LIST_WIDTH}px`);
+    wrap.style.setProperty("--formation-list-item-height", `${CONFIG.UI.BATTLE_PREPARE_LIST_ITEM_HEIGHT}px`);
+    wrap.style.setProperty("--formation-list-spacing-y", `${CONFIG.UI.FORMATION_LIST_SPACING_Y}px`);
+    wrap.style.setProperty("--formation-slot-label-height", `${CONFIG.UI.BATTLE_PREPARE_SLOT_LABEL_HEIGHT}px`);
+    wrap.style.setProperty("--formation-preview-height", `${CONFIG.UI.BATTLE_PREPARE_PREVIEW_HEIGHT}px`);
+    wrap.style.setProperty("--formation-preview-cols", `${CONFIG.UI.BATTLE_PREPARE_GRID_COLUMNS}`);
+    wrap.style.setProperty("--formation-preview-rows", `${CONFIG.UI.BATTLE_PREPARE_GRID_ROWS}`);
+    wrap.style.setProperty("--formation-summary-height", `${CONFIG.UI.BATTLE_PREPARE_SUMMARY_HEIGHT}px`);
+    wrap.appendChild(createEl("h2", "formation-title", "Battle Prepare"));
+    const selectedIndex = getSelectableIndex(gameState.ui.battlePrepareIndex, FORMATION_SLOT_COUNT - 1);
+    const selectedFormation = selectedIndex >= 0 ? getFormationAt(gameState, selectedIndex) : null;
+    const selectedMemberCount = getFormationMembers(selectedFormation).length;
+    wrap.appendChild(createEl(
+      "div",
+      "battle-prepare-status",
+      `選択中: Slot ${selectedIndex + 1} / メンバー ${selectedMemberCount}/${FORMATION_MEMBER_COUNT}`
+    ));
+    const list = createEl("div", "formation-slot-list");
+    for (let i = 0; i < FORMATION_SLOT_COUNT; i += 1) {
+      const formation = getFormationAt(gameState, i);
+      const isSelected = i === gameState.ui.battlePrepareIndex;
+      list.appendChild(renderFormationSlotCard({
+        formation,
+        index: i,
+        isSelected,
+        action: "battle-prepare-select",
+        showSummary: true,
+        previewOptions: { emptySubText: "モンスターを編成して出撃" },
+        extraClassName: "battle-prepare-slot"
+      }));
+    }
+    const buttons = createEl("div", "screen-button-row");
+    buttons.classList.add("battle-prepare-actions");
+    const back = createEl("button", "screen-nav-btn", "もどる");
+    back.dataset.action = "go-home";
+    const start = createEl("button", "screen-nav-btn primary", "勝ちにいく");
+    start.dataset.action = "battle-start";
+    start.disabled = selectedIndex < 0 || !hasAnyValidFormationMember(selectedFormation);
+    buttons.append(back, start);
+    wrap.append(list, buttons, createEl("div", "formation-help", "編成を確認して出撃しましょう"));
+    return wrap;
+  };
+
+  const render = () => {
+    ensureUiSafety();
+    if (gameState.phase === PHASE.PLAYING) {
+      syncPartyUiState();
+    }
+    clearTempArrays();
+    const app = document.getElementById("app");
+    app.innerHTML = "";
+    app.style.setProperty("--detail-h", `${CONFIG.MOVE_DETAIL_PANEL_HEIGHT}px`);
+    app.style.setProperty("--hl-attacker", CONFIG.HIGHLIGHT_COLORS.attackSource);
+    app.style.setProperty("--hl-target-single", CONFIG.HIGHLIGHT_COLORS.attackTargetSingle);
+    app.style.setProperty("--hl-target-aoe", CONFIG.HIGHLIGHT_COLORS.attackTargetAoe);
+    app.style.setProperty("--hl-status-poison", CONFIG.HIGHLIGHT_COLORS.statusPoison);
+    app.style.setProperty("--hl-status-default", CONFIG.HIGHLIGHT_COLORS.statusDefault);
+    app.style.setProperty("--hl-status-remove", CONFIG.HIGHLIGHT_COLORS.statusRemove);
+    app.style.setProperty("--hl-trait-source", CONFIG.HIGHLIGHT_COLORS.traitSource);
+    app.style.setProperty("--hl-trait-target", CONFIG.HIGHLIGHT_COLORS.traitTarget);
+    if (gameState.systemMessage) {
+      const message = createEl("div", "formation-help", gameState.systemMessage);
+      app.appendChild(message);
+    }
+
+    const main = createEl("div", "main");
+    if (gameState.phase === PHASE.PLAYING || gameState.screen === CONFIG.SCREENS.BATTLE) {
+      const battleStage = createEl("div", "battle-stage");
+      battleStage.appendChild(renderBattleTopHeader());
+      battleStage.appendChild(renderBattlefield());
+      battleStage.appendChild(renderBattleMessageBox());
+      main.appendChild(battleStage);
+      main.appendChild(renderCommandArea());
+    } else if (gameState.phase === PHASE.GAMEOVER || gameState.screen === CONFIG.SCREENS.RESULT) {
+      main.appendChild(renderBattleResultScreen());
+    } else if (gameState.screen === CONFIG.SCREENS.HOME) {
+      main.appendChild(renderHomeScreen());
+    } else if (gameState.screen === CONFIG.SCREENS.FORMATION) {
+      if (gameState.phase === PHASE.FORMATION_EDIT) main.appendChild(renderFormationEditScreen());
+      else main.appendChild(renderFormationScreen());
+    } else if (gameState.screen === CONFIG.SCREENS.MONSTER_LIST) {
+      if (gameState.phase === PHASE.MONSTER_DETAIL) main.appendChild(renderMonsterDetailScreen());
+      else main.appendChild(renderMonsterListScreen());
+    } else if (gameState.phase === PHASE.START) {
+      main.appendChild(renderStartPhaseScreen());
+    } else if (gameState.phase === PHASE.REWARD) {
+      main.appendChild(renderRewardScreen());
+    } else if (gameState.phase === PHASE.MONSTER_DETAIL) {
+      main.appendChild(renderMonsterDetailScreen());
+    } else if (gameState.phase === PHASE.TRAINER_CARD) {
+      main.appendChild(renderTrainerCardScreen());
+    } else if (gameState.phase === PHASE.SETTINGS) {
+      main.appendChild(renderSettingsScreen());
+    } else if (gameState.phase === PHASE.BATTLE_PREPARE) {
+      main.appendChild(renderBattlePrepareScreen());
+    } else if (gameState.phase === PHASE.FORMATION_EDIT) {
+      main.appendChild(renderFormationEditScreen());
+    } else main.appendChild(renderHomeScreen());
+    const headerLayer = renderHeader(app, gameState);
+    if (headerLayer) app.appendChild(headerLayer);
+    app.append(main);
+    const logModal = renderLogModal();
+    if (logModal) app.appendChild(logModal);
+    const menuModal = renderMenuModal();
+    if (menuModal) app.appendChild(menuModal);
+  };
+
+  const update = (now) => {
+    gameState.input.mouseClicked = false;
+    const hasHpAnimations = Object.keys(gameState.displayState.hpAnimations).length > 0;
+    const hasDefeatVanish = Object.keys(gameState.displayState.defeatVanish).length > 0;
+    const hasPlayback = gameState.phase === PHASE.PLAYING && gameState.battleFlow.mode === "playback";
+    const hasCutIn = gameState?.cutIn?.active === true;
+    if (!hasHpAnimations && !hasDefeatVanish && !hasPlayback && !hasCutIn) return;
+    updateHpAnimations(now);
+    updateDefeatVanishAnimations(now);
+    if (hasPlayback) updateBattlePlayback(now);
+    if (hasCutIn) updateCutIn();
+    render();    
+  };
+
+  const loop = (now) => {
+    update(now);
+    requestAnimationFrame(loop);
+  };
+
+  const getLocalPointerPosition = (event) => {
+    const appRect = document.getElementById("app")?.getBoundingClientRect?.();
+    const localX = appRect ? event.clientX - appRect.left : 0;
+    const localY = appRect ? event.clientY - appRect.top : 0;
+    return {
+      x: Number.isFinite(localX) ? localX : 0,
+      y: Number.isFinite(localY) ? localY : 0
+    };
+  };
+
+  const getCanvasPoint = (event) => {
+    const app = document.getElementById("app");
+    const rect = app?.getBoundingClientRect?.();
+    const x = rect ? event.clientX - rect.left : 0;
+    const y = rect ? event.clientY - rect.top : 0;
+    return {
+      x: Number.isFinite(x) ? x : 0,
+      y: Number.isFinite(y) ? y : 0
+    };
+  };
+
+  const getFormationEditLocalPointerPosition = (event) => {
+    const leftMain = document.querySelector(".formation-left-main");
+    const panelRect = leftMain?.getBoundingClientRect?.();
+    if (!panelRect) return { x: -1, y: -1 };
+    const localX = event.clientX - panelRect.left;
+    const localY = event.clientY - panelRect.top;
+    return {
+      x: Number.isFinite(localX) ? localX : -1,
+      y: Number.isFinite(localY) ? localY : -1
+    };
+  };
+
+  const getHomeLocalPointerPosition = (event) => {
+    const screenRect = document.querySelector(".home-screen")?.getBoundingClientRect?.();
+    if (!screenRect) return { x: -1, y: -1 };
+    const localX = event.clientX - screenRect.left;
+    const localY = event.clientY - screenRect.top;
+    return {
+      x: Number.isFinite(localX) ? localX : -1,
+      y: Number.isFinite(localY) ? localY : -1
+    };
+  };
+
+  const updateHomeHoverFromPoint = (x, y) => {
+    let nextHover = -1;
+    const rects = getHomeMenuCardRects();
+    for (const rect of rects) {
+      if (isPointInRect(x, y, rect)) {
+        nextHover = rect.index;
+        break;
+      }
+    }
+    if (gameState.ui.homeHoverIndex !== nextHover) {
+      gameState.ui.homeHoverIndex = nextHover;
+      return true;
+    }
+    return false;
+  };
+
+  const handleHomeCardPointerClick = (x, y) => {
+    const rects = getHomeMenuCardRects();
+    for (const rect of rects) {
+      if (isPointInRect(x, y, rect)) {
+        handleHomeMenuConfirm(rect.index);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleFormationEditPointerClick = (x, y) => {
+    const slotRects = getFormationSlotRects();
+    for (const rect of slotRects) {
+      if (isPointInRect(x, y, rect)) {
+        handleFormationSlotSelect(rect.index);
+        return true;
+      }
+    }
+    const visibleFormationMonsterCount = getVisibleMonsters("formation", gameState).length;
+    const monsterRects = getMonsterGridItemRects(gameState.ui.formationEdit.scrollOffset, visibleFormationMonsterCount);
+    for (const rect of monsterRects) {
+      if (isPointInRect(x, y, rect)) {
+        assignMonsterToSelectedSlot(rect.index);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleFormationButtonAction = (buttonKey) => {
+    if (buttonKey === "back") {
+      cancelFormationEdit();
+      return true;
+    }
+    if (buttonKey === "save") {
+      const draft = cloneFormation(gameState?.ui?.formationEdit?.draft);
+      if (!hasAnyValidFormationMember(draft)) {
+        gameState.systemMessage = "保存するには1体以上を編成してください。";
+        return true;
+      }
+      saveFormationEdit();
+      return true;
+    }
+    return false;
+  };
+
+  const handleFormationButtonClick = (point) => {
+    if (gameState.phase !== PHASE.FORMATION_EDIT) return false;
+    const appRect = document.getElementById("app")?.getBoundingClientRect?.();
+    const leftMain = document.querySelector(".formation-left-main");
+    const panelRect = leftMain?.getBoundingClientRect?.();
+    if (!panelRect || !appRect) return false;
+    const localPoint = {
+      x: point.x - (panelRect.left - appRect.left),
+      y: point.y - (panelRect.top - appRect.top)
+    };
+    if (isPointInRect(localPoint.x, localPoint.y, gameState?.uiRects?.backButton || null)) {
+      return handleFormationButtonAction("back");
+    }
+    if (isPointInRect(localPoint.x, localPoint.y, gameState?.uiRects?.saveButton || null)) {
+      return handleFormationButtonAction("save");
     }
   };
 }
