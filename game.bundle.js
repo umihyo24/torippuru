@@ -650,6 +650,10 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       TEXT_SIZE: 28
     },
     UI: {
+      HEADER_BACK_X: 20,
+      HEADER_BACK_Y: 20,
+      HEADER_BACK_W: 180,
+      HEADER_BACK_H: 44,
       FORMATION_EDIT_PADDING: 20,
       FORMATION_LEFT_PANEL_X: 20,
       FORMATION_LEFT_PANEL_Y: 60,
@@ -1141,7 +1145,6 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const getSafeEditMonsterIndex = (state, value) => getSafeBoxIndex(state, value);
 
   let UID_COUNTER = 1;
-  const backgroundLoadState = new Map();
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const byTeamOrder = (team) => CONFIG.TIEBREAKER_TEAM_ORDER.indexOf(team);
   const isAlive = (u) => !!u && u.defeated !== true && u.hp > 0;
@@ -4896,25 +4899,15 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     return wrap;
   };
 
-  const applyBoardBackgroundWithFallback = (boardEl, src) => {
-    if (!boardEl) return;
+  const renderBackground = (state = gameState) => {
+    const layer = createEl("div", "battle-background-layer");
     const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
-    const normalizedSrc = typeof src === "string" ? src.trim() : "";
-    boardEl.style.backgroundImage = gradient;
-    if (!normalizedSrc) return;
-    const cachedStatus = backgroundLoadState.get(normalizedSrc);
-    if (cachedStatus === "loaded") {
-      boardEl.style.backgroundImage = `${gradient}, url('${normalizedSrc}')`;
-      return;
-    }
-    if (cachedStatus === "loading" || cachedStatus === "error") return;
-    backgroundLoadState.set(normalizedSrc, "loading");
-    const bg = new Image();
-    bg.onload = () => {
-      backgroundLoadState.set(normalizedSrc, "loaded");
-    };
-    bg.onerror = () => { backgroundLoadState.set(normalizedSrc, "error"); };
-    bg.src = normalizedSrc;
+    const fallbackColor = "#1b2432";
+    const bgImage = createImage("backgrounds.battle");
+    const canDrawImage = !!(bgImage && bgImage.complete && bgImage.naturalWidth > 0 && bgImage.naturalHeight > 0);
+    layer.style.backgroundColor = fallbackColor;
+    layer.style.backgroundImage = canDrawImage ? `${gradient}, url('${bgImage.src}')` : gradient;
+    return layer;
   };
 
   const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
@@ -5013,7 +5006,6 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const overlay = createEl("section", "overlay");
     overlay.dataset.action = "close-panels";
     const modal = createEl("div", "modal");
-    modal.addEventListener("click", (event) => event.stopPropagation());
     const header = createEl("div", "modal-header");
     header.append(createEl("div", "", "バトルログ"), createEl("button", "action-btn", "閉じる"));
     header.lastChild.dataset.action = "toggle-log";
@@ -5029,7 +5021,6 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const overlay = createEl("section", "overlay");
     overlay.dataset.action = "close-panels";
     const modal = createEl("div", "modal");
-    modal.addEventListener("click", (event) => event.stopPropagation());
 
     const header = createEl("div", "modal-header");
     header.append(createEl("div", "", "メニュー"), createEl("button", "action-btn", "戻る"));
@@ -5297,7 +5288,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
   const renderBattlefield = () => {
     const board = createEl("section", "battlefield shared-content-width");
     applySharedContentRect(board, "battlefield");
-    applyBoardBackgroundWithFallback(board, gameState.battlefield.background);
+    board.appendChild(renderBackground(gameState));
     ensureSelectedEnemyTarget();
 
     board.append(
@@ -5692,6 +5683,7 @@ const applyTraitEffect = (ctx, traitKey = "") => {
 
   const renderMonsterListScreen = () => {
     const wrap = createEl("section", "monster-list-screen");
+    wrap.style.paddingTop = `${CONFIG.UI.HEADER_BACK_Y + CONFIG.UI.HEADER_BACK_H}px`;
     wrap.appendChild(createEl("h2", "formation-title", "Monster List"));
     const list = createEl("div", "monster-list-grid");
     const monsters = getVisibleMonsters("monsterList", gameState);
@@ -5717,12 +5709,22 @@ const applyTraitEffect = (ctx, traitKey = "") => {
       appendMonsterDebugBadges(card, getMonsterVisibilityInfo(monster, "monsterList", gameState));
       list.appendChild(card);
     });
-    const buttons = createEl("div", "screen-button-row");
-    const back = createEl("button", "screen-nav-btn", "Back HOME");
-    back.dataset.action = "go-home";
-    buttons.append(back);
-    wrap.append(list, buttons);
+    wrap.append(list);
     return wrap;
+  };
+
+  const renderHeader = (ctx, currentGameState) => {
+    if (!ctx || !currentGameState) return null;
+    if (currentGameState.phase !== PHASE.MONSTER_LIST) return null;
+    const layer = createEl("div", "header-layer");
+    const back = createEl("button", "screen-nav-btn header-back-btn", "Back HOME");
+    back.dataset.action = "go-home";
+    back.style.left = `${CONFIG.UI.HEADER_BACK_X}px`;
+    back.style.top = `${CONFIG.UI.HEADER_BACK_Y}px`;
+    back.style.width = `${CONFIG.UI.HEADER_BACK_W}px`;
+    back.style.height = `${CONFIG.UI.HEADER_BACK_H}px`;
+    layer.appendChild(back);
+    return layer;
   };
 
   const renderMonsterStatEditingSection = (monster, draft, unlocks) => {
@@ -6363,8 +6365,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     const main = createEl("div", "main");
     if (gameState.phase === PHASE.PLAYING || gameState.screen === CONFIG.SCREENS.BATTLE) {
       const battleStage = createEl("div", "battle-stage");
-      battleStage.appendChild(renderBattleTopHeader());
       battleStage.appendChild(renderBattlefield());
+      battleStage.appendChild(renderBattleTopHeader());
       battleStage.appendChild(renderBattleMessageBox());
       main.appendChild(battleStage);
       main.appendChild(renderCommandArea());
@@ -6393,6 +6395,8 @@ const applyTraitEffect = (ctx, traitKey = "") => {
     } else if (gameState.phase === PHASE.FORMATION_EDIT) {
       main.appendChild(renderFormationEditScreen());
     } else main.appendChild(renderHomeScreen());
+    const headerLayer = renderHeader(app, gameState);
+    if (headerLayer) app.appendChild(headerLayer);
     app.append(main);
     const logModal = renderLogModal();
     if (logModal) app.appendChild(logModal);
