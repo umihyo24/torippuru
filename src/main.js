@@ -1,6 +1,6 @@
 import { MOVES } from "./data/moves.js";
 import { MONSTERS } from "./data/monsters.js";
-import { TRAITS as TRAIT_LIBRARY } from "./data/traits.js";
+import { ABILITIES } from "./data/abilities.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
 import { ASSETS, getAssetPath } from "./data/assets.js";
 import {
@@ -234,6 +234,8 @@ import {
   };
 
   const TEAM = { ALLY: "ally", ENEMY: "enemy" };
+  const TRAIT_LIBRARY = ABILITIES;
+
   const DEBUG_FLAGS = {
     battleTargeting: true
   };
@@ -297,20 +299,7 @@ import {
     bind: { kind: "bind", category: "debuffBind", duration: 2, tags: ["debuff", "bind"] }
   };
 
-  const TRAIT_LIBRARY = {
-    venomTouch: { key: "venomTouch", name: "ベノムタッチ", description: "攻撃を当てた後、相手をどくにする。", onAfterDamage: [{ type: "applyStatus", status: "poison", duration: 2 }] },
-    battleRhythm: { key: "battleRhythm", name: "バトルリズム", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
-    openingSurge: { key: "openingSurge", name: "オープニングサージ", description: "登場時、こうげき段階が2上がる。", triggerType: "onEnter", onEnter: [{ type: "addAtkStage", amount: 2, target: "self" }] },
-    gyakkyo_maru: { key: "gyakkyo_maru", name: "ぎゃっきょう○", description: "ターン開始時、こうげき段階が1上がる。", onTurnStart: [{ type: "addAtkStage", amount: 1, target: "self" }] },
-    intimidate: { key: "intimidate", name: "いあつかん", description: "登場時、正面の相手のこうげきを1段階さげる" },
-    wonder_guard: { key: "wonder_guard", name: "ふしぎなまもり", description: "弱点以外の攻撃を受けない" },
-    koukakudahou: { key: "koukakudahou", name: "こうかくだほう", description: "自分以外のタイプのわざも一致威力になる" },
-    no_guard: { key: "no_guard", name: "ノーガード", description: "お互いのすべての技が必中になる" },
-    ino_ichiban: { key: "ino_ichiban", name: "いのいちばん", description: "1ターン目だけ先制しやすくなる", traitKey: "first_turn_priority" },
-    innocence: { key: "innocence", name: "イノセンス", description: "能力低下を受けない", traitKey: "ignore_stat_down" },
-    innovation: { key: "innovation", name: "イノベーション", description: "攻撃後に攻撃↑防御↓", traitKey: "atk_up_def_down" },
-    iron_fist: { key: "iron_fist", name: "アイアンフィスト", description: "パンチわざの威力が上がる。", triggerType: "passive" }
-  };
+
 
   const INITIAL_PARTY = {
     ally: ["maguma", "sandko", "frostfang", "emberlynx", "hittokage", "stormimp"],
