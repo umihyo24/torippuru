@@ -13,10 +13,8 @@ import {
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
 import { applyTraitEffectsCore } from "./battle/traitEffectsCore.js";
-import {
-  resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore,
-  collectBattleStartTraitEvents
-} from "./battle/abilities.js";
+import { collectBattleStartTraitEvents } from "./battle/abilities.js";
+import { resolveUnitOnEnterEffectsCore } from "./battle/onEnterEffectsCore.js";
 
 (() => {
   "use strict";
@@ -2386,7 +2384,7 @@ import {
     addStatus,
     clamp,
     getSelectedTrait,
-    applyTraitEffects: ({ eventType, context }) => applyTraitEffects(eventType, context)
+    applyTraitEffects
   });
 
 
@@ -3616,7 +3614,7 @@ import {
       TEAM,
       isAlive,
       getSelectedTrait,
-      applyTraitEffects: ({ eventType, context }) => applyTraitEffects(eventType, context)
+      applyTraitEffects
     });
     events.forEach((event) => {
       if (event.sourceId) {
