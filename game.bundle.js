@@ -2965,7 +2965,7 @@ const collectBattleStartTraitEvents = ({
     return weaknessTypes.includes(moveType);
   };
 
-  const applyTraitEffects = (eventType, context = {}) => applyTraitEffectsCore({
+  const runTraitEffects = (eventType, context = {}) => applyTraitEffects({
     eventType,
     context,
     getSelectedTrait,
@@ -3141,7 +3141,7 @@ const collectBattleStartTraitEvents = ({
 
   const removeExpired = (arr) => arr.filter((s) => s.duration > 0);
 
-  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => resolveUnitOnEnterEffectsCore({
+  const runResolveUnitOnEnterEffects = ({ state, team, slot, unit }) => resolveUnitOnEnterEffects({
     state,
     team,
     slot,
@@ -3155,7 +3155,7 @@ const collectBattleStartTraitEvents = ({
     addStatus,
     clamp,
     getSelectedTrait,
-    applyTraitEffects: ({ eventType, context }) => applyTraitEffects(eventType, context)
+    applyTraitEffects: ({ eventType, context }) => runTraitEffects(eventType, context)
   });
 
 
@@ -3456,7 +3456,7 @@ const collectBattleStartTraitEvents = ({
       switchInsThisTurn.forEach((entry) => {
         const unit = sim?.teams?.[entry.team]?.active?.[entry.slot];
         if (!unit || !isAlive(unit) || unit.uid !== entry.incomingUnitId) return;
-        const enter = resolveUnitOnEnterEffects({ state: sim, team: entry.team, slot: entry.slot, unit });
+        const enter = runResolveUnitOnEnterEffects({ state: sim, team: entry.team, slot: entry.slot, unit });
         entry.enterEffects = enter.messages;
         entry.enterStatusApplies = enter.statusApplies;
         unit.needsOnEnterResolution = false;
@@ -3471,7 +3471,7 @@ const collectBattleStartTraitEvents = ({
       [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
         (sim?.teams?.[team]?.active || []).forEach((unit, slot) => {
           if (!unit || !isAlive(unit) || !unit.needsOnEnterResolution) return;
-          const enter = resolveUnitOnEnterEffects({ state: sim, team, slot, unit });
+          const enter = runResolveUnitOnEnterEffects({ state: sim, team, slot, unit });
           turnResult.turnStartStepResults.abilityStatuses.push(...enter.statusApplies);
           unit.needsOnEnterResolution = false;
         });
@@ -4313,7 +4313,7 @@ const collectBattleStartTraitEvents = ({
       requireDefeatedOutgoing: true
     });
     if (!replacement) return false;
-    const enter = resolveUnitOnEnterEffects({ state: gameState, team, slot, unit: replacement.incoming });
+    const enter = runResolveUnitOnEnterEffects({ state: gameState, team, slot, unit: replacement.incoming });
     if (withLog) {
       appendBattleLogEntry("交代処理");
       appendBattleLogEntry("交代完了");
@@ -4385,7 +4385,7 @@ const collectBattleStartTraitEvents = ({
       TEAM,
       isAlive,
       getSelectedTrait,
-      applyTraitEffects: ({ eventType, context }) => applyTraitEffects(eventType, context)
+      applyTraitEffects: ({ eventType, context }) => runTraitEffects(eventType, context)
     });
     events.forEach((event) => {
       if (event.sourceId) {
