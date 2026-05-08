@@ -215,7 +215,7 @@ body {
   overflow: hidden;
   padding: 8px 12px;
   display: grid;
-  grid-template-rows: 68px minmax(0, 1.3fr) minmax(0, 1.3fr) 68px;
+  grid-template-rows: minmax(54px, 64px) minmax(0, 1fr) minmax(0, 1fr) minmax(54px, 64px);
   gap: 10px;
 }
 
