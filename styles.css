@@ -309,6 +309,14 @@ body {
   margin-block: 2px;
 }
 
+.enemy-sprite-row {
+  margin-bottom: 8px;
+}
+
+.ally-sprite-row {
+  margin-top: 8px;
+}
+
 .status-panel,
 .sprite-slot {
   position: relative;
