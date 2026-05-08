@@ -2874,6 +2874,7 @@ const calculateDamageCore = ({ attacker, defender, move, isCritical = false, app
     return out;
   };
 
+
   const doesMoveHit = ({ actor, target, move, state }) => {
     const traitResult = applyTraitEffects("beforeHitCheck", { actor, target, move });
     if (traitResult.forceHit) return true;
@@ -2901,12 +2902,12 @@ const calculateDamageCore = ({ attacker, defender, move, isCritical = false, app
 
   validateUnitLibraryStats();
 
-  const addStatus = (unit, statusKind, duration) => {
+  function addStatus(unit, statusKind, duration) {
     const next = cloneStatus(statusKind, duration);
     const idx = unit.statuses.findIndex((s) => s.category === next.category);
     if (idx >= 0) unit.statuses[idx] = next;
     else unit.statuses.push(next);
-  };
+  }
 
   const getStatusState = (unit) => {
     const statusKinds = unit.statuses.map((s) => s.kind);
@@ -3081,6 +3082,24 @@ const calculateDamageCore = ({ attacker, defender, move, isCritical = false, app
 
     return { messages, statusApplies };
   };
+
+  const collectBattleStartTraitEvents = ({ state, TEAM, isAlive, applyTraitEffects, getSelectedTrait }) => {
+    if (!state?.teams) return [];
+    const events = [];
+    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
+      const opponentTeam = team === TEAM.ALLY ? TEAM.ENEMY : TEAM.ALLY;
+      const active = Array.isArray(state.teams?.[team]?.active) ? state.teams[team].active : [];
+      active.forEach((unit, slot) => {
+        if (!unit || !isAlive(unit)) return;
+        const opponent = state?.teams?.[opponentTeam]?.active?.[slot] || null;
+        const traitResult = applyTraitEffects("onBattleStart", { source: unit, opponent, state, team, slot });
+        if (!traitResult.messages.length) return;
+        events.push({ sourceId: unit.uid, targetId: opponent?.uid || null, traitKind: getSelectedTrait(unit)?.key || null, messages: traitResult.messages });
+      });
+    });
+    return events;
+  };
+
 
   const isEnemyOnlyTargetRule = (move) => move?.targetRule === "enemy"
     || (isDamageMoveCategory(move?.category) && move?.targetRule === "anyOtherSingle");
@@ -4303,18 +4322,12 @@ const calculateDamageCore = ({ attacker, defender, move, isCritical = false, app
   };
 
   const applyBattleStartTraitEffects = (state = gameState) => {
-    if (!state?.teams) return;
-    const events = [];
-    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
-      const opponentTeam = team === TEAM.ALLY ? TEAM.ENEMY : TEAM.ALLY;
-      const active = Array.isArray(state.teams?.[team]?.active) ? state.teams[team].active : [];
-      active.forEach((unit, slot) => {
-        if (!unit || !isAlive(unit)) return;
-        const opponent = state?.teams?.[opponentTeam]?.active?.[slot] || null;
-        const traitResult = applyTraitEffects("onBattleStart", { source: unit, opponent, state, team, slot });
-        if (!traitResult.messages.length) return;
-        events.push({ sourceId: unit.uid, targetId: opponent?.uid || null, traitKind: getSelectedTrait(unit)?.key || null, messages: traitResult.messages });
-      });
+    const events = collectBattleStartTraitEvents({
+      state,
+      TEAM,
+      isAlive,
+      getSelectedTrait,
+      applyTraitEffects: ({ eventType, context }) => applyTraitEffects(eventType, context)
     });
     events.forEach((event) => {
       if (event.sourceId) {
