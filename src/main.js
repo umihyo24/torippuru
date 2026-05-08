@@ -12,7 +12,10 @@ import {
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
-import * as BattleAbilities from "./battle/abilities.js";
+import { applyTraitEffects as applyTraitEffectsCoreImpl, resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore, collectBattleStartTraitEvents } from "./battle/abilities.js";
+
+const applyTraitEffectsCore = (...args) => applyTraitEffectsCoreImpl(...args);
+
 
 (() => {
   "use strict";
@@ -231,6 +234,8 @@ import * as BattleAbilities from "./battle/abilities.js";
 
   const TEAM = { ALLY: "ally", ENEMY: "enemy" };
   const TRAIT_LIBRARY = ABILITIES;
+  const abilities = TRAIT_LIBRARY;
+  const traits = TRAIT_LIBRARY;
 
   const DEBUG_FLAGS = {
     battleTargeting: true
@@ -2181,7 +2186,7 @@ import * as BattleAbilities from "./battle/abilities.js";
     return weaknessTypes.includes(moveType);
   };
 
-  const applyTraitEffects = (eventType, context = {}) => BattleAbilities.applyTraitEffects({
+  const applyTraitEffects = (eventType, context = {}) => applyTraitEffectsCore({
     eventType,
     context,
     getSelectedTrait,
@@ -2219,6 +2224,18 @@ import * as BattleAbilities from "./battle/abilities.js";
   };
 
   validateUnitLibraryStats();
+  if (typeof window !== "undefined") {
+    window.TRAIT_LIBRARY = TRAIT_LIBRARY;
+    window.abilities = abilities;
+    window.traits = traits;
+    window.applyTraitEffectsCore = applyTraitEffectsCore;
+    window.BattleAbilities = {
+      applyTraitEffects: applyTraitEffectsCore,
+      resolveUnitOnEnterEffects: resolveUnitOnEnterEffectsCore,
+      collectBattleStartTraitEvents
+    };
+  }
+
 
   function addStatus(unit, statusKind, duration) {
     const next = cloneStatus(statusKind, duration);
@@ -2357,7 +2374,7 @@ import * as BattleAbilities from "./battle/abilities.js";
 
   const removeExpired = (arr) => arr.filter((s) => s.duration > 0);
 
-  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => BattleAbilities.resolveUnitOnEnterEffects({
+  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => resolveUnitOnEnterEffectsCore({
     state,
     team,
     slot,
@@ -3596,7 +3613,7 @@ import * as BattleAbilities from "./battle/abilities.js";
   };
 
   const applyBattleStartTraitEffects = (state = gameState) => {
-    const events = BattleAbilities.collectBattleStartTraitEvents({
+    const events = collectBattleStartTraitEvents({
       state,
       TEAM,
       isAlive,
