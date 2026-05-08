@@ -196,13 +196,6 @@ body {
 }
 
 
-.battle-background-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
 .battlefield {
   isolation: isolate;
   border: 2px solid #83704b;
@@ -214,8 +207,33 @@ body {
   overflow: hidden;
   padding: 8px 12px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
+  grid-template-rows: 44px 150px 150px 44px;
   gap: 10px;
+}
+
+.enemy-status-row,
+.enemy-sprite-row,
+.ally-sprite-row,
+.ally-status-row {
+  grid-column: 1;
+  position: relative;
+  z-index: 2;
+}
+.enemy-status-row {
+  grid-row: 1;
+}
+
+.enemy-sprite-row {
+  grid-row: 2;
+}
+
+.ally-sprite-row {
+  grid-row: 3;
+}
+
+.ally-status-row {
+  grid-row: 4;
 }
 
 .skill-cutin-layer {
