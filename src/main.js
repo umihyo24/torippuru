@@ -12,7 +12,15 @@ import {
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
-import { applyTraitEffects as applyTraitEffectsCore, resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore, collectBattleStartTraitEvents } from "./battle/abilities.js";
+import {
+  applyTraitEffects as applyTraitEffectsCoreImpl,
+  resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore,
+  collectBattleStartTraitEvents
+} from "./battle/abilities.js";
+
+function applyTraitEffectsCore(...args) {
+  return applyTraitEffectsCoreImpl(...args);
+}
 
 (() => {
   "use strict";
@@ -2219,13 +2227,19 @@ import { applyTraitEffects as applyTraitEffectsCore, resolveUnitOnEnterEffects a
       TRAIT_LIBRARY
     });
   };
+  const calculateDamage = (...args) => calcDamage(...args);
 
   validateUnitLibraryStats();
   if (typeof window !== "undefined") {
+    window.MONSTER_LIBRARY = MONSTERS;
+    window.MOVE_LIBRARY = MOVES;
+    window.ABILITIES = ABILITIES;
     window.TRAIT_LIBRARY = TRAIT_LIBRARY;
     window.abilities = abilities;
     window.traits = traits;
     window.applyTraitEffectsCore = applyTraitEffectsCore;
+    window.calcDamage = calcDamage;
+    window.calculateDamage = calculateDamage;
     window.BattleAbilities = {
       applyTraitEffects: applyTraitEffectsCore,
       resolveUnitOnEnterEffects: resolveUnitOnEnterEffectsCore,
