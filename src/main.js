@@ -13,7 +13,7 @@ import {
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
 import { applyTraitEffectsCore } from "./battle/traitEffectsCore.js";
-import { collectBattleStartTraitEvents } from "./battle/abilities.js";
+import { collectBattleStartTraitEventsCore } from "./battle/battleStartEffectsCore.js";
 import { resolveUnitOnEnterEffectsCore } from "./battle/onEnterEffectsCore.js";
 
 (() => {
@@ -3518,6 +3518,15 @@ import { resolveUnitOnEnterEffectsCore } from "./battle/onEnterEffectsCore.js";
     if (!availableReserves.length) return [];
     return getDefeatedActiveSlots(gameState, team);
   };
+
+  const collectBattleStartTraitEvents = (state) => collectBattleStartTraitEventsCore({
+    state,
+    TEAM,
+    applyTraitEffects,
+    resolveUnitOnEnterEffects,
+    isAlive,
+    getSelectedTrait
+  });
 
   const startKoReplacementPhase = (team) => {
     gameState.battleFlow.mode = "replacement";
