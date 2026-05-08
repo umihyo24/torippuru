@@ -2977,6 +2977,7 @@ const collectBattleStartTraitEvents = ({
   });
 
 
+
   const doesMoveHit = ({ actor, target, move, state }) => {
     const traitResult = applyTraitEffects("beforeHitCheck", { actor, target, move });
     if (traitResult.forceHit) return true;
