@@ -13,7 +13,6 @@ body {
   justify-content: center;
   align-items: flex-start;
   padding: 12px;
-  overflow: hidden;
 }
 
 #app {
@@ -63,7 +62,7 @@ body {
 .hanafuda-trial-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   margin-top: 10px;
 }
 
@@ -215,7 +214,7 @@ body {
   overflow: hidden;
   padding: 8px 12px;
   display: grid;
-  grid-template-rows: 68px minmax(0, 1.3fr) minmax(0, 1.3fr) 68px;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 10px;
 }
 
@@ -301,12 +300,23 @@ body {
 
 .enemy-status-row,
 .ally-status-row {
-  margin-block: 1px;
+  margin-block: 2px;
+  align-items: start;
+}
+
+.enemy-sprite-row {
+  margin-top: 2px;
+  margin-bottom: 10px;
+}
+
+.ally-sprite-row {
+  margin-top: 10px;
+  margin-bottom: 2px;
 }
 
 .enemy-sprite-row,
 .ally-sprite-row {
-  margin-block: 2px;
+  align-items: center;
 }
 
 .status-panel,
@@ -436,14 +446,16 @@ body {
 .sprite-slot:hover { transform: translateY(-1px); }
 
 .status-panel {
+  position: relative;
   display: grid;
   grid-template-rows: auto auto;
-  gap: 3px;
-  min-height: 0;
+  gap: 1px;
+  min-height: 44px;
+  height: 44px;
+  max-height: 44px;
   align-content: start;
   max-width: 250px;
-  height: 52px;  
-  padding: 5px 7px 4px;
+  padding: 3px 8px;
 }
 
 .status-top {
@@ -480,6 +492,7 @@ body {
 }
 
 .sprite-slot {
+  position: relative;
   min-height: 0;
   display: grid;
   place-items: center;
@@ -568,7 +581,6 @@ body {
   border-radius: 999px;
   background: rgba(8, 12, 20, 0.8);
   border: 1px solid rgba(160, 178, 218, 0.65);
-  overflow: hidden;
 }
 
 .hp-bar-fill {
@@ -811,7 +823,6 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.45);
   line-height: 1;
   text-align: center;
-  overflow: hidden;
 }
 
 .move-icon-asset {
@@ -1158,7 +1169,6 @@ button:disabled {
 .move-detail-line {
   white-space: nowrap;
   text-overflow: ellipsis;
-  overflow: hidden;
 }
 
 .move-detail-placeholder {
@@ -1287,7 +1297,6 @@ button:disabled {
 
 .formation-edit-screen {
   min-height: 840px;
-  overflow: hidden;
 }
 
 .formation-title { margin: 0; }
@@ -1501,7 +1510,6 @@ button:disabled {
 
 .formation-monster-area {
   padding: 30px 8px 8px;
-  overflow: hidden;
 }
 
 .formation-edit-divider {
@@ -1616,7 +1624,6 @@ button:disabled {
   grid-template-rows: 1fr auto;
   gap: 4px;
   padding: 6px;
-  overflow: hidden;
 }
 
 .formation-slot-row.front { background: var(--front-slot-color); }
@@ -1630,7 +1637,6 @@ button:disabled {
   justify-items: center;
   gap: 4px;
   padding: 6px;
-  overflow: hidden;
 }
 
 .formation-edit-footer {
@@ -1772,7 +1778,6 @@ button:disabled {
   width: 140px;
   height: 110px;
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .formation-detail-top-info {
@@ -1919,7 +1924,6 @@ button:disabled {
 .monster-detail-screen {
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
-  overflow: hidden;
 }
 
 .monster-detail-actions {
@@ -1935,7 +1939,6 @@ button:disabled {
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   max-height: 100%;
-  overflow: hidden;
 }
 
 .monster-build-left-body {
@@ -2048,7 +2051,6 @@ button:disabled {
   gap: var(--mb-section-gap, 8px);
   max-height: 100%;
   min-height: 0;
-  overflow: hidden;
 }
 
 .monster-moves-header {
