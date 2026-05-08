@@ -36,4 +36,11 @@ export const MOVES = {
   megaton_punch: { id: "megaton_punch", name: "メガトンパンチ", category: "physical", role: "attack", type: "earth", target: "single", power: 52, description: "つよいパンチ攻撃", tags: ["punch"], patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
   bakuretsuken: { id: "bakuretsuken", name: "ばくれつけん", category: "physical", role: "attack", type: "earth", target: "single", power: 8, description: "8回連続のパンチ", tags: ["punch"], effectKey: "bakuretsuken_hits", patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
   jaouensatsuken: { id: "jaouensatsuken", name: "じゃおうえんさつけん", category: "physical", role: "attack", type: "fire", target: "single", power: 44, description: "炎をまとった拳で攻撃", tags: ["punch"], patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] }
+  ,
+  butterflyDance: { id: "butterflyDance", name: "バタフライダンス", category: "status", type: "light", power: 0, patternId: "self", targetRule: "selfOnly", targetMode: "single", beforeDamage: [{ type: "modifyCritStage", stages: 1, duration: 2, target: "self" }], afterDamage: [] },
+  boarRush: { id: "boarRush", name: "ボアラッシュ", category: "physical", type: "nature", power: 42, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  wildCharge: { id: "wildCharge", name: "ワイルドチャージ", category: "physical", type: "light", power: 50, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  tuskCrash: { id: "tuskCrash", name: "タスククラッシュ", category: "physical", type: "earth", power: 46, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  hornBreaker: { id: "hornBreaker", name: "ホーンブレイカー", category: "physical", type: "nature", power: 48, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] },
+  mapleAntler: { id: "mapleAntler", name: "メイプルアントラー", category: "physical", type: "fire", power: 44, patternId: "singleAttackReach", targetRule: "anyOtherSingle", targetMode: "single", beforeDamage: [], afterDamage: [] }
 };
