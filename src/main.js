@@ -4247,17 +4247,6 @@ import { resolveUnitOnEnterEffectsCore } from "./battle/onEnterEffectsCore.js";
     return wrap;
   };
 
-  const renderBackground = (state = gameState) => {
-    const layer = createEl("div", "battle-background-layer");
-    const gradient = "linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.2))";
-    const fallbackColor = "#1b2432";
-    const bgImage = createImage("backgrounds.battle");
-    const canDrawImage = !!(bgImage && bgImage.complete && bgImage.naturalWidth > 0 && bgImage.naturalHeight > 0);
-    layer.style.backgroundColor = fallbackColor;
-    layer.style.backgroundImage = canDrawImage ? `${gradient}, url('${bgImage.src}')` : gradient;
-    return layer;
-  };
-
   const clearTempArrays = () => { gameState.temp.renderCells.length = 0; };
 
   const getMoveCategoryIconPath = (category) => getAssetPath("icons", category);
@@ -4636,7 +4625,6 @@ import { resolveUnitOnEnterEffectsCore } from "./battle/onEnterEffectsCore.js";
   const renderBattlefield = () => {
     const board = createEl("section", "battlefield shared-content-width");
     applySharedContentRect(board, "battlefield");
-    board.appendChild(renderBackground(gameState));
     ensureSelectedEnemyTarget();
 
     board.append(
