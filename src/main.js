@@ -1,6 +1,6 @@
 import { MOVES } from "./data/moves.js";
 import { MONSTERS } from "./data/monsters.js";
-import { ABILITIES } from "./data/abilities.js";
+import { ABILITIES as TRAIT_LIBRARY } from "./data/abilities.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
 import { ASSETS, getAssetPath } from "./data/assets.js";
 import {
