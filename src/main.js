@@ -1,6 +1,6 @@
 import { MOVES } from "./data/moves.js";
 import { MONSTERS } from "./data/monsters.js";
-import { ABILITIES as TRAIT_LIBRARY } from "./data/abilities.js";
+import { ABILITIES } from "./data/abilities.js";
 import { TYPE_META, TYPE_ICON_GLYPHS, TYPE_FILTER_ORDER } from "./data/types.js";
 import { ASSETS, getAssetPath } from "./data/assets.js";
 import {
@@ -12,11 +12,7 @@ import {
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
-import {
-  applyTraitEffects as applyTraitEffectsCore,
-  resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore,
-  collectBattleStartTraitEvents
-} from "./battle/abilities.js";
+import * as BattleAbilities from "./battle/abilities.js";
 
 (() => {
   "use strict";
@@ -2185,7 +2181,7 @@ import {
     return weaknessTypes.includes(moveType);
   };
 
-  const applyTraitEffects = (eventType, context = {}) => applyTraitEffectsCore({
+  const applyTraitEffects = (eventType, context = {}) => BattleAbilities.applyTraitEffects({
     eventType,
     context,
     getSelectedTrait,
@@ -2361,7 +2357,7 @@ import {
 
   const removeExpired = (arr) => arr.filter((s) => s.duration > 0);
 
-  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => resolveUnitOnEnterEffectsCore({
+  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => BattleAbilities.resolveUnitOnEnterEffects({
     state,
     team,
     slot,
@@ -3600,7 +3596,7 @@ import {
   };
 
   const applyBattleStartTraitEffects = (state = gameState) => {
-    const events = collectBattleStartTraitEvents({
+    const events = BattleAbilities.collectBattleStartTraitEvents({
       state,
       TEAM,
       isAlive,

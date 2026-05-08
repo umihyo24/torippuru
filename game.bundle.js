@@ -2965,7 +2965,7 @@ const collectBattleStartTraitEvents = ({
     return weaknessTypes.includes(moveType);
   };
 
-  const applyTraitEffects = (eventType, context = {}) => applyTraitEffectsCore({
+  const applyTraitEffects = (eventType, context = {}) => BattleAbilities.applyTraitEffects({
     eventType,
     context,
     getSelectedTrait,
@@ -3141,7 +3141,7 @@ const collectBattleStartTraitEvents = ({
 
   const removeExpired = (arr) => arr.filter((s) => s.duration > 0);
 
-  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => resolveUnitOnEnterEffectsCore({
+  const resolveUnitOnEnterEffects = ({ state, team, slot, unit }) => BattleAbilities.resolveUnitOnEnterEffects({
     state,
     team,
     slot,
@@ -4380,7 +4380,7 @@ const collectBattleStartTraitEvents = ({
   };
 
   const applyBattleStartTraitEffects = (state = gameState) => {
-    const events = collectBattleStartTraitEvents({
+    const events = BattleAbilities.collectBattleStartTraitEvents({
       state,
       TEAM,
       isAlive,
