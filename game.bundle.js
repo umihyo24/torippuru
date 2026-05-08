@@ -3007,13 +3007,19 @@ function applyTraitEffectsCore(...args) {
       TRAIT_LIBRARY
     });
   };
+  const calculateDamage = (...args) => calcDamage(...args);
 
   validateUnitLibraryStats();
   if (typeof window !== "undefined") {
+    window.MONSTER_LIBRARY = MONSTERS;
+    window.MOVE_LIBRARY = MOVES;
+    window.ABILITIES = ABILITIES;
     window.TRAIT_LIBRARY = TRAIT_LIBRARY;
     window.abilities = abilities;
     window.traits = traits;
     window.applyTraitEffectsCore = applyTraitEffectsCore;
+    window.calcDamage = calcDamage;
+    window.calculateDamage = calculateDamage;
     window.BattleAbilities = {
       applyTraitEffects: applyTraitEffectsCore,
       resolveUnitOnEnterEffects: resolveUnitOnEnterEffectsCore,
