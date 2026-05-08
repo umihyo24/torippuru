@@ -280,7 +280,7 @@ body {
 .battle-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   align-items: stretch;
   justify-items: center;
 }
@@ -309,13 +309,6 @@ body {
   margin-block: 2px;
 }
 
-.enemy-sprite-row {
-  margin-bottom: 8px;
-}
-
-.ally-sprite-row {
-  margin-top: 8px;
-}
 
 .status-panel,
 .sprite-slot {
