@@ -498,6 +498,7 @@ body {
   place-items: center;
   padding: 2px;
   max-width: 270px;
+  overflow: hidden;
 }
 
 .enemy-sprite-row .sprite-slot {
