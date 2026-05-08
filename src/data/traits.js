@@ -10,5 +10,6 @@ export const TRAITS = {
   ino_ichiban: { key: "ino_ichiban", name: "いのいちばん", description: "1ターン目だけ先制しやすくなる", traitKey: "first_turn_priority" },
   innocence: { key: "innocence", name: "イノセンス", description: "能力低下を受けない", traitKey: "ignore_stat_down" },
   innovation: { key: "innovation", name: "イノベーション", description: "攻撃後に攻撃↑防御↓", traitKey: "atk_up_def_down" },
-  iron_fist: { key: "iron_fist", name: "アイアンフィスト", description: "パンチわざの威力が上がる。", traitKey: "none", triggerType: "passive" }
+  iron_fist: { key: "iron_fist", name: "アイアンフィスト", description: "パンチわざの威力が上がる。", traitKey: "none", triggerType: "passive" },
+  ironFist: { key: "ironFist", name: "アイアンフィスト", description: "パンチ系わざの威力が1.25倍になる。さらに命中時、対象を小さくノックバックさせる。", traitKey: "none", triggerType: "passive", modifiers: { punchMovePowerMultiplier: 1.25 }, onPunchHit: { knockback: { distance: 0.8, staggerFrames: 8 } } }
 };
