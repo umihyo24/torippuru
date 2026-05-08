@@ -12,7 +12,11 @@ import {
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
-import { applyTraitEffects as applyTraitEffectsCore, resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore } from "./battle/abilities.js";
+import {
+  applyTraitEffects as applyTraitEffectsCore,
+  resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore,
+  collectBattleStartTraitEvents
+} from "./battle/abilities.js";
 
 (() => {
   "use strict";
@@ -3607,18 +3611,12 @@ import { applyTraitEffects as applyTraitEffectsCore, resolveUnitOnEnterEffects a
   };
 
   const applyBattleStartTraitEffects = (state = gameState) => {
-    if (!state?.teams) return;
-    const events = [];
-    [TEAM.ALLY, TEAM.ENEMY].forEach((team) => {
-      const opponentTeam = team === TEAM.ALLY ? TEAM.ENEMY : TEAM.ALLY;
-      const active = Array.isArray(state.teams?.[team]?.active) ? state.teams[team].active : [];
-      active.forEach((unit, slot) => {
-        if (!unit || !isAlive(unit)) return;
-        const opponent = state?.teams?.[opponentTeam]?.active?.[slot] || null;
-        const traitResult = applyTraitEffects("onBattleStart", { source: unit, opponent, state, team, slot });
-        if (!traitResult.messages.length) return;
-        events.push({ sourceId: unit.uid, targetId: opponent?.uid || null, traitKind: getSelectedTrait(unit)?.key || null, messages: traitResult.messages });
-      });
+    const events = collectBattleStartTraitEvents({
+      state,
+      TEAM,
+      isAlive,
+      getSelectedTrait,
+      applyTraitEffects: ({ eventType, context }) => applyTraitEffects(eventType, context)
     });
     events.forEach((event) => {
       if (event.sourceId) {
