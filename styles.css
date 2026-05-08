@@ -301,12 +301,23 @@ body {
 
 .enemy-status-row,
 .ally-status-row {
-  margin-block: 1px;
+  margin-block: 2px;
+  align-items: start;
+}
+
+.enemy-sprite-row {
+  margin-top: 2px;
+  margin-bottom: 22px;
+}
+
+.ally-sprite-row {
+  margin-top: 22px;
+  margin-bottom: 2px;
 }
 
 .enemy-sprite-row,
 .ally-sprite-row {
-  margin-block: 2px;
+  align-items: center;
 }
 
 .status-panel,
@@ -436,14 +447,17 @@ body {
 .sprite-slot:hover { transform: translateY(-1px); }
 
 .status-panel {
+  position: relative;
   display: grid;
   grid-template-rows: auto auto;
-  gap: 3px;
-  min-height: 0;
+  gap: 1px;
+  min-height: 44px;
+  height: 44px;
+  max-height: 44px;
   align-content: start;
   max-width: 250px;
-  height: 52px;  
-  padding: 5px 7px 4px;
+  padding: 3px 8px;
+  overflow: hidden;
 }
 
 .status-top {
@@ -480,11 +494,13 @@ body {
 }
 
 .sprite-slot {
+  position: relative;
   min-height: 0;
   display: grid;
   place-items: center;
   padding: 2px;
   max-width: 270px;
+  overflow: hidden;
 }
 
 .enemy-sprite-row .sprite-slot {
