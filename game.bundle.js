@@ -798,6 +798,10 @@ const collectBattleStartTraitEvents = ({
 };
 
 // ---- src/main.js ----
+function applyTraitEffectsCore(...args) {
+  return applyTraitEffectsCoreImpl(...args);
+}
+
 (() => {
   "use strict";
 
