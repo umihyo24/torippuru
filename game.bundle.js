@@ -1014,6 +1014,8 @@ const collectBattleStartTraitEvents = ({
   };
 
   const TEAM = { ALLY: "ally", ENEMY: "enemy" };
+  const TRAIT_LIBRARY = ABILITIES;
+
   const DEBUG_FLAGS = {
     battleTargeting: true
   };
