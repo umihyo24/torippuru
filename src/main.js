@@ -12,7 +12,10 @@ import {
 } from "./data/hanafudaBosses.js";
 import { applyMoveEffect, applyTraitEffect, createAttackContext } from "./battle/battleEngine.js";
 import { calculateDamageCore } from "./battle/damage.js";
-import { applyTraitEffects as applyTraitEffectsCore, resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore, collectBattleStartTraitEvents } from "./battle/abilities.js";
+import { applyTraitEffects as applyTraitEffectsCoreImpl, resolveUnitOnEnterEffects as resolveUnitOnEnterEffectsCore, collectBattleStartTraitEvents } from "./battle/abilities.js";
+
+const applyTraitEffectsCore = (...args) => applyTraitEffectsCoreImpl(...args);
+
 
 (() => {
   "use strict";
