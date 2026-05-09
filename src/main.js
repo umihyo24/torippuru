@@ -1479,6 +1479,13 @@ import { resolveUnitOnEnterEffectsCore } from "./battle/onEnterEffectsCore.js";
       : null;
     if (!gameState.moves || typeof gameState.moves !== "object") gameState.moves = createDefaultMovesBuildState();
     if (!TYPE_FILTER_ORDER.includes(gameState.moves.activeTypeFilter)) gameState.moves.activeTypeFilter = "all";
+    const allMonsterIds = Object.keys(MONSTERS || {});
+    const available = Array.isArray(gameState.availableMonsters) ? gameState.availableMonsters : [];
+    const normalizedAvailable = available.filter((monsterId, index, src) => typeof monsterId === "string" && !!MONSTERS[monsterId] && src.indexOf(monsterId) === index);
+    allMonsterIds.forEach((monsterId) => {
+      if (!normalizedAvailable.includes(monsterId)) normalizedAvailable.push(monsterId);
+    });
+    gameState.availableMonsters = normalizedAvailable;
     const monsterIds = getMonsterLibraryIds(gameState);
     if (!MONSTERS[gameState.selectedMonsterId]) {
       gameState.selectedMonsterId = monsterIds.length ? monsterIds[0] : null;
